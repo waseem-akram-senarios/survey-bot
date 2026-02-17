@@ -1,0 +1,5 @@
+# Environment variables
+.env
+.env.*
+auth.env
+!.env.example
