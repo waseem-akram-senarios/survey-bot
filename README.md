@@ -1,4 +1,4 @@
-# SurveyBot - AI-Powered Survey Platform
+# SurvAI Platform - AI-Powered Survey System
 
 An AI-powered survey platform that conducts intelligent phone and web surveys using natural conversation. Built with a microservices architecture for scalability and independent deployability.
 
@@ -48,7 +48,7 @@ An AI-powered survey platform that conducts intelligent phone and web surveys us
 ```bash
 # 1. Clone
 git clone https://github.com/waseem-akram-senarios/surveybot.git
-cd surveybot/itcurves_deploy
+cd surveybot/survai-platform
 
 # 2. Configure
 cp .env.example .env
@@ -83,7 +83,7 @@ PHONE_NUMBER_ID=...
 MAILERSEND_API_KEY=mlsn...
 MAILERSEND_SENDER_EMAIL=noreply@yourdomain.com
 
-# Speech-to-text (fallback)
+# Speech-to-text (web voice survey)
 DEEPGRAM_API_TOKEN=...
 
 # Public URL for VAPI callbacks
@@ -94,7 +94,7 @@ PUBLIC_URL=https://your-public-url.com
 
 ```
 surveybot/
-├── itcurves_deploy/                    # Main deployment
+├── survai-platform/                    # Main platform code
 │   ├── docker-compose.microservices.yml
 │   ├── .env.example
 │   ├── gateway/                        # Nginx config
@@ -118,7 +118,6 @@ surveybot/
 │   ├── shared/                         # Shared models/utils
 │   ├── dashboard/                      # React admin app
 │   ├── recipient/                      # Next.js survey app
-│   ├── pg/                             # Legacy monolith (deprecated)
 │   ├── schema/                         # DB migration scripts
 │   └── migrations/                     # DB migrations
 ├── docs/                               # Documentation

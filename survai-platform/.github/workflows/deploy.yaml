@@ -22,7 +22,7 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd /home/ashahzad/itcurves_deploy &&
+            cd /home/ashahzad/survai-platform &&
             export DB_HOST='${{ secrets.DB_HOST }}' &&
             export DB_PORT='${{ secrets.DB_PORT }}' &&
             export DB_USER='${{ secrets.DB_USER }}' &&

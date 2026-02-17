@@ -22,14 +22,14 @@ chmod +x scripts/setup.sh
 
 2. **Configure Environment**
 ```bash
-cp itcurves_deploy/.env.example itcurves_deploy/.env
+cp survai-platform/.env.example survai-platform/.env
 # Edit .env with your API keys and configuration
 ```
 
 3. **Start Services**
 ```bash
-cd itcurves_deploy
-docker-compose up -d
+cd survai-platform
+docker compose -f docker-compose.microservices.yml up -d --build
 ```
 
 ### Environment Variables
@@ -75,11 +75,11 @@ BACKEND_URL=https://api.yourdomain.com
 pip install -r requirements.txt
 
 # Node.js (Dashboard)
-cd itcurves_deploy/dashboard
+cd survai-platform/dashboard
 npm install
 
 # Node.js (Recipient)
-cd itcurves_deploy/recipient
+cd survai-platform/recipient
 npm install
 ```
 
@@ -89,7 +89,7 @@ npm install
 docker-compose up -d pg redis
 
 # Start backend services
-cd itcurves_deploy/pg
+cd survai-platform/pg
 python app.py
 
 # Start microservices
@@ -359,9 +359,8 @@ aws s3 cp backup_$DATE.sql s3://your-backup-bucket/
 ```bash
 # Backup environment and configs
 tar -czf config_backup_$(date +%Y%m%d).tar.gz \
-  itcurves_deploy/.env \
-  itcurves_deploy/docker-compose.yml \
-  scripts/
+  survai-platform/.env \
+  survai-platform/docker-compose.microservices.yml
 ```
 
 ## 📞 Support
