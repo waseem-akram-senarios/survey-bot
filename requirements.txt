@@ -1,0 +1,21 @@
+# LiveKit Agents SDK
+livekit-agents==0.8.0
+
+# STT Provider
+livekit-plugins-deepgram
+
+# LLM Provider
+livekit-plugins-openai
+
+# TTS Provider
+livekit-plugins-elevenlabs
+
+# VAD (Voice Activity Detection)
+livekit-plugins-silero
+
+# Environment variables
+python-dotenv
+
+# Async support
+aiohttp
+

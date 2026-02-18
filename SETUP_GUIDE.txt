@@ -1,0 +1,137 @@
+╔══════════════════════════════════════════════════════════════════╗
+║          SURVEY BOT - QUICK SETUP GUIDE                         ║
+╚══════════════════════════════════════════════════════════════════╝
+
+📍 Project Location: /home/senarios/Documents/ai_dev/survey_bot
+
+═══════════════════════════════════════════════════════════════════
+STEP 1: Setup Environment
+═══════════════════════════════════════════════════════════════════
+
+1. Copy environment variables template:
+   $ cp .env.example .env
+
+2. Edit .env file and add your API keys:
+   $ nano .env
+   
+   Required:
+   - LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET
+   - DEEPGRAM_API_KEY
+   - OPENAI_API_KEY
+   - ELEVENLABS_API_KEY
+   - ELEVENLABS_VOICE_ID (default: cgSgspJ2msm6clMCkdW9)
+
+═══════════════════════════════════════════════════════════════════
+STEP 2: Install Dependencies
+═══════════════════════════════════════════════════════════════════
+
+1. Create virtual environment (if not already done):
+   $ python -m venv venv
+   $ source venv/bin/activate
+
+2. Install packages:
+   $ pip install -r requirements.txt
+
+═══════════════════════════════════════════════════════════════════
+STEP 3: Run the Agent
+═══════════════════════════════════════════════════════════════════
+
+$ python agent.py start
+
+Agent will run on PORT 8083 (configurable in agent.py)
+
+═══════════════════════════════════════════════════════════════════
+SURVEY FLOW
+═══════════════════════════════════════════════════════════════════
+
+1. GREETING & AVAILABILITY CHECK
+   Bot: "Hello! Thank you for riding with us earlier today. 
+         I'm calling to ask about your experience. This will 
+         only take about 2 minutes. Are you available to answer 
+         a few quick questions?"
+   
+   → If YES: Continue to Question 1
+   → If NO: End call politely
+
+2. QUESTION 1: Rating (1-5)
+   "On a scale of 1 to 5, where 1 is very poor and 5 is 
+    excellent, how would you rate your overall ride experience?"
+   
+   Stores: survey_responses["q1_rating"]
+
+3. QUESTION 2: Multiple Choice (A/B/C/D)
+   "What was the primary reason for choosing our service?"
+   A) Competitive pricing
+   B) Convenience and ease of booking
+   C) Driver ratings and reviews
+   D) Vehicle availability
+   
+   Stores: survey_responses["q2_mcq"]
+
+4. QUESTION 3: Open Flow (Branching)
+   "Would you recommend our service to friends or family?"
+   
+   If YES → "What did you like most about your experience?"
+   If NO  → "What could we improve to serve you better?"
+   
+   Stores: survey_responses["q3_recommend"]
+           survey_responses["q3_followup"]
+
+5. CONCLUSION
+   "Thank you so much for your valuable feedback! 
+    Your responses will help us improve our service."
+
+═══════════════════════════════════════════════════════════════════
+OUTPUT FILES
+═══════════════════════════════════════════════════════════════════
+
+📁 survey_responses/
+   - survey_20260217_143045_1234567890.json
+   - Contains all answers with question tags
+
+📁 survey_logs/
+   - survey_20260217_143045_1234567890_room-abc123.log
+   - Detailed call logs
+
+═══════════════════════════════════════════════════════════════════
+KEY FEATURES
+═══════════════════════════════════════════════════════════════════
+
+✅ LLM intelligently maps natural language to correct options
+   Example: "It was cheap" → Maps to option A (Pricing)
+
+✅ Handles variations:
+   "5", "five stars", "I'd give it a 4" → All valid
+
+✅ Branching logic for open-ended questions
+
+✅ Graceful handling of user declining survey
+
+✅ Auto-saves responses to JSON files
+
+═══════════════════════════════════════════════════════════════════
+CUSTOMIZATION
+═══════════════════════════════════════════════════════════════════
+
+To change questions, edit agent.py around line 150:
+- Modify survey_prompt variable
+- Add/remove questions
+- Change branching logic
+- Adjust LLM temperature (default: 0.7)
+
+To change port, edit agent.py around line 295:
+- Change port="8083" to your desired port
+
+═══════════════════════════════════════════════════════════════════
+TESTING
+═══════════════════════════════════════════════════════════════════
+
+1. Start agent: python agent.py start
+2. Connect via LiveKit room or SIP
+3. Conduct survey
+4. Check survey_responses/ for JSON output
+5. Check survey_logs/ for detailed logs
+
+═══════════════════════════════════════════════════════════════════
+For detailed documentation, see README.md
+═══════════════════════════════════════════════════════════════════
