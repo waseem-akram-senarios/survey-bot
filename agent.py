@@ -323,9 +323,10 @@ Current time: {datetime.now().strftime('%I:%M %p')}
         
         async def on_enter(self):
             """Called when agent enters - AI speaks first."""
-            # Greet the participant immediately
-            greeting = f"Hi, this is Jane with {ORGANIZATION_NAME}. Am I speaking to {rider_first_name}?"
-            await self.session.say(greeting, allow_interruptions=True)
+            # With Realtime Model, use generate_reply to initiate conversation
+            await self.session.generate_reply(
+                instructions=f"Immediately greet the participant with: 'Hi, this is Jane with {ORGANIZATION_NAME}. Am I speaking to {rider_first_name}?' Wait for their response."
+            )
         
         @function_tool()
         async def confirm_name_and_availability(
@@ -542,25 +543,13 @@ Current time: {datetime.now().strftime('%I:%M %p')}
     )
     
     # Create session with survey tools
+    # Use OpenAI Realtime Model (has built-in STT and TTS)
     session = AgentSession(
-        stt=deepgram.STT(model='nova-3'),
-        llm=openai.LLM(
-            model='gpt-4o-mini',
-            temperature=0.7,  # Slightly higher for natural conversation
+        llm=openai.realtime.RealtimeModel(
+            voice="ash",  # ash, ballad, coral, sage, verse
+            temperature=0.7,
         ),
-        tts=elevenlabs.TTS(
-            voice_id=os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9"),
-            model='eleven_flash_v2_5',
-        ),
-        # tts=openai.TTS(
-        #     model="gpt-4o-mini-tts",
-        #     voice="ash",
-        #     instructions="Speak in a friendly and conversational tone.",
-        # ),
-        vad=silero.VAD.load(),
-        preemptive_generation=True,
-        resume_false_interruption=True,
-        false_interruption_timeout=1.0,
+        vad=silero.VAD.load(),  # Still use VAD for turn detection
     )
     
     # Start the session with the agent
