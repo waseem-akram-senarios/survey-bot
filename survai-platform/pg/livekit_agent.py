@@ -327,15 +327,24 @@ async def _run_sandbox_mode(ctx: JobContext):
 
     agent = SandboxAgent(instructions=SANDBOX_PROMPT)
 
-    session = AgentSession(
-        llm=openai.realtime.RealtimeModel(
+    try:
+        logger.info("Creating RealtimeModel...")
+        model = openai.realtime.RealtimeModel(
             voice="ash",
             temperature=0.7,
-        ),
-        vad=silero.VAD.load(),
-    )
+        )
+        logger.info(f"RealtimeModel created: {model}")
 
-    await session.start(agent=agent, room=ctx.room)
+        session = AgentSession(
+            llm=model,
+            vad=silero.VAD.load(),
+        )
+        logger.info("AgentSession created, starting session...")
+
+        await session.start(agent=agent, room=ctx.room)
+        logger.info("AgentSession.start() returned successfully")
+    except Exception as e:
+        logger.error(f"Sandbox session error: {type(e).__name__}: {e}", exc_info=True)
 
 
 # ─── Entrypoint ──────────────────────────────────────────────────────────────
