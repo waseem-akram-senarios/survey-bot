@@ -30,8 +30,9 @@ from livekit.agents.voice import AgentSession, Agent
 from livekit.plugins import openai, silero
 
 load_dotenv(dotenv_path=".env.local")
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("livekit-survey-agent")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8081/pg")
 BRAIN_SERVICE_URL = os.getenv("BRAIN_SERVICE_URL", "http://brain-service:8016")
