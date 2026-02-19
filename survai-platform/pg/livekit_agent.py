@@ -311,11 +311,7 @@ def _build_tts():
             return elevenlabs.TTS(voice_id=voice_id, model="eleven_flash_v2_5")
         except ImportError:
             logger.warning("ElevenLabs plugin not installed, falling back to OpenAI TTS")
-    return openai.TTS(
-        model="gpt-4o-mini-tts",
-        voice="ash",
-        instructions="Speak in a friendly and conversational tone.",
-    )
+    return openai.TTS(model="tts-1", voice="nova")
 
 
 # ─── Sandbox demo mode ───────────────────────────────────────────────────────

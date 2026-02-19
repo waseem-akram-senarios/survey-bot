@@ -328,7 +328,7 @@ services:
       context: ./pg
     container_name: livekit-agent
     restart: unless-stopped
-    entrypoint: ["python", "livekit_agent.py", "dev"]
+    entrypoint: ["python", "livekit_agent.py", "start"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
