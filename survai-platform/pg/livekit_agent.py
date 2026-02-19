@@ -313,9 +313,14 @@ class SandboxAgent(Agent):
     """Simple agent for sandbox/browser demo."""
 
     async def on_enter(self):
-        await self.session.generate_reply(
-            instructions=f"Immediately greet the user: 'Hi there! I'm Cameron from {ORGANIZATION_NAME}. I'm a voice AI agent that conducts conversational surveys. Would you like to try a quick demo?'"
-        )
+        logger.info("SandboxAgent.on_enter() called!")
+        try:
+            await self.session.generate_reply(
+                instructions=f"Immediately greet the user: 'Hi there! I'm Cameron from {ORGANIZATION_NAME}. I'm a voice AI agent that conducts conversational surveys. Would you like to try a quick demo?'"
+            )
+            logger.info("SandboxAgent.on_enter() generate_reply completed")
+        except Exception as e:
+            logger.error(f"SandboxAgent.on_enter() error: {type(e).__name__}: {e}", exc_info=True)
 
 
 async def _run_sandbox_mode(ctx: JobContext):
@@ -340,6 +345,14 @@ async def _run_sandbox_mode(ctx: JobContext):
             vad=silero.VAD.load(),
         )
         logger.info("AgentSession created, starting session...")
+
+        @session.on("error")
+        def on_session_error(error):
+            logger.error(f"AgentSession error event: {error}")
+
+        @session.on("close")
+        def on_session_close():
+            logger.warning("AgentSession close event fired")
 
         await session.start(agent=agent, room=ctx.room)
         logger.info("AgentSession.start() returned successfully")
