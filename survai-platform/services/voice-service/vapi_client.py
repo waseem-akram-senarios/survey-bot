@@ -62,6 +62,8 @@ class VAPIClient:
             "customer": {"number": customer_phone},
         }
 
+        logger.info(f"VAPI Call Payload: {payload}")
+
         try:
             resp = requests.post(
                 f"{VAPI_BASE_URL}/call",
