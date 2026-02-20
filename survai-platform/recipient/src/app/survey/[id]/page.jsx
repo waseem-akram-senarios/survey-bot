@@ -25,6 +25,7 @@ export default function Survey() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [recipientName, setRecipientName] = useState("");
+  const [riderName, setRiderName] = useState("");
   const [surveyName, setSurveyName] = useState("");
   const [lang, setLang] = useState("en");
   const [visibleLines, setVisibleLines] = useState(0);
@@ -39,6 +40,7 @@ export default function Survey() {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const result = await response.json();
       setRecipientName(result.Recipient || "");
+      setRiderName(result.RiderName || "");
       setSurveyName(result.Name || "");
       if (result.Name) setLang(detectLanguage(result.Name));
     } catch (error) {
@@ -222,7 +224,7 @@ export default function Survey() {
                   lineHeight: 1.5,
                 }}
               >
-                {getLine(recipientName, lang)}
+                {getLine(riderName, lang)}
               </Typography>
             </Box>
           )

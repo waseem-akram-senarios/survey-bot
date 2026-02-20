@@ -124,7 +124,8 @@ def get_template_config(template_name: str) -> Dict[str, Any]:
         """SELECT name, status,
                   COALESCE(time_limit_minutes, 8) as time_limit_minutes,
                   COALESCE(restricted_topics, '{}') as restricted_topics,
-                  greeting_template, survey_type
+                  greeting_template, survey_type,
+                  COALESCE(ai_augmented, false) as ai_augmented
            FROM templates WHERE name = :name""",
         {"name": template_name},
     )
@@ -136,6 +137,7 @@ def get_template_config(template_name: str) -> Dict[str, Any]:
         "restricted_topics": [],
         "greeting_template": None,
         "survey_type": None,
+        "ai_augmented": False,
     }
 
 

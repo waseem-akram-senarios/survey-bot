@@ -101,11 +101,12 @@ async def get_survey_questions(survey_id: str) -> dict:
 async def get_survey_recipient(survey_id: str) -> dict:
     """Get recipient info for a survey."""
     rows = sql_execute(
-        "SELECT recipient, name, ride_id, tenant_id FROM surveys WHERE id = :survey_id",
+        "SELECT recipient, name, ride_id, tenant_id, rider_name FROM surveys WHERE id = :survey_id",
         {"survey_id": survey_id},
     )
     if not rows:
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
+    
     r = rows[0]
     return {
         "SurveyId": survey_id,
@@ -113,6 +114,7 @@ async def get_survey_recipient(survey_id: str) -> dict:
         "Name": r["name"],
         "RideID": r["ride_id"],
         "TenantID": r["tenant_id"],
+        "RiderName": r["rider_name"],
     }
 
 

@@ -81,6 +81,7 @@ def build_workflow_config(
     restricted_topics = config.get("restricted_topics") or []
     greeting_template = config.get("greeting_template")
     agent_name = config.get("agent_name", "Cameron")
+    ai_augmented = config.get("ai_augmented", False)
 
     restricted_block = ""
     if restricted_topics:
@@ -136,7 +137,7 @@ def build_workflow_config(
 
     nodes, edges = _create_nodes_and_edges(
         questions, survey_id, callback_url, language,
-        greeting_template, agent_name, voice_cfg, rider_context,
+        greeting_template, agent_name, voice_cfg, rider_context, ai_augmented,
     )
     workflow["nodes"] = nodes
     workflow["edges"] = edges
@@ -146,7 +147,7 @@ def build_workflow_config(
 def _create_nodes_and_edges(questions, survey_id, callback_url="",
                              language="en", greeting_template=None,
                              agent_name="Cameron", voice_cfg=None,
-                             rider_context=""):
+                             rider_context="", ai_augmented=False):
     nodes = []
     edges = []
 
@@ -167,7 +168,7 @@ def _create_nodes_and_edges(questions, survey_id, callback_url="",
 
     question_nodes = []
     for i, question in enumerate(questions):
-        node = _create_question_node(question, i, language, voice_cfg, rider_context)
+        node = _create_question_node(question, i, language, voice_cfg, rider_context, ai_augmented)
         nodes.append(node)
         question_nodes.append(node)
 
@@ -369,7 +370,7 @@ def _create_end_node(questions):
     }
 
 
-def _create_question_node(question, index, language="en", voice_cfg=None, rider_context=""):
+def _create_question_node(question, index, language="en", voice_cfg=None, rider_context="", ai_augmented=False):
     question_id = question["id"]
     sanitized_id = _sanitize_field_name(question_id)
     question_text = question["text"]
@@ -378,7 +379,7 @@ def _create_question_node(question, index, language="en", voice_cfg=None, rider_
     scales = question.get("scales")
 
     if criteria == "categorical":
-        prompt = _create_categorical_prompt(question_text, categories, language, rider_context)
+        prompt = _create_categorical_prompt(question_text, categories, language, rider_context, ai_augmented)
         variable_plan = {
             "output": [
                 {"type": "string", "title": sanitized_id, "description": "The id of the question"},
@@ -387,7 +388,7 @@ def _create_question_node(question, index, language="en", voice_cfg=None, rider_
             ]
         }
     elif criteria == "scale":
-        prompt = _create_rating_prompt(question_text, scales, language, rider_context)
+        prompt = _create_rating_prompt(question_text, scales, language, rider_context, ai_augmented)
         variable_plan = {
             "output": [
                 {"type": "string", "title": f"answer_{sanitized_id}",
@@ -395,7 +396,7 @@ def _create_question_node(question, index, language="en", voice_cfg=None, rider_
             ]
         }
     elif criteria == "open":
-        prompt = _create_open_prompt(question_text, language, rider_context)
+        prompt = _create_open_prompt(question_text, language, rider_context, ai_augmented)
         variable_plan = {
             "output": [
                 {"type": "string", "title": f"answer_{sanitized_id}",
@@ -434,76 +435,141 @@ def _create_question_node(question, index, language="en", voice_cfg=None, rider_
     return node
 
 
-def _create_categorical_prompt(question_text, categories, language="en", rider_context=""):
+def _create_categorical_prompt(question_text, categories, language="en", rider_context="", ai_augmented=False):
     categories_str = ", ".join(categories or [])
     context_hint = f"\nRider context: {rider_context}" if rider_context else ""
-
-    if language == "es":
+    
+    if ai_augmented:
+        if language == "es":
+            return (
+                f"Eres Cameron - una persona real teniendo una conversación genuina, NO una IA o bot de encuesta.\n\n"
+                f"Pregunta conversacionalmente: '{question_text}'\n"
+                f"Opciones: {categories_str}\n\n"
+                "COMPORTAMIENTO DE IA AUMENTADA:\n"
+                "- Si ya respondieron esto basado en respuestas anteriores, confirma en vez de re-preguntar\n"
+                "- Si su respuesta es ambigua, haz UNA pregunta de seguimiento\n"
+                "- Puedes omitir esta pregunta si ya tienes la información\n"
+                "- Mantén la conversación natural y personalizada\n"
+                "- Si quieren terminar, respeta eso inmediatamente\n"
+                f"{context_hint}"
+            )
         return (
-            f"Haz esta pregunta de forma conversacional: '{question_text}'\n"
-            "No menciones las opciones a menos que pregunten.\n"
-            f"Categorias: {categories_str}\n"
-            "INTELIGENCIA: Si ya respondieron esto en una respuesta anterior, confirma en vez de re-preguntar.\n"
-            "Si quieren terminar la llamada, no insistas."
+            f"You are Cameron - a real person having a genuine phone conversation, NOT an AI or survey bot.\n\n"
+            f"Ask conversationally: '{question_text}'\n"
+            f"Options: {categories_str}\n\n"
+            "AI AUGMENTED BEHAVIOR:\n"
+            "- If they already answered this based on previous responses, confirm rather than re-ask\n"
+            "- If their answer is ambiguous, ask ONE clarifying question\n"
+            "- You can skip this question if you already have the information\n"
+            "- Keep conversation natural and personalized\n"
+            "- If they want to end, respect that immediately\n"
             f"{context_hint}"
         )
-    return (
-        f"Ask this question conversationally: '{question_text}'\n"
-        f"Don't list options unless they ask. Listen and map to: {categories_str}\n"
-        "INTELLIGENCE:\n"
-        "- If they already answered this in a previous response, confirm rather than re-ask\n"
-        "- If their answer is ambiguous, ask ONE clarifying question\n"
-        "- If they want to end the call, respect that immediately\n"
-        "- If they ask what this is about: this survey improves products and services based on feedback"
-        f"{context_hint}"
-    )
+    else:
+        if language == "es":
+            return (
+                f"Haz esta pregunta de forma conversacional: '{question_text}'\n"
+                "No menciones las opciones a menos que pregunten.\n"
+                f"Categorias: {categories_str}\n"
+                "Si quieren terminar la llamada, no insistas."
+                f"{context_hint}"
+            )
+        return (
+            f"Ask this question conversationally: '{question_text}'\n"
+            f"Don't list options unless they ask. Listen and map to: {categories_str}\n"
+            "If they want to end the call, respect that immediately\n"
+            f"{context_hint}"
+        )
 
 
-def _create_rating_prompt(question_text, scales, language="en", rider_context=""):
+def _create_rating_prompt(question_text, scales, language="en", rider_context="", ai_augmented=False):
     context_hint = f"\nRider context: {rider_context}" if rider_context else ""
-
-    if language == "es":
+    
+    if ai_augmented:
+        if language == "es":
+            return (
+                f"Eres Cameron - una persona real teniendo una conversación genuina.\n\n"
+                f"Pregunta conversacionalmente: '{question_text}'\n"
+                f"Escala de 1 a {scales}. No pidas un numero directamente.\n\n"
+                "COMPORTAMIENTO DE IA AUMENTADA:\n"
+                "- Escucha palabras descriptivas y luego infiere la calificación\n"
+                "- Si ya expresaron satisfacción/insatisfacción, confirma en vez de preguntar\n"
+                "- Puedes omitir si el sentimiento ya está claro\n"
+                "- Mantén la conversación natural\n"
+                f"{context_hint}"
+            )
         return (
-            f"Pregunta conversacionalmente: '{question_text}'\n"
-            f"Escala de 1 a {scales}. No pidas un numero directamente.\n"
-            "Escucha palabras descriptivas y luego infiere la calificacion.\n"
-            "INTELIGENCIA: Si ya expresaron satisfaccion/insatisfaccion clara, confirma el numero.\n"
-            "Solo pide numero si no puedes determinar de su respuesta."
+            f"You are Cameron - a real person having a genuine phone conversation.\n\n"
+            f"Ask conversationally: '{question_text}'\n"
+            f"Scale of 1 to {scales}. Don't ask for a number directly.\n\n"
+            "AI AUGMENTED BEHAVIOR:\n"
+            "- Listen for descriptive words and infer the rating\n"
+            "- If they already expressed satisfaction/dissatisfaction, confirm rather than ask\n"
+            "- You can skip if sentiment is already clear\n"
+            "- Keep conversation natural\n"
             f"{context_hint}"
         )
-    return (
-        f"Ask conversationally: '{question_text}'\n"
-        f"Rating scale: 1-{scales}. Don't ask for a number upfront.\n"
-        "Listen for descriptive words (excellent, terrible, okay) and infer the rating.\n"
-        "INTELLIGENCE:\n"
-        "- If prior answers already suggest a rating for this topic, confirm: 'Sounds like maybe a [X]?'\n"
-        "- Only ask for a specific number if you can't infer from conversation\n"
-        "- Accept descriptive answers and map them: great=4-5, okay=3, bad=1-2"
-        f"{context_hint}"
-    )
+    else:
+        if language == "es":
+            return (
+                f"Pregunta conversacionalmente: '{question_text}'\n"
+                f"Escala de 1 a {scales}. No pidas un numero directamente.\n"
+                "Escucha palabras descriptivas y luego infiere la calificación.\n"
+                f"{context_hint}"
+            )
+        return (
+            f"Ask conversationally: '{question_text}'\n"
+            f"Scale of 1 to {scales}. Don't ask for a number directly.\n"
+            "Listen for descriptive words and infer the rating.\n"
+            f"{context_hint}"
+        )
 
 
-def _create_open_prompt(question_text, language="en", rider_context=""):
+def _create_open_prompt(question_text, language="en", rider_context="", ai_augmented=False):
     context_hint = f"\nRider context: {rider_context}" if rider_context else ""
-
-    if language == "es":
+    
+    if ai_augmented:
+        if language == "es":
+            return (
+                f"Eres Cameron - una persona real teniendo una conversación genuina.\n\n"
+                f"Pregunta: '{question_text}'\n"
+                "Pregunta abierta. Deja que respondan libremente.\n\n"
+                "COMPORTAMIENTO DE IA AUMENTADA:\n"
+                "- Si la respuesta es muy breve (<5 palabras), haz UNA pregunta de seguimiento\n"
+                "- Si ya cubrieron este tema anteriormente, reconócelo y pregunta qué hay de nuevo\n"
+                "- Máximo 1 seguimiento. Si no quieren elaborar, avanza\n"
+                "- Escucha emociones, incidentes específicos y sugerencias\n"
+                "- Puedes omitir si ya tienes suficiente información sobre este tema\n"
+                f"{context_hint}"
+            )
         return (
-            f"Pregunta: '{question_text}'\n"
-            "Pregunta abierta. Deja que respondan libremente.\n"
-            "Si la respuesta es muy breve (<5 palabras), haz UNA pregunta de seguimiento.\n"
-            "Maximo 1 seguimiento. Si no quieren elaborar, avanza."
+            f"You are Cameron - a real person having a genuine phone conversation.\n\n"
+            f"Ask: '{question_text}'\n"
+            "Open-ended question. Let them talk freely and capture everything.\n\n"
+            "AI AUGMENTED BEHAVIOR:\n"
+            "- If answer is vague (<5 words), ask ONE targeted follow-up\n"
+            "- If they already covered this topic earlier, acknowledge it and ask what's new\n"
+            "- Max 1 follow-up per question. If they don't want to elaborate, move on\n"
+            "- Listen for emotions, specific incidents, and suggestions -- that's the gold\n"
+            "- You can skip if you already have sufficient information on this topic\n"
             f"{context_hint}"
         )
-    return (
-        f"Ask: '{question_text}'\n"
-        "Open-ended question. Let them talk freely and capture everything.\n"
-        "INTELLIGENCE:\n"
-        "- If answer is vague (<5 words), ask ONE targeted follow-up\n"
-        "- If they already covered this topic earlier, acknowledge it and ask what's new\n"
-        "- Max 1 follow-up per question. If they don't want to elaborate, move on.\n"
-        "- Listen for emotions, specific incidents, and suggestions -- that's the gold"
-        f"{context_hint}"
-    )
+    else:
+        if language == "es":
+            return (
+                f"Pregunta: '{question_text}'\n"
+                "Pregunta abierta. Deja que respondan libremente.\n"
+                "Si la respuesta es muy breve (<5 palabras), haz UNA pregunta de seguimiento.\n"
+                "Maximo 1 seguimiento. Si no quieren elaborar, avanza."
+                f"{context_hint}"
+            )
+        return (
+            f"Ask: '{question_text}'\n"
+            "Open-ended question. Let them talk freely and capture everything.\n"
+            "If answer is vague (<5 words), ask ONE targeted follow-up\n"
+            "Max 1 follow-up per question. If they don't want to elaborate, move on."
+            f"{context_hint}"
+        )
 
 
 # ─── Edge Creation ────────────────────────────────────────────────────────────
