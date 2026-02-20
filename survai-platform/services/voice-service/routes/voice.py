@@ -182,6 +182,11 @@ async def make_call(
 
     # Make the call
     try:
+        # Ensure phone number is in E.164 format
+        if not phone.startswith('+'):
+            phone = '+' + phone
+        phone = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+        
         call_result = vapi.make_call(
             workflow_id=workflow_id,
             phone_number_id=phone_number_id,
