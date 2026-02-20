@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Background from '../../../../public/StartBackground.svg'
 import { detectLanguage, t } from '../../../lib/i18n';
+import { generatePersonalizedGreeting } from '../../../lib/aiService';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -29,6 +30,7 @@ export default function Survey() {
   const [surveyName, setSurveyName] = useState("");
   const [lang, setLang] = useState("en");
   const [visibleLines, setVisibleLines] = useState(0);
+  const [personalizedGreeting, setPersonalizedGreeting] = useState("");
 
   const fetchRecipientInfo = async () => {
     if (!id) return;
@@ -43,6 +45,15 @@ export default function Survey() {
       setRiderName(result.RiderName || "");
       setSurveyName(result.Name || "");
       if (result.Name) setLang(detectLanguage(result.Name));
+      
+      // Generate AI-powered personalized greeting
+      try {
+        const greeting = await generatePersonalizedGreeting(result.RiderName, result.Name, lang);
+        setPersonalizedGreeting(greeting);
+      } catch (error) {
+        console.error("Failed to generate AI greeting:", error);
+        // Fallback to default greeting
+      }
     } catch (error) {
       console.error("Error fetching recipient info:", error);
     }
@@ -224,7 +235,9 @@ export default function Survey() {
                   lineHeight: 1.5,
                 }}
               >
-                {getLine(riderName, lang)}
+                {i === 0 && personalizedGreeting ? personalizedGreeting.split('\n')[0] : getLine(riderName, lang)}
+                {i === 1 && personalizedGreeting ? personalizedGreeting.split('\n')[1] : getLine(riderName, lang)}
+                {i === 2 && personalizedGreeting ? personalizedGreeting.split('\n')[2] || getLine(riderName, lang) : getLine(riderName, lang)}
               </Typography>
             </Box>
           )

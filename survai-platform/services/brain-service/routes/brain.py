@@ -321,3 +321,93 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
     except Exception as e:
         logger.error(f"Build system prompt error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/enhance-question")
+async def enhance_question_endpoint(req: dict):
+    """Enhance a question with AI based on context and previous answers."""
+    try:
+        question = req.get("question", {})
+        context = req.get("context", {})
+        previous_answers = req.get("previousAnswers", [])
+        
+        # Check if the survey has AI augmentation enabled
+        template_name = context.get("template_name", "")
+        if template_name:
+            from db import sql_execute
+            template = sql_execute(
+                "SELECT ai_augmented FROM templates WHERE name = :name",
+                {"name": template_name}
+            )
+            ai_augmented = template[0]["ai_augmented"] if template else False
+        else:
+            ai_augmented = False
+        
+        if not ai_augmented:
+            return {"enhancedQuestion": question}
+        
+        # Simple enhancement logic - can be expanded
+        enhanced = {
+            **question,
+            "enhanced": True,
+            "personalized": bool(context.get("rider_name")),
+        }
+        
+        return {"enhancedQuestion": enhanced}
+    except Exception as e:
+        logger.error(f"Enhance question error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/should-skip")
+async def should_skip_endpoint(req: dict):
+    """Determine if a question should be skipped based on previous answers."""
+    try:
+        question_id = req.get("questionId", "")
+        previous_answers = req.get("previousAnswers", [])
+        
+        # Simple logic - skip if question is already answered
+        for answer in previous_answers:
+            if answer.get("questionId") == question_id and answer.get("answer"):
+                return {"shouldSkip": True}
+        
+        return {"shouldSkip": False}
+    except Exception as e:
+        logger.error(f"Should skip error: {e}")
+        return {"shouldSkip": False}
+
+
+@router.post("/generate-greeting")
+async def generate_greeting_endpoint(req: dict):
+    """Generate a personalized greeting."""
+    try:
+        rider_name = req.get("riderName", "")
+        survey_name = req.get("surveyName", "")
+        language = req.get("language", "en")
+        
+        if language == "es":
+            greeting = f"¡Hola{rider_name and f', {rider_name}' or ''}! 👋"
+            greeting += "\nSoy tu asistente de encuesta de IA. Estoy aquí para recopilar tus comentarios de forma rápida y sencilla."
+        else:
+            greeting = f"Hi{rider_name and f', {rider_name}' or ''}! 👋"
+            greeting += "\nI'm your AI survey assistant. I'm here to collect your feedback quickly and easily."
+        
+        return {"greeting": greeting}
+    except Exception as e:
+        logger.error(f"Generate greeting error: {e}")
+        # Fallback greeting
+        return {"greeting": f"Hi{req.get('riderName', '')}! 👋"}
+
+
+@router.post("/suggest-answer")
+async def suggest_answer_endpoint(req: dict):
+    """Get AI-powered answer suggestions for a question."""
+    try:
+        question = req.get("question", "")
+        partial_answer = req.get("partialAnswer", "")
+        
+        # For now, return empty suggestions - can be enhanced with actual AI logic
+        return {"suggestions": []}
+    except Exception as e:
+        logger.error(f"Suggest answer error: {e}")
+        return {"suggestions": []}

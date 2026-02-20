@@ -808,9 +808,17 @@ async def delete_survey(survey_id: str):
     rows = sql_execute("SELECT * FROM surveys WHERE id = :survey_id", {"survey_id": survey_id})
     if not rows:
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
-    if rows[0]["status"] == "Completed":
-        raise HTTPException(status_code=400, detail=f"Can't delete completed Survey {survey_id}")
-
+    
+    survey = rows[0]
+    
+    # Can't delete completed or in-progress surveys
+    if survey["status"] in ["Completed", "In-Progress"]:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Can't delete {survey['status'].lower()} Survey {survey_id}"
+        )
+    
+    # Allow deletion of Published surveys (not yet launched) and Draft surveys
     sql_execute("DELETE FROM survey_response_items WHERE survey_id = :survey_id", {"survey_id": survey_id})
     sql_execute("DELETE FROM surveys WHERE id = :survey_id", {"survey_id": survey_id})
     return {"message": f"Survey deleted with SurveyId {survey_id}"}
