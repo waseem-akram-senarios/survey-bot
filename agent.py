@@ -1,11 +1,12 @@
 """
 Survey Voice Bot - Main Entry Point
-Ride-sharing Customer Feedback Survey Agent
+Ride-sharing Customer Feedback Survey Agent (Outbound-Only)
 
 This is the main entry point for the survey bot.
 All logic is organized in separate modules for maintainability.
 """
 
+import json
 from datetime import datetime
 
 from livekit import api
@@ -21,6 +22,7 @@ from livekit.plugins import deepgram, openai, silero, elevenlabs
 # Local imports
 from config.settings import (
     ORGANIZATION_NAME,
+    SIP_OUTBOUND_TRUNK_ID,
     STT_MODEL,
     LLM_MODEL,
     LLM_TEMPERATURE,
@@ -48,61 +50,83 @@ logger = get_logger()
 
 async def entrypoint(ctx: JobContext):
     """
-    Main entry point for survey calls.
-    
-    This function is called when a new call/job is received.
-    It sets up the survey session and starts the agent.
+    Main entry point for outbound survey calls.
+
+    The phone number to dial is passed via job metadata as JSON:
+        {"phone_number": "+15555550123"}
+
+    Flow:
+        1. Parse phone number from job metadata.
+        2. Connect to the LiveKit room.
+        3. Place the outbound SIP call and wait for the rider to answer.
+        4. Run the survey session once the rider picks up.
     """
+    # Parse phone number from dispatch metadata
+    phone_number = json.loads(ctx.job.metadata or "{}").get("phone_number")
+    if not phone_number:
+        logger.error("No phone_number found in job metadata — aborting job.")
+        return
+
+    logger.info(f"Outbound call requested to {phone_number} in room {ctx.room.name}")
+
     # Connect to the room
-    logger.info(f"Connecting to room {ctx.room.name}")
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-    
-    # Wait for participant
+
+    # Place the outbound SIP call — blocks until the rider answers or the call fails
+    try:
+        await ctx.api.sip.create_sip_participant(
+            api.CreateSIPParticipantRequest(
+                room_name=ctx.room.name,
+                sip_trunk_id=SIP_OUTBOUND_TRUNK_ID,
+                sip_call_to=phone_number,
+                participant_identity=phone_number,
+                wait_until_answered=True,
+            )
+        )
+        logger.info(f"Rider answered: {phone_number}")
+    except Exception as e:
+        logger.error(f"Outbound call to {phone_number} failed: {e}")
+        return
+
+    # Wait for the SIP participant to appear in the room
     participant = await ctx.wait_for_participant()
     logger.info(f"Starting survey for participant {participant.identity}")
-    
-    # Extract caller number from SIP attributes
-    caller_number = participant.attributes.get('sip.phoneNumber', 'unknown')
-    
+
+    caller_number = phone_number
+
     # Set up per-call logging
     log_filename, log_handler = setup_survey_logging(ctx.room.name, caller_number)
-    
+
     # Track call start time for duration calculation
     call_start_time = datetime.now()
-    
+
     # Get rider information from data store
     rider_info = get_rider_info(caller_number)
     rider_first_name = rider_info["first_name"]
-    
-    logger.info(f"📋 Rider Info: {rider_first_name} - Phone: {caller_number}")
-    
+
+    logger.info(f"Rider Info: {rider_first_name} - Phone: {caller_number}")
+
     # Initialize survey responses dictionary
     survey_responses = create_empty_response_dict(rider_first_name, caller_number)
-    
+
     # Build the survey prompt with rider context
     survey_prompt = build_survey_prompt(
         organization_name=ORGANIZATION_NAME,
         rider_first_name=rider_first_name,
     )
-    
-    # Create hangup function for ending calls (deletes room for ALL participants)
+
+    # Hang up by deleting the room — ends the call for ALL participants
     async def hangup_call():
-        """
-        Hang up the call by deleting the room.
-        This ends the call for ALL participants (not just the agent).
-        Using room.disconnect() only disconnects the agent, leaving the user in silence.
-        """
-        logger.info("📞 Hanging up call - deleting room...")
+        logger.info("Hanging up call - deleting room...")
         try:
             await ctx.api.room.delete_room(
                 api.DeleteRoomRequest(room=ctx.room.name)
             )
-            logger.info("✅ Room deleted - call ended for all participants")
+            logger.info("Room deleted — call ended for all participants")
         except Exception as e:
-            logger.error(f"❌ Error deleting room: {e}")
-            # Fallback to disconnect if delete fails
+            logger.error(f"Error deleting room: {e}")
             await ctx.room.disconnect()
-    
+
     # Create survey tools with access to state
     survey_tools = create_survey_tools(
         survey_responses=survey_responses,
@@ -113,14 +137,14 @@ async def entrypoint(ctx: JobContext):
         cleanup_logging_fn=cleanup_survey_logging,
         disconnect_fn=hangup_call,
     )
-    
+
     # Create the survey agent instance
     survey_agent = SurveyAgent(
         instructions=survey_prompt,
         rider_first_name=rider_first_name,
         tools=survey_tools,
     )
-    
+
     # Create the agent session with optimized settings
     session = AgentSession(
         stt=deepgram.STT(
@@ -137,25 +161,23 @@ async def entrypoint(ctx: JobContext):
             apply_text_normalization="on",
         ),
         vad=silero.VAD.load(),
-        
+
         # Latency optimizations
         preemptive_generation=PREEMPTIVE_GENERATION,
         resume_false_interruption=RESUME_FALSE_INTERRUPTION,
         false_interruption_timeout=FALSE_INTERRUPTION_TIMEOUT,
         max_tool_steps=MAX_TOOL_STEPS,
     )
-    
+
     # Start the session with the agent
     await session.start(room=ctx.room, agent=survey_agent)
-    
-    # Connect to the room (binds the room after session startup)
-    await ctx.connect()
 
 
 if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
+            agent_name="survey-agent",  # Must match the agent_name used in make_call.py dispatch
             initialize_process_timeout=WORKER_INITIALIZE_TIMEOUT,
             job_memory_warn_mb=JOB_MEMORY_WARN_MB,
             job_memory_limit_mb=JOB_MEMORY_LIMIT_MB,

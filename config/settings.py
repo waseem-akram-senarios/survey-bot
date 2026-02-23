@@ -54,6 +54,11 @@ LOG_DIR = os.getenv("LOG_DIR", "survey_logs")
 RESPONSES_DIR = os.getenv("RESPONSES_DIR", "survey_responses")
 
 # ===========================================
+# TELEPHONY SETTINGS
+# ===========================================
+SIP_OUTBOUND_TRUNK_ID = os.getenv("SIP_OUTBOUND_TRUNK_ID", "")
+
+# ===========================================
 # WORKER SETTINGS
 # ===========================================
 WORKER_INITIALIZE_TIMEOUT = 120.0
