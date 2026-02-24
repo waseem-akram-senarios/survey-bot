@@ -75,6 +75,53 @@ def save_survey_responses(caller_number: str, responses: dict, call_duration: fl
     return filename
 
 
+def save_survey_with_logs(
+    caller_number: str, 
+    responses: dict, 
+    call_start_time: datetime,
+    call_duration: float,
+    transcript: str,
+    event_logs: str
+) -> str:
+    """
+    Save survey responses with full transcript and event logs.
+    Includes both the survey responses and the detailed call logs.
+    
+    Args:
+        caller_number: The caller's phone number
+        responses: Dictionary of survey responses
+        call_start_time: When the call started
+        call_duration: Duration of the call in seconds
+        transcript: Full conversation transcript (speech only)
+        event_logs: Complete event logs (all events)
+        
+    Returns:
+        str: Path to the saved file
+    """
+    os.makedirs(RESPONSES_DIR, exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    caller_clean = caller_number.replace("+", "").replace("-", "").replace(" ", "")
+    filename = f"{RESPONSES_DIR}/survey_{timestamp}_{caller_clean}.json"
+    
+    survey_data = {
+        "caller_number": caller_number,
+        "timestamp": datetime.now().isoformat(),
+        "call_start_time": call_start_time.isoformat(),
+        "call_duration_seconds": round(call_duration, 2),
+        "responses": responses,
+        "completed": responses.get("completed", False),
+        "call_transcript": transcript,
+        "event_logs": event_logs
+    }
+    
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(survey_data, f, indent=2, ensure_ascii=False)
+    
+    logger.info(f"✅ Survey responses with logs saved to: {filename}")
+    return filename
+
+
 def load_survey_response(filename: str) -> dict | None:
     """
     Load a survey response from a JSON file.

@@ -59,6 +59,11 @@ RESPONSES_DIR = os.getenv("RESPONSES_DIR", "survey_responses")
 SIP_OUTBOUND_TRUNK_ID = os.getenv("SIP_OUTBOUND_TRUNK_ID", "")
 
 # ===========================================
+# DEV / SANDBOX SETTINGS
+# ===========================================
+DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+
+# ===========================================
 # WORKER SETTINGS
 # ===========================================
 WORKER_INITIALIZE_TIMEOUT = 120.0

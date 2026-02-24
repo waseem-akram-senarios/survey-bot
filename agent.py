@@ -7,6 +7,7 @@ All logic is organized in separate modules for maintainability.
 """
 
 import json
+import asyncio
 from datetime import datetime
 
 from livekit import api
@@ -15,7 +16,12 @@ from livekit.agents import (
     WorkerOptions,
     cli,
     AutoSubscribe,
+    metrics,
+    MetricsCollectedEvent,
+    FunctionToolsExecutedEvent,
+    ConversationItemAddedEvent,
 )
+from livekit.agents.metrics import STTMetrics, LLMMetrics, TTSMetrics
 from livekit.agents.voice import AgentSession
 from livekit.plugins import deepgram, openai, silero, elevenlabs
 
@@ -23,6 +29,7 @@ from livekit.plugins import deepgram, openai, silero, elevenlabs
 from config.settings import (
     ORGANIZATION_NAME,
     SIP_OUTBOUND_TRUNK_ID,
+    DEV_MODE,
     STT_MODEL,
     LLM_MODEL,
     LLM_TEMPERATURE,
@@ -41,7 +48,7 @@ from data.riders import get_rider_info
 from prompts.survey_template import build_survey_prompt
 from tools.survey_tools import create_survey_tools
 from utils.logging import get_logger, setup_survey_logging, cleanup_survey_logging
-from utils.storage import create_empty_response_dict
+from utils.storage import create_empty_response_dict, save_survey_with_logs
 from survey_agent import SurveyAgent
 
 # Get logger
@@ -68,7 +75,7 @@ async def entrypoint(ctx: JobContext):
     # Connect to the room
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
-    if phone_number:
+    if phone_number and not DEV_MODE:
         # === OUTBOUND CALL MODE ===
         logger.info(f"Outbound call requested to {phone_number} in room {ctx.room.name}")
         try:
@@ -89,14 +96,17 @@ async def entrypoint(ctx: JobContext):
         logger.info(f"Starting survey for participant {participant.identity}")
         caller_number = phone_number
     else:
-        # === SANDBOX / BROWSER MODE ===
-        logger.info(f"Sandbox mode — waiting for browser participant in room {ctx.room.name}")
+        # === DEV MODE / SANDBOX ===
+        logger.info(f"DEV_MODE={DEV_MODE} — skipping SIP, waiting for browser participant in room {ctx.room.name}")
         participant = await ctx.wait_for_participant()
         logger.info(f"Sandbox participant joined: {participant.identity}")
         caller_number = participant.identity or "sandbox-user"
 
     # Set up per-call logging
-    log_filename, log_handler = setup_survey_logging(ctx.room.name, caller_number)
+    log_filename, log_handlers = setup_survey_logging(ctx.room.name, caller_number)
+
+    # Initialize event log queue for chronological event tracking
+    event_log_queue = asyncio.Queue()
 
     # Track call start time for duration calculation
     call_start_time = datetime.now()
@@ -106,6 +116,24 @@ async def entrypoint(ctx: JobContext):
     rider_first_name = rider_info["first_name"]
 
     logger.info(f"Rider Info: {rider_first_name} - Phone: {caller_number}")
+    
+    # Log call start event
+    event_log_queue.put_nowait(f"[{datetime.now()}] CALL_START: Survey call initiated to {caller_number} (Rider: {rider_first_name})\n\n")
+    
+    # Display all survey data in a clean format
+    print("\n" + "="*80)
+    print("SURVEY CALL DATA LOADED AT START")
+    print("="*80)
+    print(f"\n📋 RIDER INFORMATION:")
+    print(f"   Name: {rider_first_name}")
+    print(f"   Phone: {caller_number}")
+    print(f"   Organization: {ORGANIZATION_NAME}")
+    print(f"\n🎙️  AGENT CONFIGURATION:")
+    print(f"   STT Model: {STT_MODEL}")
+    print(f"   LLM Model: {LLM_MODEL}")
+    print(f"   TTS Model: {TTS_MODEL}")
+    print(f"   TTS Voice: {TTS_VOICE_ID}")
+    print("="*80 + "\n")
 
     # Initialize survey responses dictionary
     survey_responses = create_empty_response_dict(rider_first_name, caller_number)
@@ -134,9 +162,10 @@ async def entrypoint(ctx: JobContext):
         rider_first_name=rider_first_name,
         caller_number=caller_number,
         call_start_time=call_start_time,
-        log_handler=log_handler,
+        log_handlers=log_handlers,
         cleanup_logging_fn=cleanup_survey_logging,
         disconnect_fn=hangup_call,
+        event_log_queue=event_log_queue,
     )
 
     # Create the survey agent instance
@@ -169,9 +198,95 @@ async def entrypoint(ctx: JobContext):
         false_interruption_timeout=FALSE_INTERRUPTION_TIMEOUT,
         max_tool_steps=MAX_TOOL_STEPS,
     )
+    
+    # Background task to process event queue and save transcription
+    async def write_transcription(transcription: str, event_logs: str):
+        """Process event queue and save transcription when call ends."""
+        while True:
+            event = await event_log_queue.get()
+            
+            if event == "call_end":
+                logger.info("Saving survey data and transcription")
+                # Calculate call duration
+                call_duration = (datetime.now() - call_start_time).total_seconds()
+                # Save transcription with event logs
+                save_survey_with_logs(
+                    caller_number, survey_responses, 
+                    call_start_time, call_duration, transcription, event_logs
+                )
+                logger.info("Survey data saved successfully")
+                break
+            
+            elif "AGENT SPEECH:" in event or "CUSTOMER SPEECH:" in event:
+                transcription += event.replace("SPEECH", "")
+            else:
+                event_logs += event
+    
+    # Start transcription writing task
+    write_task = asyncio.create_task(write_transcription("", ""))
+
+    # Log session start event
+    event_log_queue.put_nowait(f"[{datetime.now()}] SESSION_START: Agent session starting...\n\n")
 
     # Start the session with the agent
     await session.start(room=ctx.room, agent=survey_agent)
+
+    # Accumulate usage across the whole call
+    usage_collector = metrics.UsageCollector()
+
+    @session.on("function_tools_executed")
+    def on_function_tools_executed(event: FunctionToolsExecutedEvent):
+        """Log all function tool executions."""
+        for call in event.function_calls:
+            event_log_queue.put_nowait(
+                f"[{datetime.now()}] FUNCTION CALL EXECUTED: "
+                f"Function {call.name} with parameters {call.arguments}\n\n"
+            )
+
+    @session.on("conversation_item_added")
+    def on_conversation_item_added(event: ConversationItemAddedEvent):
+        """Log agent and user speech."""
+        if event.item.text_content != '':
+            ts = datetime.now()
+            if event.item.role == 'assistant':
+                event_log_queue.put_nowait(
+                    f"[{ts}] AGENT SPEECH: {event.item.text_content}\n\n"
+                )
+            if event.item.role == 'user':
+                event_log_queue.put_nowait(
+                    f"[{ts}] CUSTOMER SPEECH: {event.item.text_content}\n\n"
+                )
+
+    @session.on("metrics_collected")
+    def _on_metrics_collected(ev: MetricsCollectedEvent):
+        metrics.log_metrics(ev.metrics)
+        usage_collector.collect(ev.metrics)
+        
+        # Enhanced metrics logging with emojis
+        if isinstance(ev.metrics, STTMetrics):
+            logger.info(f"STT audio_duration: {ev.metrics.audio_duration:.4f}s")
+        
+        if isinstance(ev.metrics, LLMMetrics):
+            logger.info(f"⏱️  LLM Time to First Token: {ev.metrics.ttft:.4f}s")
+        
+        if isinstance(ev.metrics, TTSMetrics):
+            logger.info(f"⏱️  TTS Time to First Byte: {ev.metrics.ttfb:.4f}s")
+
+    # Log the full usage summary when the call ends
+    async def _log_usage_summary():
+        summary = usage_collector.get_summary()
+        logger.info(f"Call usage summary: {summary}")
+
+    # Shutdown callback to ensure transcription task completes
+    async def finish_queue():
+        """Ensure transcription task completes before shutdown."""
+        event_log_queue.put_nowait("call_end")
+        await write_task
+        logger.info(f"📝 SURVEY LOG COMPLETED: {log_filename}")
+        cleanup_survey_logging(log_handlers)
+        await _log_usage_summary()
+
+    ctx.add_shutdown_callback(finish_queue)
 
 
 if __name__ == "__main__":

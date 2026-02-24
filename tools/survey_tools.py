@@ -5,11 +5,11 @@ These are the tools that the LLM can call during the survey conversation.
 
 from datetime import datetime
 from typing import Optional, Callable
+import asyncio
 
 from livekit.agents import function_tool, RunContext
 
 from utils.logging import get_logger
-from utils.storage import save_survey_responses
 
 logger = get_logger()
 
@@ -19,9 +19,10 @@ def create_survey_tools(
     rider_first_name: str,
     caller_number: str,
     call_start_time: datetime,
-    log_handler,
+    log_handlers: list,
     cleanup_logging_fn: Callable,
-    disconnect_fn: Callable = None
+    disconnect_fn: Callable = None,
+    event_log_queue: asyncio.Queue = None
 ):
     """
     Create survey tool functions with access to survey state.
@@ -34,11 +35,13 @@ def create_survey_tools(
         rider_first_name: The rider's first name
         caller_number: The caller's phone number
         call_start_time: When the call started
-        log_handler: The logging handler for this call
+        log_handlers: List of (logger, handler) tuples for this call
         cleanup_logging_fn: Function to cleanup logging
+        disconnect_fn: Function to disconnect the call
+        event_log_queue: Queue for logging events
         
     Returns:
-        dict: Dictionary of tool functions
+        list: List of tool functions
     """
     
     @function_tool()
@@ -213,16 +216,7 @@ def create_survey_tools(
         survey_responses["completed"] = True
         logger.info("✅ Survey completed successfully!")
         
-        # Calculate call duration
-        call_duration = (datetime.now() - call_start_time).total_seconds()
-        
-        # Save responses
-        save_survey_responses(caller_number, survey_responses, call_duration)
-        
-        # Cleanup logging
-        cleanup_logging_fn(log_handler)
-        
-        return """Survey completed and saved successfully! 
+        return """Survey completed! 
         
 IMPORTANT - NEXT STEPS:
 1. Say goodbye to the user: "Thanks again, have a great day!"
@@ -243,17 +237,7 @@ If user says ANYTHING like: bye, thanks, okay, sure, you too, take care, goodbye
         
         survey_responses["availability_status"] = reason
         
-        # Calculate call duration
-        call_duration = (datetime.now() - call_start_time).total_seconds()
-        
-        # Save responses if any were collected
-        if any(v is not None for k, v in survey_responses.items() if k not in ["completed", "rider_name", "rider_phone"]):
-            save_survey_responses(caller_number, survey_responses, call_duration)
-        
-        # Cleanup logging
-        cleanup_logging_fn(log_handler)
-        
-        # Disconnect the call
+        # Disconnect the call (saving will be handled by background task)
         if disconnect_fn:
             await disconnect_fn()
         

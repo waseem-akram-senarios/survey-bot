@@ -21,7 +21,7 @@ def get_logger() -> logging.Logger:
     return _logger
 
 
-def setup_survey_logging(room_name: str, caller_number: str) -> tuple[str, RotatingFileHandler]:
+def setup_survey_logging(room_name: str, caller_number: str) -> tuple[str, list]:
     """
     Set up a separate log file for this survey call.
     
@@ -30,7 +30,7 @@ def setup_survey_logging(room_name: str, caller_number: str) -> tuple[str, Rotat
         caller_number: The caller's phone number
         
     Returns:
-        tuple: (log_filename, file_handler)
+        tuple: (log_filename, handlers_list) where handlers_list contains (logger, handler) tuples
     """
     os.makedirs(LOG_DIR, exist_ok=True)
     
@@ -52,19 +52,30 @@ def setup_survey_logging(room_name: str, caller_number: str) -> tuple[str, Rotat
     )
     file_handler.setFormatter(formatter)
     
-    _logger.addHandler(file_handler)
+    # Add handler to all relevant loggers
+    loggers_to_track = [
+        "survey-agent",
+        "livekit",
+    ]
+    
+    handlers = []
+    for logger_name in loggers_to_track:
+        log = logging.getLogger(logger_name)
+        log.addHandler(file_handler)
+        handlers.append((log, file_handler))
     
     _logger.info(f"📝 SURVEY LOG FILE CREATED: {log_filename}")
-    return log_filename, file_handler
+    return log_filename, handlers
 
 
-def cleanup_survey_logging(handler: RotatingFileHandler) -> None:
+def cleanup_survey_logging(handlers: list) -> None:
     """
-    Remove the survey-specific handler after the call ends.
+    Remove the survey-specific handlers after the call ends.
     
     Args:
-        handler: The file handler to remove
+        handlers: List of (logger, handler) tuples to remove
     """
-    _logger.removeHandler(handler)
-    handler.close()
+    for log, handler in handlers:
+        log.removeHandler(handler)
+        handler.close()
 
