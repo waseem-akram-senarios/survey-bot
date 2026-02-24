@@ -235,9 +235,7 @@ export default function Survey() {
                   lineHeight: 1.5,
                 }}
               >
-                {i === 0 && personalizedGreeting ? personalizedGreeting.split('\n')[0] : getLine(riderName, lang)}
-                {i === 1 && personalizedGreeting ? personalizedGreeting.split('\n')[1] : getLine(riderName, lang)}
-                {i === 2 && personalizedGreeting ? personalizedGreeting.split('\n')[2] || getLine(riderName, lang) : getLine(riderName, lang)}
+                {personalizedGreeting ? (personalizedGreeting.split('\n')[i] || getLine(riderName, lang)) : getLine(riderName, lang)}
               </Typography>
             </Box>
           )

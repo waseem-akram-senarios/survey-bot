@@ -5,7 +5,11 @@ Survey routes for the Survey Service.
 import json
 import logging
 import os
+import smtplib
+import resend
 from concurrent.futures import ThreadPoolExecutor
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -715,42 +719,109 @@ async def makecall(request: MakeCallRequest):
         raise HTTPException(status_code=502, detail=f"Voice service unreachable: {str(e)}")
 
 
+
+
+def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str):
+    """Send email via SMTP fallback. Returns True on success, False if not configured."""
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASSWORD")
+    smtp_from = os.getenv("SMTP_FROM_EMAIL", smtp_user)
+    smtp_from_name = os.getenv("SMTP_FROM_NAME", "SurvAI")
+
+    if not all([smtp_host, smtp_user, smtp_pass]):
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"{smtp_from_name} <{smtp_from}>"
+    msg["To"] = to_email
+    msg.attach(MIMEText(text_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
+
+    use_ssl = smtp_port == 465
+    if use_ssl:
+        server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
+    else:
+        server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
+        server.starttls()
+    server.login(smtp_user, smtp_pass)
+    server.sendmail(smtp_from, [to_email], msg.as_string())
+    server.quit()
+    return True
+
+
+def _send_via_resend(to_email: str, subject: str, html_body: str):
+    """Send email via Resend. Returns True on success, False if not configured."""
+    api_key = os.getenv("RESEND_API_KEY")
+    if not api_key:
+        return False
+
+    resend.api_key = api_key
+    from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+
+    resend.Emails.send({
+        "from": from_email,
+        "to": to_email,
+        "subject": subject,
+        "html": html_body,
+    })
+    return True
+
+
 @router.post("/surveys/sendemail")
 async def sendemail(email: Email):
-    """Send email survey."""
-    api_key = os.getenv("MAILERSEND_API_KEY")
-    sender_email = os.getenv("MAILERSEND_SENDER_EMAIL", "noreply@example.com")
+    """Send email survey. Tries Resend first, then MailerSend, then SMTP."""
+    url = email.SurveyURL
+    html_body = build_html_email(url)
+    text_body = build_text_email(url)
+    subject = "Your Survey is Ready!"
+    errors = []
 
-    if not api_key:
-        raise HTTPException(
-            status_code=503,
-            detail="Email service not configured: MAILERSEND_API_KEY is missing. Contact your administrator.",
-        )
-
+    # 1. Try Resend (primary)
     try:
-        ms = MailerSendClient(api_key=api_key)
-        url = email.SurveyURL
-        html_body = build_html_email(url)
-        text_body = build_text_email(url)
-
-        msg = (
-            EmailBuilder()
-            .from_email(sender_email, "SurvAI")
-            .to_many([{"email": email.EmailTo, "name": "Recipient"}])
-            .subject("Your Survey is Ready!")
-            .html(html_body)
-            .text(text_body)
-            .build()
-        )
-        ms.emails.send(msg)
-        logger.info(f"Survey email sent to {email.EmailTo} (survey: {url})")
-        return {"message": "Email sent successfully"}
+        if _send_via_resend(email.EmailTo, subject, html_body):
+            logger.info(f"Survey email sent via Resend to {email.EmailTo}")
+            return {"message": "Email sent successfully"}
     except Exception as e:
-        logger.exception(f"Failed to send survey email to {email.EmailTo}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to send email: {str(e)}. Check that your MailerSend sender domain is verified.",
-        )
+        errors.append(f"Resend: {e}")
+        logger.warning(f"Resend failed for {email.EmailTo}: {e}")
+
+    # 2. Try MailerSend (fallback)
+    api_key = os.getenv("MAILERSEND_API_KEY")
+    if api_key:
+        try:
+            sender_email = os.getenv("MAILERSEND_SENDER_EMAIL", "noreply@example.com")
+            ms = MailerSendClient(api_key=api_key)
+            msg = (
+                EmailBuilder()
+                .from_email(sender_email, "SurvAI")
+                .to_many([{"email": email.EmailTo, "name": "Recipient"}])
+                .subject(subject)
+                .html(html_body)
+                .text(text_body)
+                .build()
+            )
+            ms.emails.send(msg)
+            logger.info(f"Survey email sent via MailerSend to {email.EmailTo}")
+            return {"message": "Email sent successfully"}
+        except Exception as e:
+            errors.append(f"MailerSend: {e}")
+            logger.warning(f"MailerSend failed for {email.EmailTo}: {e}")
+
+    # 3. Try SMTP (last resort)
+    try:
+        if _send_via_smtp(email.EmailTo, subject, html_body, text_body):
+            logger.info(f"Survey email sent via SMTP to {email.EmailTo}")
+            return {"message": "Email sent successfully"}
+    except Exception as e:
+        errors.append(f"SMTP: {e}")
+        logger.warning(f"SMTP failed for {email.EmailTo}: {e}")
+
+    if not errors:
+        raise HTTPException(status_code=503, detail="No email provider configured. Set RESEND_API_KEY, MAILERSEND_API_KEY, or SMTP credentials.")
+    raise HTTPException(status_code=500, detail=f"All email providers failed: {'; '.join(errors)}")
 
 
 @router.post("/surveys/callback")

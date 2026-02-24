@@ -62,7 +62,7 @@ const CreateTemplateForm = () => {
 
   // Extract props from location state
   const editMode = location.state?.editMode || false;
-  const viewMode = location.state?.viewMode || false;
+  const [viewMode, setViewMode] = useState(location.state?.viewMode || false);
   const templateData = location.state?.templateData || null;
 
   // Component state
@@ -507,6 +507,11 @@ const CreateTemplateForm = () => {
     }
   };
 
+  const handleEditQuestions = () => {
+    setViewMode(false);
+    showInfo("You can now edit the template questions.");
+  };
+
   const handleSaveDraft = async () => {
     if (viewMode) return;
     
@@ -728,8 +733,10 @@ const CreateTemplateForm = () => {
             isLoading={isLoading}
             isSaving={isSaving}
             templateData={templateData}
+            viewMode={viewMode}
             onBack={handleBack}
             onNext={handleNext}
+            onEditQuestions={handleEditQuestions}
           />
 
           {/* Question Modals */}

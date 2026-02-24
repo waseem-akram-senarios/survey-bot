@@ -1,15 +1,17 @@
 import { Box, Button } from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
 
 const TemplateFooter = ({
   currentStep,
   isLoading,
   isSaving,
   templateData,
+  viewMode,
   onBack,
   onNext,
+  onEditQuestions,
 }) => {
   const getNextButtonText = () => {
-    console.log("ree", templateData)
     if (isLoading) return "Processing...";
     if (currentStep === 1) return "Next";
     if (templateData?.status === "Published") return "Create Survey";
@@ -36,6 +38,27 @@ const TemplateFooter = ({
       >
         Back
       </Button>
+
+      {viewMode && templateData?.status === "Published" && onEditQuestions && (
+        <Button
+          variant="outlined"
+          onClick={onEditQuestions}
+          startIcon={<EditIcon />}
+          sx={{
+            textTransform: "none",
+            color: "#1958F7",
+            width: "170px",
+            height: "48px",
+            borderColor: "#1958F7",
+            borderRadius: "17px",
+            fontFamily: "Poppins, sans-serif",
+            fontWeight: 400,
+            fontSize: "14px",
+          }}
+        >
+          Edit Questions
+        </Button>
+      )}
 
       <Button
         variant="contained"
