@@ -22,17 +22,33 @@ def _get_livekit_api() -> api.LiveKitAPI:
     )
 
 
-async def dispatch_livekit_call(phone_number: str, survey_id: str) -> dict:
+async def dispatch_livekit_call(
+    phone_number: str,
+    survey_id: str,
+    survey_context: dict = None,
+) -> dict:
     """
     Dispatch the LiveKit survey-caller agent to make an outbound call.
+
+    Args:
+        phone_number: E.164 phone number to dial.
+        survey_id: Survey identifier.
+        survey_context: Optional enriched context from the platform
+            (system_prompt, questions, recipient_name, callback_url, etc.).
+            When provided, the agent uses real survey data instead of defaults.
 
     Returns dict with room_name (used as call identifier).
     """
     room_name = f"survey-{survey_id}-{uuid.uuid4().hex[:8]}"
-    metadata = json.dumps({
+
+    meta = {
         "phone_number": phone_number,
         "survey_id": survey_id,
-    })
+    }
+    if survey_context:
+        meta.update(survey_context)
+
+    metadata = json.dumps(meta)
 
     lk_api = _get_livekit_api()
     try:

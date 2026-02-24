@@ -146,7 +146,7 @@ async def entrypoint(ctx: JobContext):
     survey_id = metadata.get("survey_id")
 
     if phone_number and survey_id:
-        await _run_phone_call(ctx, phone_number, survey_id, participant)
+        await _run_phone_call(ctx, phone_number, survey_id, participant, metadata)
     else:
         await _run_sandbox(ctx, participant)
 
@@ -197,45 +197,66 @@ Current time: {datetime.now().strftime('%I:%M %p')}
 
 # ─── Phone call mode ─────────────────────────────────────────────────────────
 
-async def _run_phone_call(ctx: JobContext, phone_number: str, survey_id: str, participant):
-    """Handle real survey phone calls with brain-service integration."""
+async def _run_phone_call(ctx: JobContext, phone_number: str, survey_id: str, participant, metadata: dict = None):
+    """Handle real survey phone calls with brain-service integration.
+
+    If the dispatch metadata contains enriched context from voice-service
+    (system_prompt, questions, recipient_name), those are used directly —
+    no HTTP calls to the backend or brain-service needed.
+    """
+    metadata = metadata or {}
     logger.info(f"Phone call mode: survey={survey_id}, phone={phone_number}")
 
-    survey_data = fetch_survey_data(survey_id)
-    if not survey_data:
-        logger.error(f"Could not fetch survey data for {survey_id}")
-        return
+    # Check for enriched metadata (provided when dispatched from the dashboard)
+    platform_prompt = metadata.get("system_prompt")
+    platform_questions = metadata.get("questions")
+    platform_recipient = metadata.get("recipient_name")
+    org_name = metadata.get("organization_name") or ORGANIZATION_NAME
+    platform_template = metadata.get("template_name", "Survey")
 
-    questions = survey_data.get("Questions", [])
-    if not questions:
-        logger.error(f"No questions found for survey {survey_id}")
-        return
+    if platform_questions and platform_prompt:
+        logger.info("Using enriched metadata from voice-service (no backend calls needed)")
+        questions = platform_questions
+        recipient_name = platform_recipient or "Customer"
+        survey_name = platform_template
+        system_prompt = platform_prompt
+    else:
+        logger.info("No enriched metadata — fetching from backend and brain-service")
+        survey_data = fetch_survey_data(survey_id)
+        if not survey_data:
+            logger.error(f"Could not fetch survey data for {survey_id}")
+            return
 
-    recipient_info = fetch_survey_recipient(survey_id) or {}
-    recipient_name = recipient_info.get("Recipient", "Customer")
-    ride_id = recipient_info.get("RideID", "N/A")
-    survey_name = recipient_info.get("Name", "Survey")
-    rider_phone = recipient_info.get("Phone", phone_number)
+        questions = survey_data.get("Questions", [])
+        if not questions:
+            logger.error(f"No questions found for survey {survey_id}")
+            return
 
-    rider_data = {"name": recipient_name, "phone": rider_phone}
-    biodata = recipient_info.get("Biodata")
-    if biodata:
-        rider_data["biodata"] = biodata
+        recipient_info = fetch_survey_recipient(survey_id) or {}
+        recipient_name = recipient_info.get("Recipient", "Customer")
+        ride_id = recipient_info.get("RideID", "N/A")
+        survey_name = recipient_info.get("Name", "Survey")
+        rider_phone = recipient_info.get("Phone", phone_number)
 
-    system_prompt = fetch_system_prompt(
-        survey_name=survey_name,
-        questions=questions,
-        rider_data=rider_data,
-        company_name=ORGANIZATION_NAME,
-    )
-    if not system_prompt:
-        logger.warning("Brain-service unavailable, using fallback prompt")
-        system_prompt = (
-            f"You are Cameron, a friendly survey caller from {ORGANIZATION_NAME}. "
-            f"You're calling {recipient_name} about their experience with {survey_name}. "
-            "Be conversational and natural. Ask one question at a time. "
-            "Use record_answer to save answers, then submit_and_end when done."
+        rider_data = {"name": recipient_name, "phone": rider_phone}
+        biodata = recipient_info.get("Biodata")
+        if biodata:
+            rider_data["biodata"] = biodata
+
+        system_prompt = fetch_system_prompt(
+            survey_name=survey_name,
+            questions=questions,
+            rider_data=rider_data,
+            company_name=org_name,
         )
+        if not system_prompt:
+            logger.warning("Brain-service unavailable, using fallback prompt")
+            system_prompt = (
+                f"You are Cameron, a friendly survey caller from {org_name}. "
+                f"You're calling {recipient_name} about their experience with {survey_name}. "
+                "Be conversational and natural. Ask one question at a time. "
+                "Use record_answer to save answers, then submit_and_end when done."
+            )
 
     call_start_time = datetime.now()
     survey_responses: dict[str, str] = {}
@@ -388,6 +409,7 @@ if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
+            agent_name="survey-agent",
             initialize_process_timeout=120.0,
             job_memory_warn_mb=1000,
             job_memory_limit_mb=1500,

@@ -101,20 +101,34 @@ async def entrypoint(ctx: JobContext):
     # Track call start time for duration calculation
     call_start_time = datetime.now()
 
-    # Get rider information from data store
-    rider_info = get_rider_info(caller_number)
-    rider_first_name = rider_info["first_name"]
+    # Platform-enriched context (provided when dispatched from the dashboard)
+    platform_prompt = metadata.get("system_prompt")
+    platform_recipient = metadata.get("recipient_name")
+    platform_org = metadata.get("organization_name")
+
+    if platform_recipient:
+        rider_first_name = platform_recipient.split()[0]
+    else:
+        rider_info = get_rider_info(caller_number)
+        rider_first_name = rider_info["first_name"]
+
+    org_name = platform_org or ORGANIZATION_NAME
 
     logger.info(f"Rider Info: {rider_first_name} - Phone: {caller_number}")
+    if platform_prompt:
+        logger.info("Using brain-service prompt from platform metadata")
 
     # Initialize survey responses dictionary
     survey_responses = create_empty_response_dict(rider_first_name, caller_number)
 
-    # Build the survey prompt with rider context
-    survey_prompt = build_survey_prompt(
-        organization_name=ORGANIZATION_NAME,
-        rider_first_name=rider_first_name,
-    )
+    # Use brain-service prompt when available, otherwise fall back to hardcoded default
+    if platform_prompt:
+        survey_prompt = platform_prompt
+    else:
+        survey_prompt = build_survey_prompt(
+            organization_name=org_name,
+            rider_first_name=rider_first_name,
+        )
 
     # Hang up by deleting the room — ends the call for ALL participants
     async def hangup_call():
@@ -143,6 +157,7 @@ async def entrypoint(ctx: JobContext):
     survey_agent = SurveyAgent(
         instructions=survey_prompt,
         rider_first_name=rider_first_name,
+        organization_name=org_name,
         tools=survey_tools,
     )
 

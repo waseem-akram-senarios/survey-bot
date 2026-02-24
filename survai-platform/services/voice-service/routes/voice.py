@@ -90,9 +90,58 @@ async def make_call(
         if not livekit_url:
             raise HTTPException(status_code=500, detail="LIVEKIT_URL not configured")
 
+        # Build enriched context (same data VAPI gets, passed via metadata)
+        template_name = survey.get("template_name", "")
+        template_config = get_template_config(template_name) if template_name else {}
+        rider_name = survey.get("rider_name") or survey.get("recipient") or ""
+        rider_phone = survey.get("phone") or phone
+
+        language = "en"
+        if template_name:
+            tname_lower = template_name.lower()
+            if "spanish" in tname_lower or "_es" in tname_lower:
+                language = "es"
+
+        company_name = template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves")
+        callback_url = os.getenv("SURVEY_SUBMIT_URL", "http://survey-service:8020/api/answers/qna_phone")
+
+        # Ask brain-service to build the system prompt
+        survey_context = {
+            "recipient_name": rider_name or "Customer",
+            "template_name": template_name,
+            "organization_name": company_name,
+            "language": language,
+            "questions": questions,
+            "callback_url": callback_url,
+        }
+
+        try:
+            rider_data = get_rider_data(rider_name=rider_name, phone=rider_phone)
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    f"{BRAIN_SERVICE_URL}/api/brain/build-system-prompt",
+                    json={
+                        "survey_name": template_name or f"Survey {survey_id}",
+                        "questions": questions,
+                        "rider_data": rider_data,
+                        "company_name": company_name,
+                    },
+                )
+                if resp.status_code == 200:
+                    survey_context["system_prompt"] = resp.json().get("system_prompt", "")
+                    logger.info(f"Built brain-service prompt for LiveKit call ({len(survey_context['system_prompt'])} chars)")
+                else:
+                    logger.warning(f"Brain-service prompt failed ({resp.status_code}), agent will use defaults")
+        except Exception as e:
+            logger.warning(f"Brain-service unreachable for LiveKit prompt: {e}, agent will use defaults")
+
         try:
             from livekit_dispatcher import dispatch_livekit_call
-            result = await dispatch_livekit_call(phone_number=phone, survey_id=survey_id)
+            result = await dispatch_livekit_call(
+                phone_number=phone,
+                survey_id=survey_id,
+                survey_context=survey_context,
+            )
 
             call_id = result.get("call_id", "")
             if call_id:
