@@ -204,14 +204,14 @@ class SurveyFromTemplateP(BaseModel):
 class MakeCallRequest(BaseModel):
     survey_id: str
     phone: str
-    provider: Literal["vapi", "livekit"] = "vapi"
+    provider: Literal["livekit"] = "livekit"
 
 
 class CallbackRequest(BaseModel):
     survey_id: str
     phone: str
     delay_minutes: int = 30
-    provider: Literal["vapi", "livekit"] = "vapi"
+    provider: Literal["livekit"] = "livekit"
 
 
 class EmailFallbackRequest(BaseModel):

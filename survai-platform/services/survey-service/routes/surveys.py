@@ -40,7 +40,6 @@ from db import (
     build_html_email,
     build_text_email,
     get_current_time,
-    make_call_task,
     process_question_sync,
     process_survey_question,
     sql_execute,
@@ -124,7 +123,7 @@ async def get_survey_recipient(survey_id: str) -> dict:
 
 
 def transform_qna(qna_data: dict) -> List[dict]:
-    """Transform VAPI-style qna payload to question list."""
+    """Transform qna payload to question list."""
     result = []
     for key, value in qna_data.items():
         if key == "SurveyId" or not isinstance(value, str):
@@ -402,7 +401,7 @@ async def get_survey_questions_only(survey_id: str):
 
 @router.get("/surveys/{survey_id}/transcript")
 async def get_transcript(survey_id: str):
-    """Get VAPI call transcript."""
+    """Get call transcript."""
     rows = sql_execute("SELECT call_id FROM surveys WHERE id = :survey_id", {"survey_id": survey_id})
     if not rows:
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
@@ -410,26 +409,12 @@ async def get_transcript(survey_id: str):
     if not call_id:
         raise HTTPException(status_code=404, detail=f"No call for Survey {survey_id}")
 
-    if call_id.startswith("survey-"):
-        try:
-            from livekit_caller import get_livekit_transcript
-            transcript = await get_livekit_transcript(call_id)
-            return {"transcript": transcript, "provider": "livekit"}
-        except ImportError:
-            raise HTTPException(status_code=500, detail="LiveKit not available")
-
-    import requests as req
-    resp = req.get(
-        f"https://api.vapi.ai/call/{call_id}",
-        headers={
-            "Authorization": f"Bearer {os.getenv('VAPI_API_KEY')}",
-            "Content-Type": "application/json",
-        },
-    )
-    if resp.status_code != 200:
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    transcript = resp.json().get("transcript", [])
-    return {"transcript": transcript, "provider": "vapi"}
+    try:
+        from livekit_caller import get_livekit_transcript
+        transcript = await get_livekit_transcript(call_id)
+        return {"transcript": transcript, "provider": "livekit"}
+    except ImportError:
+        raise HTTPException(status_code=500, detail="LiveKit transcript module not available")
 
 
 # ─── POST/PATCH/DELETE routes ────────────────────────────────────────────────
@@ -701,7 +686,7 @@ async def submit_phone_answers(qna_data: SurveyQnAPhone, background_tasks: Backg
 
 @router.post("/surveys/makecall")
 async def makecall(request: MakeCallRequest):
-    """Make VAPI call via voice-service /api/voice/make-call."""
+    """Make call via voice-service /api/voice/make-call."""
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
@@ -773,27 +758,18 @@ def _send_via_resend(to_email: str, subject: str, html_body: str):
 
 @router.post("/surveys/sendemail")
 async def sendemail(email: Email):
-    """Send email survey. Tries Resend first, then MailerSend, then SMTP."""
+    """Send email survey. Tries MailerSend (verified domain) first, then Resend, then SMTP."""
     url = email.SurveyURL
     html_body = build_html_email(url)
     text_body = build_text_email(url)
     subject = "Your Survey is Ready!"
     errors = []
 
-    # 1. Try Resend (primary)
-    try:
-        if _send_via_resend(email.EmailTo, subject, html_body):
-            logger.info(f"Survey email sent via Resend to {email.EmailTo}")
-            return {"message": "Email sent successfully"}
-    except Exception as e:
-        errors.append(f"Resend: {e}")
-        logger.warning(f"Resend failed for {email.EmailTo}: {e}")
-
-    # 2. Try MailerSend (fallback)
+    # 1. Try MailerSend with verified domain first (best deliverability)
     api_key = os.getenv("MAILERSEND_API_KEY")
     if api_key:
         try:
-            sender_email = os.getenv("MAILERSEND_SENDER_EMAIL", "noreply@example.com")
+            sender_email = os.getenv("MAILERSEND_SENDER_EMAIL", "noreply@aidevlab.com")
             ms = MailerSendClient(api_key=api_key)
             msg = (
                 EmailBuilder()
@@ -811,6 +787,15 @@ async def sendemail(email: Email):
             errors.append(f"MailerSend: {e}")
             logger.warning(f"MailerSend failed for {email.EmailTo}: {e}")
 
+    # 2. Try Resend
+    try:
+        if _send_via_resend(email.EmailTo, subject, html_body):
+            logger.info(f"Survey email sent via Resend to {email.EmailTo}")
+            return {"message": "Email sent successfully"}
+    except Exception as e:
+        errors.append(f"Resend: {e}")
+        logger.warning(f"Resend failed for {email.EmailTo}: {e}")
+
     # 3. Try SMTP (last resort)
     try:
         if _send_via_smtp(email.EmailTo, subject, html_body, text_body):
@@ -821,7 +806,7 @@ async def sendemail(email: Email):
         logger.warning(f"SMTP failed for {email.EmailTo}: {e}")
 
     if not errors:
-        raise HTTPException(status_code=503, detail="No email provider configured. Set RESEND_API_KEY, MAILERSEND_API_KEY, or SMTP credentials.")
+        raise HTTPException(status_code=503, detail="No email provider configured. Set MAILERSEND_API_KEY, RESEND_API_KEY, or SMTP credentials.")
     raise HTTPException(status_code=500, detail=f"All email providers failed: {'; '.join(errors)}")
 
 
@@ -939,7 +924,7 @@ async def send_sms_alias(request: SMSRequest):
 
 
 @router.post("/surveys/make-call")
-async def make_call_alias(to: str, survey_id: str, run_at: Optional[str] = None, provider: str = "vapi"):
+async def make_call_alias(to: str, survey_id: str, run_at: Optional[str] = None, provider: str = "livekit"):
     """Alias: /surveys/make-call (dashboard expects hyphenated version)."""
     return await makecall(MakeCallRequest(survey_id=survey_id, phone=to, provider=provider))
 
@@ -952,7 +937,7 @@ async def update_survey_qna(qna_data: SurveyQnAP):
 
 @router.post("/answers/qna_phone")
 async def update_survey_qna_phone(qna_data: SurveyQnAPhone, background_tasks: BackgroundTasks):
-    """Submit phone answers (VAPI callback uses this path)."""
+    """Submit phone answers (voice agent callback path)."""
     return await submit_phone_answers(qna_data, background_tasks)
 
 

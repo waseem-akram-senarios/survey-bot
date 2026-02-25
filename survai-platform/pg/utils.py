@@ -419,35 +419,3 @@ def send_email(to, subject, body):
     return response.json()
 
 
-def make_call_task(headers, payload, survey_id):
-    try:
-        # API endpoint
-        url = "https://api.vapi.ai/call"
-        response = requests.post(url, headers=headers, json=payload)
-
-        if response.status_code == 201:
-            call_id = response.json().get("id")
-            # insert workflow id into surveys db
-            try:
-                sql_query = (
-                    """UPDATE surveys SET call_id = :call_id WHERE id = :survey_id"""
-                )
-                sql_dict = {"survey_id": survey_id, "call_id": call_id}
-                rows = sql_execute(sql_query, sql_dict)
-                logger.info(f"✅ Call ID updated successfully: {call_id}")
-            except Exception as e:
-                logger.warning(f"❌ Error updating surveys: {e}")
-
-            return {"CallId": call_id}
-        else:
-            logger.error(f"❌ Failed to create outbound call: {response.text}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to create outbound call: {response.text}",
-            )
-
-    except Exception as e:
-        logger.error(f"❌ Failed to create outbound call: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create outbound call: {e}"
-        )

@@ -206,39 +206,3 @@ def build_text_email(url: str) -> str:
     )
 
 
-def make_call_task(headers: dict, payload: dict, survey_id: str) -> dict:
-    """Make VAPI call and update survey with call_id."""
-    try:
-        url = "https://api.vapi.ai/call"
-        response = requests.post(url, headers=headers, json=payload)
-
-        if response.status_code == 201:
-            call_id = response.json().get("id")
-            try:
-                sql_execute(
-                    """UPDATE surveys SET call_id = :call_id, call_time = NOW() AT TIME ZONE 'UTC', call_number = :call_number WHERE id = :survey_id""",
-                    {
-                        "survey_id": survey_id,
-                        "call_id": call_id,
-                        "call_number": payload.get("customer", {}).get("number", ""),
-                    },
-                )
-                logger.info(f"Call ID updated successfully: {call_id}")
-            except Exception as e:
-                logger.warning(f"Error updating surveys: {e}")
-
-            return {"CallId": call_id}
-        else:
-            logger.error(f"Failed to create outbound call: {response.text}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to create outbound call: {response.text}",
-            )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create outbound call: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create outbound call: {str(e)}"
-        )

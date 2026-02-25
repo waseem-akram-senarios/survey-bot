@@ -79,7 +79,7 @@ export const useSurvey = () => {
     }
   };
 
-  const sendSurveyBySMS = async (surveyId, phone, provider = "vapi") => {
+  const sendSurveyBySMS = async (surveyId, phone, provider = "livekit") => {
     setIsSendingSMS(true);
     try {
       const result = await SurveyService.sendSurveyBySMS(surveyId, phone, provider);

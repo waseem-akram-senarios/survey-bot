@@ -30,12 +30,10 @@ from utils import (
     build_html_email,
     build_text_email,
     get_current_time,
-    make_call_task,
     process_question_sync,
     process_survey_question,
     sql_execute,
 )
-from workflow import create_workflow_only
 
 from .template_questions import get_template_questions
 
@@ -1281,7 +1279,7 @@ async def send_survey_email(email: Email):
         to (str): The phone number to call in E.164 format (e.g., "+1234567890")
         survey_id (str): The ID of the survey to conduct during the call
         run_at (str): The time to run the job in the format YYYY-MM-DD HH:MM
-        provider (str): Voice provider to use - "vapi" (default) or "livekit"
+        provider (str): Voice provider to use - "livekit"
         
     Returns:
         dict: Response from the call service with call status
@@ -1291,112 +1289,49 @@ async def make_call(
     to: str,
     survey_id: str,
     run_at: Optional[str] = None,
-    provider: str = "vapi",
+    provider: str = "livekit",
 ):
     """
     Initiate a call to the specified phone number with the given survey.
 
-    Supports two voice providers:
-    - vapi (default): Uses VAPI.ai workflow-based calling
-    - livekit: Uses LiveKit Agents Framework with SIP outbound calling
+    Uses LiveKit Agents Framework with SIP outbound calling.
 
     The phone number should be in E.164 format (e.g., "+1234567890").
     The run_at should be in the format YYYY-MM-DD HH:MM.
     """
 
-    # ─── LiveKit provider ───
-    if provider == "livekit":
-        if not LIVEKIT_AVAILABLE:
-            raise HTTPException(
-                status_code=500,
-                detail="LiveKit is not available. Install livekit-agents and configure LIVEKIT_URL/KEY/SECRET.",
-            )
-
-        if run_at:
-            # Schedule for later
-            job_id = f"survey_job_lk_{survey_id}"
-            run_at_dt = datetime.strptime(run_at, "%Y-%m-%d %H:%M")
-            try:
-                job = scheduler.add_job(
-                    _livekit_call_sync,
-                    "date",
-                    run_date=run_at_dt,
-                    args=[to, survey_id],
-                    id=job_id,
-                )
-                logger.info(f"LiveKit job scheduled: {job.id} for {run_at_dt}")
-                return {"job_id": job.id, "run_date": str(run_at_dt), "provider": "livekit"}
-            except Exception as e:
-                logger.error(f"Failed to schedule LiveKit job: {e}")
-                raise
-        else:
-            try:
-                result = await dispatch_livekit_call(to, survey_id)
-                # Store the room name as call_id
-                sql_query = """UPDATE surveys SET call_id = :call_id WHERE id = :survey_id"""
-                sql_dict = {"survey_id": survey_id, "call_id": result["CallId"]}
-                sql_execute(sql_query, sql_dict)
-                return result
-            except Exception as e:
-                logger.error(f"LiveKit call failed: {e}")
-                raise HTTPException(status_code=500, detail=f"LiveKit call failed: {e}")
-
-    # ─── VAPI provider (default) ───
-    recipient_info = await get_survey_recipient(survey_id)
-
-    variable_overrides = {
-        "SurveyId": survey_id,
-        "Recipient": recipient_info["Recipient"],
-        "Name": recipient_info["Name"],
-        "RideID": recipient_info["RideID"],
-    }
-
-    # Headers
-    headers = {
-        "Authorization": f"Bearer {os.getenv('VAPI_API_KEY')}",
-        "Content-Type": "application/json",
-    }
-
-    workflow_id = await create_workflow_only(survey_id)
-
-    if not workflow_id:
-        raise HTTPException(status_code=500, detail="Failed to create workflow")
-
-    sql_query = (
-        """UPDATE surveys SET workflow_id = :workflow_id WHERE id = :survey_id"""
-    )
-    sql_dict = {"survey_id": survey_id, "workflow_id": workflow_id}
-    rows = sql_execute(sql_query, sql_dict)
-    logger.info(f"✅ Workflow ID updated successfully: {workflow_id}")
-
-    # Request payload
-    payload = {
-        "workflowId": workflow_id,
-        "phoneNumberId": os.getenv("PHONE_NUMBER_ID"),
-        "workflowOverrides": {"variableValues": variable_overrides},
-        "customer": {"number": to},
-    }
+    if not LIVEKIT_AVAILABLE:
+        raise HTTPException(
+            status_code=500,
+            detail="LiveKit is not available. Install livekit-agents and configure LIVEKIT_URL/KEY/SECRET.",
+        )
 
     if run_at:
-        job_id = f"survey_job_{survey_id}"
-        run_at = datetime.strptime(run_at, "%Y-%m-%d %H:%M")
-
+        job_id = f"survey_job_lk_{survey_id}"
+        run_at_dt = datetime.strptime(run_at, "%Y-%m-%d %H:%M")
         try:
             job = scheduler.add_job(
-                make_call_task,
-                "date",  # one-time job
-                run_date=run_at,
-                args=[headers, payload, survey_id],  # positional args
+                _livekit_call_sync,
+                "date",
+                run_date=run_at_dt,
+                args=[to, survey_id],
                 id=job_id,
             )
-            logger.info(f"Job scheduled: {job.id} for {run_at}")
-            return {"job_id": job.id, "run_date": str(run_at)}
+            logger.info(f"LiveKit job scheduled: {job.id} for {run_at_dt}")
+            return {"job_id": job.id, "run_date": str(run_at_dt), "provider": "livekit"}
         except Exception as e:
-            logger.error(f"Failed to schedule job: {e}")
+            logger.error(f"Failed to schedule LiveKit job: {e}")
             raise
     else:
-        resp = make_call_task(headers, payload, survey_id)
-        return resp
+        try:
+            result = await dispatch_livekit_call(to, survey_id)
+            sql_query = """UPDATE surveys SET call_id = :call_id WHERE id = :survey_id"""
+            sql_dict = {"survey_id": survey_id, "call_id": result["CallId"]}
+            sql_execute(sql_query, sql_dict)
+            return result
+        except Exception as e:
+            logger.error(f"LiveKit call failed: {e}")
+            raise HTTPException(status_code=500, detail=f"LiveKit call failed: {e}")
 
 
 def _livekit_call_sync(phone_number: str, survey_id: str):
@@ -1412,39 +1347,6 @@ def _livekit_call_sync(phone_number: str, survey_id: str):
         return result
     finally:
         loop.close()
-
-
-@router.post(
-    "/surveys/make-workflow",
-    response_model=dict,
-    description="""
-    Creates a workflow for the given survey.
-    
-    Args:
-        survey_id (str): The ID of the survey to conduct during the call
-        
-    Returns:
-        dict: Response from the call service with call status
-    """,
-)
-async def make_workflow(survey_id: str):
-    """
-    Creates a workflow for the given survey.
-    """
-
-    workflow_id = await create_workflow_only(survey_id)
-
-    if not workflow_id:
-        raise HTTPException(status_code=500, detail="Failed to create workflow")
-
-    sql_query = (
-        """UPDATE surveys SET workflow_id = :workflow_id WHERE id = :survey_id"""
-    )
-    sql_dict = {"survey_id": survey_id, "workflow_id": workflow_id}
-    rows = sql_execute(sql_query, sql_dict)
-    logger.info(f"✅ Workflow ID updated successfully: {workflow_id}")
-
-    return {"workflow_id": workflow_id}
 
 
 @router.get("/surveys/make-call")
@@ -1484,24 +1386,11 @@ async def get_transcript(survey_id: str):
                 status_code=404, detail=f"No call made for Survey with ID {survey_id}"
             )
 
-        # Check if this is a LiveKit call (room names start with "survey-")
-        if call_id.startswith("survey-") and LIVEKIT_AVAILABLE:
+        if LIVEKIT_AVAILABLE:
             transcript = await get_livekit_transcript(call_id)
             return {"transcript": transcript, "provider": "livekit"}
 
-        # Default: VAPI transcript
-        url = f"https://api.vapi.ai/call/{call_id}"
-        response = requests.get(
-            url,
-            headers={
-                "Authorization": f"Bearer {os.getenv('VAPI_API_KEY')}",
-                "Content-Type": "application/json",
-            },
-        )
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
-        transcript = response.json().get("transcript", [])
-        return {"transcript": transcript, "provider": "vapi"}
+        raise HTTPException(status_code=500, detail="LiveKit transcript module not available")
     except HTTPException:
         raise
     except Exception as e:

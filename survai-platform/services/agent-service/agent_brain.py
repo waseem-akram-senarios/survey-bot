@@ -1,5 +1,5 @@
 """
-Intelligent Agent Brain -- builds the system prompt and VAPI workflow
+Intelligent Agent Brain -- builds the system prompt
 for a single-node, low-latency AI survey agent.
 
 All context is loaded upfront into the system prompt so the agent
@@ -145,7 +145,3 @@ def _build_questions_block(questions: List[Dict[str, Any]]) -> str:
     return "\n\n".join(lines)
 
 
-def build_vapi_tools() -> List[Dict]:
-    """Return the VAPI function tool definitions for the agent."""
-    from prompts import VAPI_FUNCTION_RECORD_ANSWER, VAPI_FUNCTION_END_SURVEY
-    return [VAPI_FUNCTION_RECORD_ANSWER, VAPI_FUNCTION_END_SURVEY]

@@ -85,8 +85,6 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=db
-      - VAPI_API_KEY=${VAPI_API_KEY}
-      - PHONE_NUMBER_ID=${PHONE_NUMBER_ID}
       - MAILERSEND_API_KEY=${MAILERSEND_API_KEY}
       - MAILERSEND_SENDER_EMAIL=${MAILERSEND_SENDER_EMAIL}
       - SMTP_HOST=${SMTP_HOST:-}
@@ -195,7 +193,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # ─── Voice Service (port 8017) -- VAPI Calls & Workflows ──────────────────
+  # ─── Voice Service (port 8017) -- LiveKit Calls ──────────────────
 
   voice-service:
     build:
@@ -213,8 +211,6 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=db
-      - VAPI_API_KEY=${VAPI_API_KEY}
-      - PHONE_NUMBER_ID=${PHONE_NUMBER_ID}
       - MAILERSEND_API_KEY=${MAILERSEND_API_KEY}
       - MAILERSEND_SENDER_EMAIL=${MAILERSEND_SENDER_EMAIL}
       - SMTP_HOST=${SMTP_HOST:-}
@@ -258,8 +254,6 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=db
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - VAPI_API_KEY=${VAPI_API_KEY}
-      - PHONE_NUMBER_ID=${PHONE_NUMBER_ID}
       - MAILERSEND_API_KEY=${MAILERSEND_API_KEY}
       - MAILERSEND_SENDER_EMAIL=${MAILERSEND_SENDER_EMAIL}
       - SMTP_HOST=${SMTP_HOST:-}

@@ -2,8 +2,7 @@
 Voice Service -- Port 8017
 
 Handles all voice/call operations:
-- VAPI workflow creation and call initiation
-- VAPI tool callbacks and webhooks
+- LiveKit call initiation via SIP
 - Transcript storage and retrieval
 - Email fallback
 
@@ -31,7 +30,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Voice Service",
-    description="Voice/call management -- VAPI workflows, calls, transcripts",
+    description="Voice/call management -- LiveKit calls, transcripts",
     version="1.0.0",
     lifespan=lifespan,
 )

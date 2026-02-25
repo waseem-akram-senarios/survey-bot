@@ -115,7 +115,7 @@ class SurveyService {
     }
   }
 
-  static async sendSurveyBySMS(surveyId, phone, provider = "vapi") {
+  static async sendSurveyBySMS(surveyId, phone, provider = "livekit") {
     try {
       const queryParams = new URLSearchParams({
         to: phone,

@@ -30,10 +30,11 @@ jobs:
             export OPENAI_API_KEY='${{ secrets.OPENAI_API_KEY }}' &&
             export MAILERSEND_API_KEY='${{ secrets.MAILERSEND_API_KEY }}' &&
             export MAILERSEND_SENDER_EMAIL='${{ secrets.MAILERSEND_SENDER_EMAIL }}' &&
-            export VAPI_API_KEY='${{ secrets.VAPI_API_KEY }}' &&
             export DEEPGRAM_API_TOKEN='${{ secrets.DEEPGRAM_API_TOKEN }}' &&
             export DEEPGRAM_API_KEY='${{ secrets.DEEPGRAM_API_TOKEN }}' &&
-            export PHONE_NUMBER_ID='${{ secrets.PHONE_NUMBER_ID }}' &&
+            export LIVEKIT_URL='${{ secrets.LIVEKIT_URL }}' &&
+            export LIVEKIT_API_KEY='${{ secrets.LIVEKIT_API_KEY }}' &&
+            export LIVEKIT_API_SECRET='${{ secrets.LIVEKIT_API_SECRET }}' &&
             export GATEWAY_PORT='8080' &&
             export VITE_SERVER_URL='${{ secrets.VITE_SERVER_URL }}' &&
             export VITE_RECIPIENT_URL='${{ secrets.VITE_RECIPIENT_URL }}' &&

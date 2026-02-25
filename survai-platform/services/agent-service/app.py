@@ -1,7 +1,6 @@
 """
 Agent Service -- Port 8050
-The intelligent survey agent brain. Handles call initiation, VAPI workflow generation,
-tool callbacks, transcripts, and email fallback.
+Handles transcript retrieval and email fallback.
 """
 
 import logging
@@ -25,7 +24,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agent Service",
-    description="Intelligent survey agent -- call initiation, VAPI workflows, transcripts",
+    description="Agent service -- transcripts, email fallback",
     version="1.0.0",
     lifespan=lifespan,
 )

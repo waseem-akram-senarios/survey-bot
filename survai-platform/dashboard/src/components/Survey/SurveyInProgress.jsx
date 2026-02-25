@@ -129,7 +129,7 @@ const SurveyInProgress = () => {
     }
   };
 
-  const handleSendPhoneConfirm = async (phone, provider = "vapi") => {
+  const handleSendPhoneConfirm = async (phone, provider = "livekit") => {
     try {
       const result = await sendSurveyBySMS(
         selectedSurvey.SurveyId, 

@@ -12,7 +12,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 import llm
-from workflow_builder import build_workflow_config
 from prompts import (
     AGENT_SYSTEM_PROMPT_TEMPLATE,
     MAX_SURVEY_QUESTIONS,
@@ -84,14 +83,6 @@ class AnalyzeResponse(BaseModel):
     summary: str = ""
     nps_score: Optional[float] = None
     satisfaction_score: Optional[float] = None
-
-class WorkflowConfigRequest(BaseModel):
-    survey_id: str
-    questions: List[Dict[str, Any]]
-    callback_url: str = ""
-    template_config: Optional[Dict[str, Any]] = None
-    rider_data: Optional[Dict[str, Any]] = None
-    language: str = "en"
 
 class PrioritizeRequest(BaseModel):
     questions: List[Dict[str, Any]]
@@ -186,27 +177,6 @@ async def analyze_endpoint(req: AnalyzeRequest):
         return AnalyzeResponse(**result)
     except Exception as e:
         logger.error(f"Analyze error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/build-workflow-config")
-async def build_workflow_config_endpoint(req: WorkflowConfigRequest):
-    """
-    Generate the VAPI workflow JSON config.
-    Does NOT create anything in VAPI -- just returns the config dict.
-    """
-    try:
-        config = build_workflow_config(
-            survey_id=req.survey_id,
-            questions=req.questions,
-            callback_url=req.callback_url,
-            template_config=req.template_config,
-            rider_data=req.rider_data,
-            language=req.language,
-        )
-        return {"workflow_config": config}
-    except Exception as e:
-        logger.error(f"Workflow config build error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
