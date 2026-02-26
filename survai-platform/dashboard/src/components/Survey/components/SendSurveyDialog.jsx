@@ -34,29 +34,53 @@ const SendSurveyDialog = ({
 
   const surveyLink = `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyId}`;
 
-  const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [phoneTouched, setPhoneTouched] = useState(false);
+
+  const validateEmail = (value) => {
+    if (!value.trim()) return "Email is required";
+    const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(value)) return "Please enter a valid email (e.g. name@example.com)";
+    return "";
   };
 
-  const validatePhone = (phone) => {
-    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-    return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ''));
+  const validatePhone = (value) => {
+    if (!value.trim()) return "Phone number is required";
+    const digits = value.replace(/[^\d]/g, '');
+    if (digits.length < 7) return "Phone number must have at least 7 digits";
+    if (digits.length > 15) return "Phone number cannot exceed 15 digits";
+    if (!/^\+?[\d\s\-()]+$/.test(value)) return "Only digits, +, spaces, hyphens and parentheses allowed";
+    if (!/^\+?[1-9]/.test(value.replace(/[\s\-()]/g, ''))) return "Phone number must start with a valid country code";
+    return "";
   };
 
   const handleEmailChange = (e) => {
     const value = e.target.value;
     setEmail(value);
-    if (emailError && value && validateEmail(value)) {
-      setEmailError("");
+    if (emailTouched) {
+      setEmailError(validateEmail(value));
+    }
+  };
+
+  const handleEmailBlur = () => {
+    setEmailTouched(true);
+    if (email.trim()) {
+      setEmailError(validateEmail(email));
     }
   };
 
   const handlePhoneChange = (e) => {
-    const value = e.target.value;
+    const value = e.target.value.replace(/[^\d\s\-+()]/g, '');
     setPhone(value);
-    if (phoneError && value && validatePhone(value)) {
-      setPhoneError("");
+    if (phoneTouched) {
+      setPhoneError(validatePhone(value));
+    }
+  };
+
+  const handlePhoneBlur = () => {
+    setPhoneTouched(true);
+    if (phone.trim()) {
+      setPhoneError(validatePhone(phone));
     }
   };
 
@@ -69,27 +93,19 @@ const SendSurveyDialog = ({
   };
 
   const handleEmailSend = () => {
-    if (!email.trim()) {
-      setEmailError("Email is required");
-      return;
-    }
-    if (!validateEmail(email)) {
-      setEmailError("Please enter a valid email address");
-      return;
-    }
-    onConfirmEmail(email);
+    setEmailTouched(true);
+    const error = validateEmail(email);
+    setEmailError(error);
+    if (error) return;
+    onConfirmEmail(email.trim());
   };
 
   const handlePhoneSend = () => {
-    if (!phone.trim()) {
-      setPhoneError("Phone number is required");
-      return;
-    }
-    if (!validatePhone(phone)) {
-      setPhoneError("Please enter a valid phone number");
-      return;
-    }
-    onConfirmPhone(phone, voiceProvider);
+    setPhoneTouched(true);
+    const error = validatePhone(phone);
+    setPhoneError(error);
+    if (error) return;
+    onConfirmPhone(phone.trim(), voiceProvider);
   };
 
   const [copied, setCopied] = useState(false);
@@ -98,20 +114,32 @@ const SendSurveyDialog = ({
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(surveyLink);
+        setCopied(true);
       } else {
         const textArea = document.createElement("textarea");
         textArea.value = surveyLink;
         textArea.style.position = "fixed";
         textArea.style.left = "-9999px";
+        textArea.style.top = "-9999px";
+        textArea.style.opacity = "0";
         document.body.appendChild(textArea);
+        textArea.focus();
         textArea.select();
-        document.execCommand("copy");
+        textArea.setSelectionRange(0, textArea.value.length);
+        const success = document.execCommand("copy");
         document.body.removeChild(textArea);
+        if (success) {
+          setCopied(true);
+        } else {
+          window.prompt("Copy this link:", surveyLink);
+          setCopied(true);
+        }
       }
-      setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error("Failed to copy:", err);
+      window.prompt("Copy this link:", surveyLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -122,6 +150,8 @@ const SendSurveyDialog = ({
       setPhone("");
       setEmailError("");
       setPhoneError("");
+      setEmailTouched(false);
+      setPhoneTouched(false);
       setVoiceProvider("livekit");
       onClose();
     }
@@ -245,12 +275,15 @@ const SendSurveyDialog = ({
                 <img src={EmailIcon} alt="Email-Icon" style={{ marginRight: '7.5px' }} />
                 <TextField
                   fullWidth
-                  placeholder="Enter email"
+                  placeholder="name@example.com"
+                  type="email"
                   value={email}
                   onChange={handleEmailChange}
+                  onBlur={handleEmailBlur}
                   error={!!emailError}
-                  helperText={emailError || "If no email arrives, check spam or share the link directly"}
+                  helperText={emailError || (emailTouched && email && !validateEmail(email) ? "" : "e.g. john@company.com")}
                   disabled={isLoading}
+                  color={emailTouched && email && !emailError ? "success" : undefined}
                   sx={{
                     "& .MuiOutlinedInput-root": {
                       borderRadius: "12px",
@@ -284,12 +317,16 @@ const SendSurveyDialog = ({
                 <img src={PhoneIcon} alt="Phone-Icon" style={{ marginRight: '7.5px' }} />
                 <TextField
                   fullWidth
-                  placeholder="Enter number"
+                  placeholder="+1 234 567 8901"
+                  type="tel"
                   value={phone}
                   onChange={handlePhoneChange}
+                  onBlur={handlePhoneBlur}
                   error={!!phoneError}
-                  helperText={phoneError || "Enter phone number with country code"}
+                  helperText={phoneError || "Include country code, e.g. +1 for US"}
                   disabled={isLoading}
+                  color={phoneTouched && phone && !phoneError ? "success" : undefined}
+                  inputProps={{ maxLength: 20 }}
                   sx={{
                     "& .MuiOutlinedInput-root": {
                       borderRadius: "12px",
@@ -392,7 +429,7 @@ const SendSurveyDialog = ({
               <Button
                 variant="contained"
                 onClick={currentState === "email" ? handleEmailSend : handlePhoneSend}
-                disabled={isLoading || (currentState === "email" ? !email.trim() : !phone.trim())}
+                disabled={isLoading || (currentState === "email" ? (!email.trim() || !!validateEmail(email)) : (!phone.trim() || !!validatePhone(phone)))}
                 sx={{
                   textTransform: "none",
                   color: "#fff",

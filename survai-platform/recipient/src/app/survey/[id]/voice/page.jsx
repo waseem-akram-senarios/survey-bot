@@ -67,6 +67,7 @@ export default function VoiceSurveyPage() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechQueue, setSpeechQueue] = useState([]);
   const [isProcessingSpeech, setIsProcessingSpeech] = useState(false);
+  const [micError, setMicError] = useState("");
 
   const params = useParams();
   const router = useRouter();
@@ -321,6 +322,15 @@ export default function VoiceSurveyPage() {
       setIsRecording(true);
     } catch (error) {
       console.error("Microphone permission error:", error);
+      if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+        setMicError("Microphone access was denied. Please allow microphone permission in your browser settings.");
+      } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+        setMicError("No microphone detected. Please connect a microphone and try again.");
+      } else if (window.location.protocol === "http:" && window.location.hostname !== "localhost") {
+        setMicError("Microphone requires a secure (HTTPS) connection. Please contact the survey administrator.");
+      } else {
+        setMicError("Could not access microphone. Please check your browser permissions and try again.");
+      }
     }
   };
 
@@ -713,6 +723,35 @@ export default function VoiceSurveyPage() {
         conversationItems={conversationItems}
         conversationEndRef={conversationEndRef}
       />
+
+      {/* Mic Error Banner */}
+      {micError && (
+        <Box
+          sx={{
+            position: "fixed",
+            bottom: 200,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1000,
+            backgroundColor: "#FFF3F3",
+            border: "1px solid #FF4444",
+            borderRadius: "12px",
+            padding: "12px 24px",
+            maxWidth: "90%",
+            width: "500px",
+            textAlign: "center",
+          }}
+        >
+          <Typography sx={{ fontSize: "14px", color: "#CC0000", fontFamily: "Poppins, sans-serif" }}>
+            {micError}
+          </Typography>
+          {window.location.protocol === "http:" && window.location.hostname !== "localhost" && (
+            <Typography sx={{ fontSize: "12px", color: "#888", fontFamily: "Poppins, sans-serif", mt: 1 }}>
+              Try the <a href={`/survey/${surveyId}/text`} style={{ color: "#1958F7" }}>Text Survey</a> instead.
+            </Typography>
+          )}
+        </Box>
+      )}
 
       {/* Voice Microphone - Updated to include speech processing state */}
       <VoiceMicrophone

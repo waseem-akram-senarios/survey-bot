@@ -6,6 +6,7 @@ This is the main entry point for the survey bot.
 All logic is organized in separate modules for maintainability.
 """
 
+import os
 import json
 from datetime import datetime
 
@@ -178,7 +179,7 @@ async def entrypoint(ctx: JobContext):
             voice_id=TTS_VOICE_ID,
             model=TTS_MODEL,
             apply_text_normalization="on",
-        ),
+        ) if os.getenv("ELEVEN_API_KEY") else openai.TTS(voice="nova"),
         vad=silero.VAD.load(
             min_silence_duration=VAD_MIN_SILENCE_DURATION,
             min_speech_duration=VAD_MIN_SPEECH_DURATION,
