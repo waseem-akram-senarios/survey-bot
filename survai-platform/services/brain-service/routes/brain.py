@@ -200,9 +200,10 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
         rider_data = req.rider_data or {}
         restricted_topics = req.restricted_topics or []
 
+        _placeholder_names = {"customer", "unknown", "rider", "rider1", "rider2", "user", "recipient", "test", "n/a", "na", "none"}
         if rider_data and any(rider_data.values()):
             rider_name = rider_data.get("name", "")
-            if rider_name and rider_name.lower() not in ("customer", "unknown"):
+            if rider_name and rider_name.strip().lower() not in _placeholder_names:
                 rider_lines = [f"- Name: {rider_name}"]
             else:
                 rider_name = ""
