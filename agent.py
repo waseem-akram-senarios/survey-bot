@@ -48,7 +48,7 @@ from data.riders import get_rider_info
 from prompts.survey_template import build_survey_prompt
 from tools.survey_tools import create_survey_tools
 from utils.logging import get_logger, setup_survey_logging, cleanup_survey_logging
-from utils.storage import create_empty_response_dict, save_survey_with_logs
+from utils.storage import create_empty_response_dict, save_survey_with_logs, save_survey_to_db
 from survey_agent import SurveyAgent
 
 # Get logger
@@ -216,30 +216,42 @@ async def entrypoint(ctx: JobContext):
     )
     
     # Background task to process event queue and save transcription
-    async def write_transcription(transcription: str, event_logs: str):
+    async def write_transcription(turns: list, event_logs: str):
         """Process event queue and save transcription when call ends."""
+        turn_index = 0
         while True:
             event = await event_log_queue.get()
-            
+
             if event == "call_end":
                 logger.info("Saving survey data and transcription")
-                # Calculate call duration
                 call_duration = (datetime.now() - call_start_time).total_seconds()
-                # Save transcription with event logs
                 save_survey_with_logs(
-                    caller_number, survey_responses, 
-                    call_start_time, call_duration, transcription, event_logs
+                    caller_number, survey_responses,
+                    call_start_time, call_duration, turns, event_logs
+                )
+                save_survey_to_db(
+                    caller_number=caller_number,
+                    call_start_time=call_start_time,
+                    call_duration=call_duration,
+                    completed=survey_responses.get("completed", False),
+                    transcript=turns,
                 )
                 logger.info("Survey data saved successfully")
                 break
-            
-            elif "AGENT SPEECH:" in event or "CUSTOMER SPEECH:" in event:
-                transcription += event.replace("SPEECH", "")
+
+            elif isinstance(event, dict) and event.get("type") == "turn":
+                turns.append({
+                    "turn_index": turn_index,
+                    "speaker": event["speaker"],
+                    "text": event["text"],
+                    "timestamp": event["timestamp"],
+                })
+                turn_index += 1
             else:
                 event_logs += event
-    
+
     # Start transcription writing task
-    write_task = asyncio.create_task(write_transcription("", ""))
+    write_task = asyncio.create_task(write_transcription([], ""))
 
     # Log session start event
     event_log_queue.put_nowait(f"[{datetime.now()}] SESSION_START: Agent session starting...\n\n")
@@ -261,17 +273,23 @@ async def entrypoint(ctx: JobContext):
 
     @session.on("conversation_item_added")
     def on_conversation_item_added(event: ConversationItemAddedEvent):
-        """Log agent and user speech."""
+        """Log agent and user speech as structured turn dicts."""
         if event.item.text_content != '':
             ts = datetime.now()
             if event.item.role == 'assistant':
-                event_log_queue.put_nowait(
-                    f"[{ts}] AGENT SPEECH: {event.item.text_content}\n\n"
-                )
-            if event.item.role == 'user':
-                event_log_queue.put_nowait(
-                    f"[{ts}] CUSTOMER SPEECH: {event.item.text_content}\n\n"
-                )
+                event_log_queue.put_nowait({
+                    "type": "turn",
+                    "speaker": "agent",
+                    "text": event.item.text_content,
+                    "timestamp": ts.isoformat(),
+                })
+            elif event.item.role == 'user':
+                event_log_queue.put_nowait({
+                    "type": "turn",
+                    "speaker": "customer",
+                    "text": event.item.text_content,
+                    "timestamp": ts.isoformat(),
+                })
 
     @session.on("metrics_collected")
     def _on_metrics_collected(ev: MetricsCollectedEvent):
@@ -305,10 +323,22 @@ async def entrypoint(ctx: JobContext):
     ctx.add_shutdown_callback(finish_queue)
 
 
+async def on_startup(worker):
+    from db.database import get_connection
+    try:
+        conn = get_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        logger.info("DB connection OK")
+    except Exception as e:
+        raise RuntimeError(f"DB connection failed — fix your DB credentials before starting the agent: {e}")
+
+
 if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
+            on_startup=on_startup,
             agent_name="survey-agent",
             initialize_process_timeout=WORKER_INITIALIZE_TIMEOUT,
             job_memory_warn_mb=JOB_MEMORY_WARN_MB,

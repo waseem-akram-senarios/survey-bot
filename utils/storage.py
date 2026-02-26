@@ -1,6 +1,6 @@
 """
 Storage utilities for survey responses.
-Handles saving and loading survey data.
+Handles saving and loading survey data, and writing call records to PostgreSQL.
 """
 
 import json
@@ -76,34 +76,34 @@ def save_survey_responses(caller_number: str, responses: dict, call_duration: fl
 
 
 def save_survey_with_logs(
-    caller_number: str, 
-    responses: dict, 
+    caller_number: str,
+    responses: dict,
     call_start_time: datetime,
     call_duration: float,
-    transcript: str,
-    event_logs: str
+    transcript: list,
+    event_logs: str,
 ) -> str:
     """
-    Save survey responses with full transcript and event logs.
-    Includes both the survey responses and the detailed call logs.
-    
+    Save survey responses with structured transcript and event logs to a local JSON file.
+
     Args:
         caller_number: The caller's phone number
         responses: Dictionary of survey responses
         call_start_time: When the call started
         call_duration: Duration of the call in seconds
-        transcript: Full conversation transcript (speech only)
-        event_logs: Complete event logs (all events)
-        
+        transcript: List of turn dicts
+            [{"turn_index": int, "speaker": str, "text": str, "timestamp": str}, ...]
+        event_logs: Complete event logs (function calls, session events, etc.)
+
     Returns:
         str: Path to the saved file
     """
     os.makedirs(RESPONSES_DIR, exist_ok=True)
-    
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     caller_clean = caller_number.replace("+", "").replace("-", "").replace(" ", "")
     filename = f"{RESPONSES_DIR}/survey_{timestamp}_{caller_clean}.json"
-    
+
     survey_data = {
         "caller_number": caller_number,
         "timestamp": datetime.now().isoformat(),
@@ -112,14 +112,44 @@ def save_survey_with_logs(
         "responses": responses,
         "completed": responses.get("completed", False),
         "call_transcript": transcript,
-        "event_logs": event_logs
+        "event_logs": event_logs,
     }
-    
-    with open(filename, 'w', encoding='utf-8') as f:
+
+    with open(filename, "w", encoding="utf-8") as f:
         json.dump(survey_data, f, indent=2, ensure_ascii=False)
-    
+
     logger.info(f"✅ Survey responses with logs saved to: {filename}")
     return filename
+
+
+def save_survey_to_db(
+    caller_number: str,
+    call_start_time: datetime,
+    call_duration: float,
+    completed: bool,
+    transcript: list,
+) -> None:
+    """
+    Write the call record to PostgreSQL (one INSERT per call, at call end).
+
+    Args:
+        caller_number: The phone number that was called
+        call_start_time: When the call started
+        call_duration: Duration of the call in seconds
+        completed: Whether the survey was completed
+        transcript: Structured list of turn dicts
+    """
+    try:
+        from db.database import insert_call
+        insert_call(
+            recipient_number=caller_number,
+            call_start_time=call_start_time,
+            call_duration_seconds=call_duration,
+            completed=completed,
+            call_transcript=transcript,
+        )
+    except Exception as e:
+        logger.error(f"DB write failed (local file is still saved): {e}")
 
 
 def load_survey_response(filename: str) -> dict | None:

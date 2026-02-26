@@ -1,15 +1,16 @@
 """
 Survey Bot Call API
 
-FastAPI server that exposes an HTTP endpoint to trigger outbound survey calls.
-The agent worker (agent.py) must be running before calls can be dispatched.
+FastAPI server that exposes HTTP endpoints to trigger outbound survey calls
+and query call records from the database.
 
 Usage:
     uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload
 
 Endpoints:
-    POST /call   — dispatch the survey agent and place an outbound call
-    GET  /health — liveness check
+    POST /call                    — dispatch the survey agent and place an outbound call
+    GET  /calls/{phone_number}    — retrieve all call records for a phone number
+    GET  /health                  — liveness check
 """
 
 import json
@@ -57,6 +58,40 @@ async def trigger_call(req: CallRequest):
         "room_name": room_name,
         "phone_number": req.phone_number,
     }
+
+
+@app.get("/calls/{phone_number}")
+def get_calls(phone_number: str):
+    """Return all call records for a given phone number, newest first."""
+    from db.database import get_connection
+    try:
+        conn = get_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, recipient_number, call_start_time,
+                       call_duration_seconds, completed, call_transcript
+                FROM calls
+                WHERE recipient_number = %s
+                ORDER BY call_start_time DESC
+                """,
+                (phone_number,),
+            )
+            rows = cur.fetchall()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return [
+        {
+            "id": r[0],
+            "recipient_number": r[1],
+            "call_start_time": r[2].isoformat() if r[2] else None,
+            "call_duration_seconds": float(r[3]) if r[3] else None,
+            "completed": r[4],
+            "call_transcript": r[5],
+        }
+        for r in rows
+    ]
 
 
 @app.get("/health")

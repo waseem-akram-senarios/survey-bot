@@ -59,6 +59,15 @@ RESPONSES_DIR = os.getenv("RESPONSES_DIR", "survey_responses")
 SIP_OUTBOUND_TRUNK_ID = os.getenv("SIP_OUTBOUND_TRUNK_ID", "")
 
 # ===========================================
+# DATABASE SETTINGS
+# ===========================================
+DB_HOST     = os.getenv("DB_HOST", "localhost")
+DB_PORT     = int(os.getenv("DB_PORT", "5432"))
+DB_NAME     = os.getenv("DB_NAME", "")
+DB_USER     = os.getenv("DB_USER", "postgres")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+
+# ===========================================
 # DEV / SANDBOX SETTINGS
 # ===========================================
 DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
