@@ -36,6 +36,9 @@ from config.settings import (
     JOB_MEMORY_WARN_MB,
     JOB_MEMORY_LIMIT_MB,
     STT_LANGUAGE,
+    VAD_MIN_SILENCE_DURATION,
+    VAD_MIN_SPEECH_DURATION,
+    VAD_ACTIVATION_THRESHOLD,
 )
 from data.riders import get_rider_info
 from prompts.survey_template import build_survey_prompt
@@ -176,7 +179,11 @@ async def entrypoint(ctx: JobContext):
             model=TTS_MODEL,
             apply_text_normalization="on",
         ),
-        vad=silero.VAD.load(),
+        vad=silero.VAD.load(
+            min_silence_duration=VAD_MIN_SILENCE_DURATION,
+            min_speech_duration=VAD_MIN_SPEECH_DURATION,
+            activation_threshold=VAD_ACTIVATION_THRESHOLD,
+        ),
 
         # Latency optimizations
         preemptive_generation=PREEMPTIVE_GENERATION,

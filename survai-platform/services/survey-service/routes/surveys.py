@@ -708,15 +708,16 @@ async def makecall(request: MakeCallRequest):
 
 
 def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str):
-    """Send email via SMTP fallback. Returns True on success, False if not configured."""
+    """Send email via SMTP. Supports both authenticated (Gmail/Brevo) and
+    unauthenticated (local Postfix/boky) SMTP servers."""
     smtp_host = os.getenv("SMTP_HOST")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASSWORD")
-    smtp_from = os.getenv("SMTP_FROM_EMAIL", smtp_user)
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASSWORD", "")
+    smtp_from = os.getenv("SMTP_FROM_EMAIL") or smtp_user or "noreply@aidevlab.com"
     smtp_from_name = os.getenv("SMTP_FROM_NAME", "SurvAI")
 
-    if not all([smtp_host, smtp_user, smtp_pass]):
+    if not smtp_host:
         return False
 
     msg = MIMEMultipart("alternative")
@@ -731,8 +732,12 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str):
         server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
     else:
         server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
-        server.starttls()
-    server.login(smtp_user, smtp_pass)
+        try:
+            server.starttls()
+        except smtplib.SMTPNotSupportedError:
+            pass
+    if smtp_user and smtp_pass:
+        server.login(smtp_user, smtp_pass)
     server.sendmail(smtp_from, [to_email], msg.as_string())
     server.quit()
     return True

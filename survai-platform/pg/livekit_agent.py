@@ -26,7 +26,7 @@ from livekit.agents import (
     get_job_context,
 )
 from livekit.agents.voice import AgentSession, Agent
-from livekit.plugins import openai, silero
+from livekit.plugins import deepgram, elevenlabs, openai, silero
 
 load_dotenv(dotenv_path=".env.local")
 
@@ -184,11 +184,16 @@ Current time: {datetime.now().strftime('%I:%M %p')}
     agent = SandboxAgent(instructions=sandbox_prompt)
 
     session = AgentSession(
-        llm=openai.realtime.RealtimeModel(
-            voice="ash",
-            temperature=0.7,
+        stt=deepgram.STT(model="nova-3", language="en"),
+        llm=openai.LLM(model="gpt-4o-mini", temperature=0.1),
+        tts=elevenlabs.TTS(
+            voice_id=os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9"),
+            model="eleven_flash_v2_5",
         ),
         vad=silero.VAD.load(),
+        preemptive_generation=True,
+        resume_false_interruption=True,
+        false_interruption_timeout=1.0,
     )
 
     await session.start(room=ctx.room, agent=agent)
@@ -217,7 +222,7 @@ async def _run_phone_call(ctx: JobContext, phone_number: str, survey_id: str, pa
     if platform_questions and platform_prompt:
         logger.info("Using enriched metadata from voice-service (no backend calls needed)")
         questions = platform_questions
-        recipient_name = platform_recipient or "Customer"
+        recipient_name = platform_recipient or ""
         survey_name = platform_template
         system_prompt = platform_prompt
     else:
@@ -233,7 +238,7 @@ async def _run_phone_call(ctx: JobContext, phone_number: str, survey_id: str, pa
             return
 
         recipient_info = fetch_survey_recipient(survey_id) or {}
-        recipient_name = recipient_info.get("Recipient", "Customer")
+        recipient_name = recipient_info.get("Recipient", "")
         ride_id = recipient_info.get("RideID", "N/A")
         survey_name = recipient_info.get("Name", "Survey")
         rider_phone = recipient_info.get("Phone", phone_number)
@@ -264,9 +269,11 @@ async def _run_phone_call(ctx: JobContext, phone_number: str, survey_id: str, pa
 
     class SurveyAgent(Agent):
         async def on_enter(self):
-            await self.session.generate_reply(
-                instructions=f"Immediately greet the participant. You are calling {recipient_name}. Start the conversation now."
-            )
+            if recipient_name and recipient_name.lower() not in ("customer", "unknown", ""):
+                greeting = f"Hi, this is Cameron, an AI assistant calling on behalf of {org_name}. Am I speaking with {recipient_name}?"
+            else:
+                greeting = f"Hi, this is Cameron, an AI assistant calling on behalf of {org_name}. I'm reaching out to get your feedback on a recent experience — do you have a quick moment?"
+            await self.session.say(greeting)
 
         async def hangup(self):
             job_ctx = get_job_context()
@@ -364,11 +371,21 @@ async def _run_phone_call(ctx: JobContext, phone_number: str, survey_id: str, pa
     agent = SurveyAgent(instructions=system_prompt)
 
     session = AgentSession(
-        llm=openai.realtime.RealtimeModel(
-            voice="ash",
-            temperature=0.7,
+        stt=deepgram.STT(model="nova-3", language="en"),
+        llm=openai.LLM(model="gpt-4o-mini", temperature=0.1),
+        tts=elevenlabs.TTS(
+            voice_id=os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9"),
+            model="eleven_flash_v2_5",
         ),
-        vad=silero.VAD.load(),
+        vad=silero.VAD.load(
+            min_silence_duration=0.3,
+            min_speech_duration=0.05,
+            activation_threshold=0.5,
+        ),
+        preemptive_generation=True,
+        resume_false_interruption=True,
+        false_interruption_timeout=1.0,
+        max_tool_steps=5,
     )
 
     await session.start(room=ctx.room, agent=agent)

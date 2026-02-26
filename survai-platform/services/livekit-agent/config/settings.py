@@ -47,6 +47,11 @@ RESUME_FALSE_INTERRUPTION = True
 FALSE_INTERRUPTION_TIMEOUT = 1.0
 MAX_TOOL_STEPS = 5
 
+# VAD tuning for phone calls
+VAD_MIN_SILENCE_DURATION = float(os.getenv("VAD_MIN_SILENCE_DURATION", "0.3"))
+VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.05"))
+VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.5"))
+
 # ===========================================
 # FILE/DIRECTORY PATHS
 # ===========================================

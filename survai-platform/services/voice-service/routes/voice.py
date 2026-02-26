@@ -65,7 +65,7 @@ async def make_call(
     callback_url = os.getenv("SURVEY_SUBMIT_URL", "http://survey-service:8020/api/answers/qna_phone")
 
     survey_context = {
-        "recipient_name": rider_name or "Customer",
+        "recipient_name": rider_name or "",
         "template_name": template_name,
         "organization_name": company_name,
         "language": language,
@@ -150,52 +150,93 @@ async def send_email_fallback(
     email: str,
     survey_url: str,
 ):
-    """Send an email survey link as fallback when call fails or is declined."""
-    try:
-        from mailersend import emails
+    """Send an email survey link as fallback when call fails or is declined.
+    Uses the same MailerSend -> Resend -> SMTP fallback chain as survey-service.
+    """
+    subject = "We'd love your feedback!"
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2 style="color: #4CAF50;">We'd love your input!</h2>
+        <p>We value your feedback and would appreciate it if you could take a few moments to complete a brief survey.</p>
+        <p><a href="{survey_url}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Take the Survey</a></p>
+        <p>Thank you for your time!</p>
+    </body>
+    </html>
+    """
+    text_body = f"We'd love your feedback! Take the survey here: {survey_url}"
 
+    # 1) Try MailerSend
+    try:
+        from mailersend import emails as ms_emails
         api_key = os.getenv("MAILERSEND_API_KEY", "")
         sender_email = os.getenv("MAILERSEND_SENDER_EMAIL", "")
-
-        if not api_key or api_key.startswith("<"):
-            logger.warning("MailerSend not configured, skipping email")
-            return {
-                "status": "skipped",
-                "reason": "MailerSend not configured",
-                "survey_url": survey_url,
-            }
-
-        mailer = emails.NewEmail(api_key)
-        mail_body = {}
-
-        mail_from = {"name": "Survey Team", "email": sender_email}
-        recipients = [{"name": "Rider", "email": email}]
-
-        mailer.set_mail_from(mail_from, mail_body)
-        mailer.set_mail_to(recipients, mail_body)
-        mailer.set_subject("We'd love your feedback!", mail_body)
-        mailer.set_html_content(
-            f"""
-            <html>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <h2 style="color: #4CAF50;">We'd love your input!</h2>
-                <p>We value your feedback and would appreciate it if you could take a few moments to complete a brief survey.</p>
-                <p><a href="{survey_url}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Take the Survey</a></p>
-                <p>Thank you for your time!</p>
-            </body>
-            </html>
-            """,
-            mail_body,
-        )
-
-        mailer.send(mail_body)
-        logger.info(f"Email fallback sent for survey {survey_id} to {email}")
-
-        return {"status": "sent", "email": email, "survey_id": survey_id}
-
+        if api_key and not api_key.startswith("<"):
+            mailer = ms_emails.NewEmail(api_key)
+            mail_body = {}
+            mailer.set_mail_from({"name": "SurvAI", "email": sender_email}, mail_body)
+            mailer.set_mail_to([{"name": "Recipient", "email": email}], mail_body)
+            mailer.set_subject(subject, mail_body)
+            mailer.set_html_content(html_body, mail_body)
+            mailer.send(mail_body)
+            logger.info(f"Email fallback sent via MailerSend for survey {survey_id} to {email}")
+            return {"status": "sent", "email": email, "survey_id": survey_id}
     except Exception as e:
-        logger.error(f"Email fallback failed: {e}")
-        return {"status": "failed", "error": str(e), "survey_url": survey_url}
+        logger.warning(f"MailerSend fallback failed for {email}: {e}")
+
+    # 2) Try Resend
+    try:
+        import resend as _resend
+        resend_key = os.getenv("RESEND_API_KEY", "")
+        resend_from = os.getenv("RESEND_FROM_EMAIL", "")
+        if resend_key and resend_from:
+            _resend.api_key = resend_key
+            _resend.Emails.send({"from": resend_from, "to": email, "subject": subject, "html": html_body})
+            logger.info(f"Email fallback sent via Resend for survey {survey_id} to {email}")
+            return {"status": "sent", "email": email, "survey_id": survey_id}
+    except Exception as e:
+        logger.warning(f"Resend fallback failed for {email}: {e}")
+
+    # 3) Try SMTP (Mailjet)
+    try:
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        smtp_host = os.getenv("SMTP_HOST", "")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_user = os.getenv("SMTP_USER", "")
+        smtp_pass = os.getenv("SMTP_PASSWORD", "")
+        smtp_from = os.getenv("SMTP_FROM_EMAIL") or smtp_user or "noreply@aidevlab.com"
+        smtp_from_name = os.getenv("SMTP_FROM_NAME", "SurvAI")
+
+        if smtp_host:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"{smtp_from_name} <{smtp_from}>"
+            msg["To"] = email
+            msg.attach(MIMEText(text_body, "plain"))
+            msg.attach(MIMEText(html_body, "html"))
+
+            if smtp_port == 465:
+                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
+            else:
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
+                try:
+                    server.starttls()
+                except smtplib.SMTPNotSupportedError:
+                    pass
+            if smtp_user and smtp_pass:
+                server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_from, [email], msg.as_string())
+            server.quit()
+            logger.info(f"Email fallback sent via SMTP for survey {survey_id} to {email}")
+            return {"status": "sent", "email": email, "survey_id": survey_id}
+    except Exception as e:
+        logger.warning(f"SMTP fallback failed for {email}: {e}")
+
+    logger.error(f"All email fallback methods failed for survey {survey_id} to {email}")
+    return {"status": "failed", "error": "All email providers failed", "survey_url": survey_url}
 
 
 # ─── Backward Compatibility Aliases ──────────────────────────────────────────

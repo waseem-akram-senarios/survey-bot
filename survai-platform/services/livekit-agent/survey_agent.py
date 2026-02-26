@@ -23,7 +23,10 @@ class SurveyAgent(Agent):
     
     async def on_enter(self):
         """Called when agent enters - AI speaks first."""
-        await self.session.say(
-            f"Hi, this is Jane with {self.organization_name}. Am I speaking to {self.rider_first_name}?"
-        )
+        name = self.rider_first_name
+        if name and name.lower() not in ("customer", "unknown", ""):
+            greeting = f"Hi, this is Cameron, an AI assistant calling on behalf of {self.organization_name}. Am I speaking with {name}?"
+        else:
+            greeting = f"Hi, this is Cameron, an AI assistant calling on behalf of {self.organization_name}. I'm reaching out to get your feedback on a recent experience — do you have a quick moment?"
+        await self.session.say(greeting)
 

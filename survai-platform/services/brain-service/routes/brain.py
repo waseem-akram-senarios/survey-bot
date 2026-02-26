@@ -201,8 +201,12 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
         restricted_topics = req.restricted_topics or []
 
         if rider_data and any(rider_data.values()):
-            rider_name = rider_data.get("name", "there")
-            rider_lines = [f"- Name: {rider_name}"]
+            rider_name = rider_data.get("name", "")
+            if rider_name and rider_name.lower() not in ("customer", "unknown"):
+                rider_lines = [f"- Name: {rider_name}"]
+            else:
+                rider_name = ""
+                rider_lines = ["- Name: Not available (do NOT guess or use placeholder names)"]
             if rider_data.get("phone"):
                 rider_lines.append(f"- Phone: {rider_data['phone']}")
             if rider_data.get("last_ride_date"):
@@ -217,10 +221,10 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
                 else:
                     rider_lines.append(f"- Bio: {bio}")
             rider_context = "\n".join(rider_lines)
-            rider_greeting = f", {rider_name}"
+            rider_greeting = f", {rider_name}" if rider_name else ""
         else:
-            rider_context = "No rider data available. Ask all questions from scratch."
-            rider_name = "there"
+            rider_context = "No rider data available. Do NOT use any name — just say 'you' or 'your experience'."
+            rider_name = ""
             rider_greeting = ""
 
         # Enforce max questions limit
