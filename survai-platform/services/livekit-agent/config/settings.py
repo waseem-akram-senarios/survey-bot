@@ -33,7 +33,7 @@ STT_LANGUAGE = os.getenv("STT_LANGUAGE", "en")
 
 # Large Language Model (OpenAI)
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4.1-mini")
-LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.4"))
 
 # Text-to-Speech
 TTS_MODEL = os.getenv("TTS_MODEL", "eleven_flash_v2_5")
@@ -44,13 +44,13 @@ TTS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9")
 # ===========================================
 PREEMPTIVE_GENERATION = True
 RESUME_FALSE_INTERRUPTION = True
-FALSE_INTERRUPTION_TIMEOUT = 1.0
-MAX_TOOL_STEPS = 5
+FALSE_INTERRUPTION_TIMEOUT = 1.5
+MAX_TOOL_STEPS = 15
 
 # VAD tuning for phone calls
-VAD_MIN_SILENCE_DURATION = float(os.getenv("VAD_MIN_SILENCE_DURATION", "0.3"))
-VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.05"))
-VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.5"))
+VAD_MIN_SILENCE_DURATION = float(os.getenv("VAD_MIN_SILENCE_DURATION", "0.5"))
+VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.08"))
+VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.45"))
 
 # ===========================================
 # FILE/DIRECTORY PATHS

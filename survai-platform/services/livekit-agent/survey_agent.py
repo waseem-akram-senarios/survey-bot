@@ -38,21 +38,20 @@ class SurveyAgent(Agent):
         return len(alpha_only) >= 2
 
     async def on_enter(self):
-        """Called when agent enters - AI speaks first."""
-        # Brief delay to let the SIP audio channel stabilize after answer
-        await asyncio.sleep(1.0)
+        """Speak the greeting, then hand control to the LLM for the survey flow."""
+        await asyncio.sleep(0.8)
 
         name = self.rider_first_name
         org = self.organization_name
         if self._is_real_name(name):
             greeting = (
-                f"Hi there! This is Cameron, an AI assistant calling on behalf of {org}. "
+                f"Hello! This is Cameron, calling on behalf of {org}. "
                 f"Am I speaking with {name}?"
             )
         else:
             greeting = (
-                f"Hi there! This is Cameron, an AI assistant calling on behalf of {org}. "
-                f"I'm reaching out to get your quick feedback on a recent experience — do you have a moment?"
+                f"Hello! This is Cameron, calling on behalf of {org}. "
+                f"I'm reaching out to get your quick feedback. Is now a good time?"
             )
         await self.session.say(greeting)
 

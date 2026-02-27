@@ -6,6 +6,7 @@ Only two tools:
   - end_survey(reason)                 — end the call and disconnect
 """
 
+import asyncio
 from datetime import datetime
 from typing import Callable
 
@@ -15,6 +16,8 @@ from utils.logging import get_logger
 from utils.storage import save_survey_responses
 
 logger = get_logger()
+
+HANGUP_DELAY_SECONDS = 2.0
 
 
 def create_survey_tools(
@@ -54,6 +57,9 @@ def create_survey_tools(
         call_duration = (datetime.now() - call_start_time).total_seconds()
         save_survey_responses(caller_number, survey_responses, call_duration)
         cleanup_logging_fn(log_handler)
+
+        # Let TTS finish the goodbye before dropping the call
+        await asyncio.sleep(HANGUP_DELAY_SECONDS)
 
         if disconnect_fn:
             await disconnect_fn()
