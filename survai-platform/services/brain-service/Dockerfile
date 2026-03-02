@@ -15,4 +15,4 @@ COPY services/brain-service/ /app/
 
 EXPOSE 8016
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8016"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8016", "--timeout-keep-alive", "75"]

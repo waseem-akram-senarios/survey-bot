@@ -15,4 +15,4 @@ COPY services/voice-service/ /app/
 
 EXPOSE 8017
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8017"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8017", "--timeout-keep-alive", "75"]

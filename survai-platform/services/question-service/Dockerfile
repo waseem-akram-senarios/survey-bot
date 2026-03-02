@@ -8,4 +8,4 @@ COPY services/question-service/requirements.txt /app/requirements.txt
 RUN uv pip install -r /app/requirements.txt --system --python 3.10
 COPY services/question-service/ /app/
 EXPOSE 8030
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8030"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8030", "--timeout-keep-alive", "75"]
