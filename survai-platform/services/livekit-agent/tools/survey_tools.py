@@ -65,11 +65,15 @@ def create_survey_tools(
     person_name = rider_name or "there"
     survey_finished = {"done": False}
 
-    async def _finalize_and_disconnect(reason: str = "completed"):
-        """Save results, notify backend, disconnect after delay."""
+    async def _save_and_disconnect(reason: str = "completed"):
+        """Save results, notify backend, disconnect."""
         if survey_responses.get("_finalized"):
+            logger.info("Already finalized, skipping duplicate _save_and_disconnect")
+            if disconnect_fn:
+                await disconnect_fn()
             return
         survey_responses["_finalized"] = True
+        logger.info(f"Finalizing survey: reason={reason}")
 
         survey_responses["end_reason"] = reason
         survey_responses["completed"] = reason == "completed"
@@ -85,16 +89,21 @@ def create_survey_tools(
             transcript_lines = []
             for qid, ans in survey_responses.get("answers", {}).items():
                 transcript_lines.append(f"Q[{qid}]: {ans}")
-            asyncio.create_task(_call_service(
-                f"{VOICE_SERVICE_URL}/api/voice/store-transcript",
-                {
-                    "survey_id": survey_id,
-                    "full_transcript": "\n".join(transcript_lines),
-                    "call_duration_seconds": str(int(call_duration)),
-                    "call_status": reason,
-                },
-            ))
+            try:
+                await _call_service(
+                    f"{VOICE_SERVICE_URL}/api/voice/store-transcript",
+                    {
+                        "survey_id": survey_id,
+                        "full_transcript": "\n".join(transcript_lines),
+                        "call_duration_seconds": str(int(call_duration)),
+                        "call_status": reason,
+                    },
+                )
+            except Exception as e:
+                logger.warning(f"Failed to store transcript: {e}")
 
+        logger.info(f"Disconnecting call in {HANGUP_DELAY_SECONDS}s")
+        await asyncio.sleep(HANGUP_DELAY_SECONDS)
         if disconnect_fn:
             await disconnect_fn()
 
@@ -110,8 +119,8 @@ def create_survey_tools(
         """
         if survey_finished["done"]:
             return (
-                f"The survey is already complete. Just say goodbye to {person_name} warmly "
-                f"and thank them for their time. Do NOT call any more tools."
+                f"The survey is already complete. Say goodbye to {person_name} warmly "
+                f"then call end_survey(\"completed\") to hang up."
             )
 
         if question_id in survey_responses["answers"]:
@@ -128,8 +137,8 @@ def create_survey_tools(
                 else:
                     survey_finished["done"] = True
                     return (
-                        f"All questions are already answered. Say goodbye to {person_name} now. "
-                        f"Do NOT call any tools."
+                        f"All questions are already answered. Say goodbye to {person_name} now, "
+                        f"then call end_survey(\"completed\")."
                     )
             return f"Already recorded {question_id}. Move to the next question."
 
@@ -157,40 +166,27 @@ def create_survey_tools(
                 )
             else:
                 survey_finished["done"] = True
-
-                async def _auto_end():
-                    await asyncio.sleep(AUTO_END_DELAY_SECONDS)
-                    logger.info("Auto-ending call after goodbye speech")
-                    await _finalize_and_disconnect("completed")
-
-                asyncio.create_task(_auto_end())
+                logger.info(f"✅ ALL {total_questions} questions answered — telling agent to close")
 
                 return (
                     f"RECORDED ({done_count}/{total_questions}). "
-                    f"✅ ALL DONE. Say this now: "
-                    f"\"Thanks so much for sharing your thoughts, {person_name}. "
+                    f"✅ ALL DONE. Now do these two things IN ORDER: "
+                    f"1) Say: \"Thanks so much for sharing your thoughts, {person_name}. "
                     f"I really appreciate your time, and I hope you have a great rest of your day!\" "
-                    f"Then STOP. Do NOT call any tools. The call ends automatically."
+                    f"2) Then call end_survey(\"completed\")."
                 )
         return f"Recorded {question_id}."
 
     @function_tool()
     async def end_survey(context: RunContext, reason: str = "completed"):
         """
-        End the survey call and hang up.
-        ONLY use for: wrong_person, declined, callback_scheduled, or link_sent.
-        Do NOT call this after finishing all questions — the call ends automatically.
+        End the survey call and hang up. Say your full goodbye BEFORE calling this.
 
         Args:
-            reason: Why the call is ending — wrong_person, declined, callback_scheduled, link_sent
+            reason: Why the call is ending — completed, wrong_person, declined, callback_scheduled, link_sent
         """
         logger.info(f"📞 end_survey called — reason: {reason}")
-
-        if reason == "completed" and survey_finished["done"]:
-            return "Survey already ending automatically. Just say goodbye."
-
-        await asyncio.sleep(HANGUP_DELAY_SECONDS)
-        await _finalize_and_disconnect(reason)
+        await _save_and_disconnect(reason)
         return "Call ended."
 
     @function_tool()
