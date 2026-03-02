@@ -685,7 +685,7 @@ async def get_survey_questions(survey_id: str):
  LEFT JOIN (
    SELECT
      question_id,
-     json_agg(text ORDER BY text) AS categories
+     json_agg(text ORDER BY CASE WHEN lower(text) = 'none of the above' THEN 1 ELSE 0 END, text) AS categories
    FROM question_categories
    GROUP BY question_id
  ) qc
@@ -702,12 +702,14 @@ async def get_survey_questions(survey_id: str):
  ORDER BY sri.ord;"""
         sql_dict = {"survey_id": survey_id}
         questions_response = sql_execute(sql_query, sql_dict)
+        survey_row = res[0]
+        template_name = survey_row.get("template_name") or survey_row.get("name") or ""
         if len(questions_response) == 0:
-            return {"SurveyId": survey_id, "Questions": []}
+            return {"SurveyId": survey_id, "TemplateName": template_name, "Questions": []}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {"SurveyId": survey_id, "Questions": questions_response}
+    return {"SurveyId": survey_id, "TemplateName": template_name, "Questions": questions_response}
 
 
 @router.get(
@@ -754,7 +756,7 @@ async def get_survey_questions_unanswered(survey_id: str):
  LEFT JOIN (
    SELECT
      question_id,
-     json_agg(text ORDER BY text) AS categories
+     json_agg(text ORDER BY CASE WHEN lower(text) = 'none of the above' THEN 1 ELSE 0 END, text) AS categories
    FROM question_categories
    GROUP BY question_id
  ) qc
@@ -1191,7 +1193,7 @@ async def get_survey_question_answer(survey_id: str, request: QuestionIdRequestP
  LEFT JOIN (
    SELECT
      question_id,
-     json_agg(text ORDER BY text) AS categories
+     json_agg(text ORDER BY CASE WHEN lower(text) = 'none of the above' THEN 1 ELSE 0 END, text) AS categories
    FROM question_categories
    GROUP BY question_id
  ) qc

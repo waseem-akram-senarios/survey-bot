@@ -24,10 +24,11 @@ _PLACEHOLDER_PATTERN = re.compile(
 
 
 class SurveyAgent(Agent):
-    def __init__(self, instructions: str, rider_first_name: str, organization_name: str = None, **kwargs):
+    def __init__(self, instructions: str, rider_first_name: str, organization_name: str = None, language: str = "en", **kwargs):
         super().__init__(instructions=instructions, **kwargs)
         self.rider_first_name = rider_first_name
         self.organization_name = organization_name or ORGANIZATION_NAME
+        self.language = language
 
     def _is_real_name(self, name: str) -> bool:
         if not name or not name.strip():
@@ -46,16 +47,29 @@ class SurveyAgent(Agent):
 
         name = self.rider_first_name
         org = self.organization_name
+        is_spanish = self.language == "es"
+
         if self._is_real_name(name):
-            greeting = (
-                f"Hi, this is Cameron calling on behalf of {org}. "
-                f"Am I speaking with {name}?"
-            )
+            if is_spanish:
+                greeting = (
+                    f"Hola, soy Cameron de {org}. "
+                    f"¿Estoy hablando con {name}?"
+                )
+            else:
+                greeting = (
+                    f"Hi, this is Cameron with {org}. "
+                    f"Am I speaking to {name}?"
+                )
         else:
-            greeting = (
-                f"Hi, this is Cameron calling on behalf of {org}. "
-                f"May I know who I'm speaking with?"
-            )
+            if is_spanish:
+                greeting = (
+                    f"Hola, soy Cameron de {org}. "
+                    f"Me comunico para obtener sus comentarios. ¿Es un buen momento?"
+                )
+            else:
+                greeting = (
+                    f"Hi, this is Cameron with {org}. "
+                    f"I'm reaching out to get your quick feedback. Is now a good time?"
+                )
         logger.info(f"[AGENT] {greeting}")
         await self.session.say(greeting)
-

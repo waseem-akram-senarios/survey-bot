@@ -71,7 +71,13 @@ async def make_call(
     company_name = template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves")
     callback_url = os.getenv("SURVEY_SUBMIT_URL", "http://survey-service:8020/api/answers/qna_phone")
 
+<<<<<<< HEAD
     rider_first_name = _extract_rider_first_name(rider_name)
+=======
+    public_url = os.getenv("NEXT_PUBLIC_API_BASE_URL", os.getenv("PUBLIC_URL", ""))
+    survey_url = f"{public_url}/survey/{survey_id}" if public_url else ""
+    rider_email = survey.get("email") or (rider_data or {}).get("email", "") if rider_data else ""
+>>>>>>> 7948bce065967078c112681abfc6578b36faaa4d
 
     survey_context = {
         "recipient_name": rider_name or "",
@@ -80,14 +86,45 @@ async def make_call(
         "language": language,
         "questions": questions,
         "callback_url": callback_url,
+        "survey_url": survey_url,
+        "rider_email": rider_email,
+        "time_limit_minutes": template_config.get("time_limit_minutes", 8),
     }
 
     try:
+<<<<<<< HEAD
         system_prompt = build_survey_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
             survey_name=template_name or f"Survey {survey_id}",
             questions=questions,
+=======
+        if not rider_data:
+            rider_data = {}
+        if not rider_data.get("name") and rider_name:
+            rider_data["name"] = rider_name
+        if not rider_data.get("phone") and rider_phone:
+            rider_data["phone"] = rider_phone
+        survey_biodata = survey.get("biodata", "")
+        if survey_biodata and not rider_data.get("biodata"):
+            rider_data["biodata"] = survey_biodata
+
+        time_limit = template_config.get("time_limit_minutes", 8)
+        restricted_topics = template_config.get("restricted_topics") or []
+
+        client = _get_brain_client()
+        resp = await client.post(
+            "/api/brain/build-system-prompt",
+            json={
+                "survey_name": template_name or f"Survey {survey_id}",
+                "questions": questions,
+                "rider_data": rider_data,
+                "company_name": company_name,
+                "time_limit_minutes": time_limit,
+                "restricted_topics": restricted_topics,
+                "language": language,
+            },
+>>>>>>> 7948bce065967078c112681abfc6578b36faaa4d
         )
         survey_context["system_prompt"] = system_prompt
         logger.info(f"Built local prompt for LiveKit call ({len(system_prompt)} chars)")
@@ -133,6 +170,27 @@ async def get_survey_transcript(survey_id: str):
             detail=f"No transcript found for survey {survey_id}",
         )
     return transcript
+
+
+@router.post("/store-transcript")
+async def api_store_transcript(
+    survey_id: str,
+    full_transcript: str,
+    call_duration_seconds: int = 0,
+    call_status: str = "completed",
+):
+    """Store a call transcript after the voice call ends."""
+    try:
+        tid = store_transcript(
+            survey_id=survey_id,
+            full_transcript=full_transcript,
+            call_duration_seconds=call_duration_seconds,
+            call_status=call_status,
+        )
+        return {"status": "stored", "transcript_id": tid}
+    except Exception as e:
+        logger.error(f"Failed to store transcript: {e}")
+        raise HTTPException(status_code=500, detail="Failed to store transcript")
 
 
 @router.post("/send-email-fallback")
@@ -226,6 +284,27 @@ async def send_email_fallback(
 
     logger.error(f"All email fallback methods failed for survey {survey_id} to {email}")
     return {"status": "failed", "error": "All email providers failed", "survey_url": survey_url}
+
+
+# ─── Agent callback endpoints (livekit-agent writes answers back to DB) ───────
+
+@router.post("/record-answer")
+async def api_record_answer(survey_id: str, question_id: str, answer: str):
+    """Record a single answer from the voice agent into the database."""
+    ok = record_answer(survey_id, question_id, answer)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to record answer")
+    return {"status": "recorded", "survey_id": survey_id, "question_id": question_id}
+
+
+@router.post("/complete-survey")
+async def api_complete_survey(survey_id: str, reason: str = "completed"):
+    """Mark a voice survey as completed (or other status) in the database."""
+    status = "Completed" if reason == "completed" else "In Progress"
+    ok = update_survey_status(survey_id, status)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to update survey status")
+    return {"status": status, "survey_id": survey_id}
 
 
 # ─── Direct call endpoint (dashboard calls this via gateway, skipping survey-service hop)

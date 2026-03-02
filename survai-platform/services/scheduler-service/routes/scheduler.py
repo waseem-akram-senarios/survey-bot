@@ -107,14 +107,16 @@ async def schedule_campaign(
 
         job_id = str(uuid4())
         sched = get_scheduler()
-        if frequency == "daily":
-            interval_hours = 24
-        elif frequency == "weekly":
-            interval_hours = 24 * 7
-        elif frequency == "monthly":
-            interval_hours = 24 * 30
-        else:
-            interval_hours = 24
+        frequency_map = {
+            "daily": 24,
+            "weekly": 24 * 7,
+            "biweekly": 24 * 14,
+            "monthly": 24 * 30,
+            "biannual": 24 * 182,
+            "annual": 24 * 365,
+            "once": 0,
+        }
+        interval_hours = frequency_map.get(frequency, 24)
 
         run_date = datetime.now(timezone.utc) + timedelta(minutes=next_run_offset_minutes)
 
@@ -145,13 +147,21 @@ async def schedule_campaign(
             except Exception as e:
                 logger.error(f"Campaign job error: {e}")
 
-        sched.add_job(
-            _campaign_job,
-            "interval",
-            hours=interval_hours,
-            id=job_id,
-            start_date=run_date,
-        )
+        if interval_hours == 0:
+            sched.add_job(
+                _campaign_job,
+                "date",
+                run_date=run_date,
+                id=job_id,
+            )
+        else:
+            sched.add_job(
+                _campaign_job,
+                "interval",
+                hours=interval_hours,
+                id=job_id,
+                start_date=run_date,
+            )
 
         return {
             "status": "scheduled",

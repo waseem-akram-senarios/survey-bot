@@ -24,8 +24,10 @@ export async function POST(request) {
     }
 
     const contentType = request.headers.get("content-type") || "audio/webm";
+    const { searchParams } = new URL(request.url);
+    const language = searchParams.get("language") || "en";
     console.log(
-      `Transcription request: ${audioData.byteLength} bytes, type: ${contentType}`
+      `Transcription request: ${audioData.byteLength} bytes, type: ${contentType}, language: ${language}`
     );
 
     // Primary: Use OpenAI Whisper API
@@ -34,7 +36,8 @@ export async function POST(request) {
         const transcript = await transcribeWithOpenAI(
           openaiKey,
           audioData,
-          contentType
+          contentType,
+          language
         );
         if (transcript && transcript.trim()) {
           console.log(`OpenAI Whisper transcript: "${transcript}"`);
@@ -68,7 +71,8 @@ export async function POST(request) {
         const data = await transcribeWithDeepgram(
           deepgramToken,
           audioData,
-          contentType
+          contentType,
+          language
         );
         const transcript =
           data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || "";
@@ -96,7 +100,7 @@ export async function POST(request) {
   }
 }
 
-async function transcribeWithOpenAI(apiKey, audioBuffer, contentType) {
+async function transcribeWithOpenAI(apiKey, audioBuffer, contentType, language = "en") {
   const extMap = {
     "audio/webm": "webm",
     "audio/webm;codecs=opus": "webm",
@@ -116,7 +120,7 @@ async function transcribeWithOpenAI(apiKey, audioBuffer, contentType) {
   const formData = new FormData();
   formData.append("file", blob, `recording.${ext}`);
   formData.append("model", "whisper-1");
-  formData.append("language", "en");
+  formData.append("language", language);
 
   const response = await fetch(
     "https://api.openai.com/v1/audio/transcriptions",
@@ -138,9 +142,15 @@ async function transcribeWithOpenAI(apiKey, audioBuffer, contentType) {
   return data.text || "";
 }
 
-async function transcribeWithDeepgram(apiToken, audioBuffer, contentType) {
+async function transcribeWithDeepgram(apiToken, audioBuffer, contentType, language = "en") {
+  const params = new URLSearchParams({
+    model: "nova-2",
+    smart_format: "true",
+    numerals: "true",
+    language: language,
+  });
   const response = await fetch(
-    "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&numerals=true",
+    `https://api.deepgram.com/v1/listen?${params.toString()}`,
     {
       method: "POST",
       headers: {

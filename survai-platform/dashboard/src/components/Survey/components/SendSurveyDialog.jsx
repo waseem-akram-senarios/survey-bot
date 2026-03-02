@@ -23,7 +23,9 @@ const SendSurveyDialog = ({
   surveyId,
   isSendingEmail,
   isSendingPhone,
+  surveyStatus,
 }) => {
+  const isCompleted = surveyStatus?.toLowerCase() === "completed";
   const isMobile = useMediaQuery("(max-width: 600px)");
   const [currentState, setCurrentState] = useState("default"); // "default", "email", "phone"
   const [email, setEmail] = useState("");
@@ -46,11 +48,11 @@ const SendSurveyDialog = ({
 
   const validatePhone = (value) => {
     if (!value.trim()) return "Phone number is required";
+    if (!value.startsWith('+')) return "Phone number must start with + and country code (e.g. +1 for US)";
     const digits = value.replace(/[^\d]/g, '');
-    if (digits.length < 7) return "Phone number must have at least 7 digits";
+    if (digits.length < 10) return "Phone number must have at least 10 digits (including country code)";
     if (digits.length > 15) return "Phone number cannot exceed 15 digits";
-    if (!/^\+?[\d\s\-()]+$/.test(value)) return "Only digits, +, spaces, hyphens and parentheses allowed";
-    if (!/^\+?[1-9]/.test(value.replace(/[\s\-()]/g, ''))) return "Phone number must start with a valid country code";
+    if (!/^\+[\d\s\-()]+$/.test(value)) return "Only digits, +, spaces, hyphens and parentheses allowed";
     return "";
   };
 
@@ -68,6 +70,8 @@ const SendSurveyDialog = ({
       setEmailError(validateEmail(email));
     }
   };
+
+  const formatPhoneForApi = (value) => value.replace(/[\s\-()]/g, '');
 
   const handlePhoneChange = (e) => {
     const value = e.target.value.replace(/[^\d\s\-+()]/g, '');
@@ -105,7 +109,8 @@ const SendSurveyDialog = ({
     const error = validatePhone(phone);
     setPhoneError(error);
     if (error) return;
-    onConfirmPhone(phone.trim(), voiceProvider);
+    const cleanNumber = formatPhoneForApi(phone.trim());
+    onConfirmPhone(cleanNumber, voiceProvider);
   };
 
   const [copied, setCopied] = useState(false);
@@ -192,6 +197,26 @@ const SendSurveyDialog = ({
               Send Survey
             </Typography>
           </Box>
+
+          {/* Completed Survey Warning */}
+          {isCompleted && (
+            <Box
+              sx={{
+                mb: 3,
+                p: 2,
+                backgroundColor: "#FFF3E0",
+                borderRadius: "12px",
+                border: "1px solid #FF9800",
+              }}
+            >
+              <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "13px", color: "#E65100", fontWeight: 500, mb: 0.5 }}>
+                Survey Already Completed
+              </Typography>
+              <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "12px", color: "#BF360C" }}>
+                This survey was already completed on the dashboard. Sending the link via email will show the recipient that it's already done. To collect new responses, please create a new survey.
+              </Typography>
+            </Box>
+          )}
 
           {/* Copy Link Section */}
           <Box sx={{ mb: 4 }}>
@@ -313,17 +338,17 @@ const SendSurveyDialog = ({
               >
                 Enter Phone Number
               </Typography>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <img src={PhoneIcon} alt="Phone-Icon" style={{ marginRight: '7.5px' }} />
                 <TextField
                   fullWidth
-                  placeholder="+1 234 567 8901"
+                  placeholder="+12345678901"
                   type="tel"
                   value={phone}
                   onChange={handlePhoneChange}
                   onBlur={handlePhoneBlur}
                   error={!!phoneError}
-                  helperText={phoneError || "Include country code, e.g. +1 for US"}
+                  helperText={phoneError || "Format: +[country code][number] e.g. +12345678901"}
                   disabled={isLoading}
                   color={phoneTouched && phone && !phoneError ? "success" : undefined}
                   inputProps={{ maxLength: 20 }}
@@ -340,6 +365,11 @@ const SendSurveyDialog = ({
                   }}
                 />
               </Box>
+              {phone && !phoneError && (
+                <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "12px", color: "#4CAF50", ml: 4.5 }}>
+                  Will call: {formatPhoneForApi(phone.trim())}
+                </Typography>
+              )}
               
             </Box>
           )}

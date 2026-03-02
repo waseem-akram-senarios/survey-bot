@@ -106,6 +106,7 @@ class SurveyBaseP(BaseModel):
     RiderName: str = ""
     RideId: str = ""
     TenantId: str = ""
+    Phone: str = ""
 
 
 class SurveyCreateP(SurveyBaseP):
@@ -237,7 +238,7 @@ class AnalyticsSummary(BaseModel):
 class CampaignCreateP(BaseModel):
     name: str
     template_name: str
-    frequency: Literal["once", "daily", "weekly", "monthly"] = "once"
+    frequency: Literal["once", "daily", "weekly", "biweekly", "monthly", "biannual", "annual"] = "once"
 
 
 class CampaignP(CampaignCreateP):

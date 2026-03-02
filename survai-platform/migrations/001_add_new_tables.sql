@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
     template_name TEXT REFERENCES templates(name),
-    frequency   TEXT DEFAULT 'once' CHECK (frequency IN ('once', 'daily', 'weekly', 'monthly')),
+    frequency   TEXT DEFAULT 'once' CHECK (frequency IN ('once', 'daily', 'weekly', 'biweekly', 'monthly', 'biannual', 'annual')),
     status      TEXT DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed')),
     next_run_date TIMESTAMP,
     created_at  TIMESTAMP DEFAULT NOW()

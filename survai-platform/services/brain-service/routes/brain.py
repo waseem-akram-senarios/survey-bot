@@ -94,8 +94,9 @@ class SystemPromptRequest(BaseModel):
     questions: List[Dict[str, Any]]
     rider_data: Optional[Dict[str, Any]] = None
     company_name: str = "the transit agency"
-    time_limit_minutes: int = 5
+    time_limit_minutes: int = 8
     restricted_topics: Optional[List[str]] = None
+    language: str = "en"
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
@@ -269,7 +270,7 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
                 )
             elif criteria == "scale":
                 line = QUESTION_FORMAT_SCALE.format(
-                    order=order, question_id=qid, question_text=text, scale_max=q.get("scales", 5),
+                    order=order, question_id=qid, question_text=text, scale_max=q.get("scales") or 5,
                 )
             elif criteria == "categorical":
                 categories = q.get("categories", [])
@@ -285,10 +286,12 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
         if restricted_topics:
             restricted_topics_block = "\n".join(f"- NEVER discuss {t}" for t in restricted_topics)
         else:
-            restricted_topics_block = "- No additional topic restrictions"
+            restricted_topics_block = ""
 
         warning_minutes = max(1, req.time_limit_minutes - 2)
         hard_stop_minutes = max(2, req.time_limit_minutes - 1)
+
+        rider_name_for_prompt = rider_name if rider_name else "the person"
 
         prompt = AGENT_SYSTEM_PROMPT_TEMPLATE.format(
             company_name=req.company_name,
@@ -296,13 +299,10 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
             rider_context=rider_context,
             questions_block=questions_block,
             restricted_topics_block=restricted_topics_block,
+            rider_name_for_prompt=rider_name_for_prompt,
             time_limit_minutes=req.time_limit_minutes,
             warning_minutes=warning_minutes,
             hard_stop_minutes=hard_stop_minutes,
-            absolute_max_minutes=req.time_limit_minutes,
-            rider_name=rider_name,
-            rider_greeting=rider_greeting,
-            max_questions=MAX_SURVEY_QUESTIONS,
         )
         return {"system_prompt": prompt}
     except Exception as e:

@@ -291,7 +291,7 @@ JOIN questions q
 LEFT JOIN (
   SELECT
     question_id,
-    json_agg(text ORDER BY text) AS categories
+    json_agg(text ORDER BY CASE WHEN lower(text) = 'none of the above' THEN 1 ELSE 0 END, text) AS categories
   FROM question_categories
   GROUP BY question_id
 ) qc

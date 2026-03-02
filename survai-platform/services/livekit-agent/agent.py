@@ -6,6 +6,7 @@ No local prompt logic — voice-service is the single source of truth for prompt
 Tools: record_answer, end_survey.
 """
 
+import asyncio
 import os
 import json
 from datetime import datetime
@@ -58,6 +59,7 @@ MINIMAL_FALLBACK_PROMPT = (
 async def entrypoint(ctx: JobContext):
     metadata = json.loads(ctx.job.metadata or "{}")
     phone_number = metadata.get("phone_number")
+    survey_id = metadata.get("survey_id")
 
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
@@ -93,14 +95,15 @@ async def entrypoint(ctx: JobContext):
 
     rider_first_name = platform_recipient.split()[0] if platform_recipient else ""
     org_name = platform_org or ORGANIZATION_NAME
+    call_language = metadata.get("language", "en")
 
     questions_list = metadata.get("questions", [])
-    # Only non-conditional questions count as "required" — conditional ones depend on prior answers
-    question_ids = [
-        q.get("id", f"q{i+1}")
-        for i, q in enumerate(questions_list)
-        if isinstance(q, dict) and not q.get("parent_id")
-    ]
+    question_ids = [q.get("id", f"q{i+1}") for i, q in enumerate(questions_list) if isinstance(q, dict)]
+    questions_map = {}
+    for i, q in enumerate(questions_list):
+        if isinstance(q, dict):
+            qid = q.get("id", f"q{i+1}")
+            questions_map[qid] = q.get("text") or q.get("question_text") or f"Question {i+1}"
 
     logger.info(f"Recipient: '{rider_first_name}' | Org: '{org_name}' | Phone: {caller_number} | Questions: {len(question_ids)}")
     if platform_prompt:
@@ -121,6 +124,9 @@ async def entrypoint(ctx: JobContext):
             logger.error(f"Room delete failed: {e}")
             await ctx.room.disconnect()
 
+    survey_url = metadata.get("survey_url", "")
+    rider_email = metadata.get("rider_email", "")
+
     survey_tools = create_survey_tools(
         survey_responses=survey_responses,
         caller_number=caller_number,
@@ -129,17 +135,23 @@ async def entrypoint(ctx: JobContext):
         cleanup_logging_fn=cleanup_survey_logging,
         disconnect_fn=hangup_call,
         question_ids=question_ids,
+        questions_map=questions_map,
+        survey_id=survey_id,
+        survey_url=survey_url,
+        rider_email=rider_email,
+        rider_name=rider_first_name,
     )
 
     survey_agent = SurveyAgent(
         instructions=survey_prompt,
         rider_first_name=rider_first_name,
         organization_name=org_name,
+        language=call_language,
         tools=survey_tools,
     )
 
     session = AgentSession(
-        stt=deepgram.STT(model=STT_MODEL, language=STT_LANGUAGE),
+        stt=deepgram.STT(model=STT_MODEL, language="es" if call_language == "es" else STT_LANGUAGE),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE),
         tts=(
             elevenlabs.TTS(
@@ -167,6 +179,20 @@ async def entrypoint(ctx: JobContext):
         is_final = getattr(ev, "is_final", True)
         if is_final and transcript.strip():
             logger.info(f"[USER] {transcript.strip()[:400]}")
+    time_limit_minutes = metadata.get("time_limit_minutes", 8)
+
+    async def _time_limit_watchdog():
+        """Enforce call time limit — gracefully end call if exceeded."""
+        await asyncio.sleep(time_limit_minutes * 60)
+        if not survey_responses.get("end_reason"):
+            logger.warning(f"Time limit reached ({time_limit_minutes}m) — disconnecting")
+            survey_responses["end_reason"] = "time_limit"
+            try:
+                await hangup_call()
+            except Exception:
+                pass
+
+    asyncio.create_task(_time_limit_watchdog())
 
     await session.start(room=ctx.room, agent=survey_agent)
 

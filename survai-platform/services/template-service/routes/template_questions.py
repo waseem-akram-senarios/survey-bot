@@ -184,7 +184,7 @@ async def get_template_answers(request: GetTemplateQuestionsRequestP):
 FROM survey_response_items sri
 JOIN questions q ON sri.question_id = q.id
 LEFT JOIN (
-  SELECT question_id, json_agg(text ORDER BY text) AS categories
+  SELECT question_id, json_agg(text ORDER BY CASE WHEN lower(text) = 'none of the above' THEN 1 ELSE 0 END, text) AS categories
   FROM question_categories
   GROUP BY question_id
 ) qc ON qc.question_id = q.id

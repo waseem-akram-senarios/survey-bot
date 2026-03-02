@@ -31,19 +31,32 @@ def _stream_csv(rows: list, columns: list, filename: str):
 
 
 @router.get("/surveys")
-async def export_surveys():
-    """Export survey responses as CSV."""
+async def export_surveys(tenant_id: Optional[str] = Query(None)):
+    """Export survey responses as CSV. Optionally filter by tenant_id."""
     try:
-        rows = sql_execute(
-            """SELECT s.id, s.template_name, s.status, s.rider_name, s.phone, s.email,
-                      s.launch_date, s.completion_date, s.channel,
-                      sri.question_id, q.text AS question_text, sri.raw_answer, sri.answer
-               FROM surveys s
-               LEFT JOIN survey_response_items sri ON sri.survey_id = s.id
-               LEFT JOIN questions q ON q.id = sri.question_id
-               ORDER BY s.id, sri.ord""",
-            {},
-        )
+        if tenant_id:
+            rows = sql_execute(
+                """SELECT s.id, s.template_name, s.status, s.rider_name, s.phone, s.email,
+                          s.launch_date, s.completion_date, s.channel,
+                          sri.question_id, q.text AS question_text, sri.raw_answer, sri.answer
+                   FROM surveys s
+                   LEFT JOIN survey_response_items sri ON sri.survey_id = s.id
+                   LEFT JOIN questions q ON q.id = sri.question_id
+                   WHERE s.tenant_id = :tid
+                   ORDER BY s.id, sri.ord""",
+                {"tid": tenant_id},
+            )
+        else:
+            rows = sql_execute(
+                """SELECT s.id, s.template_name, s.status, s.rider_name, s.phone, s.email,
+                          s.launch_date, s.completion_date, s.channel,
+                          sri.question_id, q.text AS question_text, sri.raw_answer, sri.answer
+                   FROM surveys s
+                   LEFT JOIN survey_response_items sri ON sri.survey_id = s.id
+                   LEFT JOIN questions q ON q.id = sri.question_id
+                   ORDER BY s.id, sri.ord""",
+                {},
+            )
         columns = ["id", "template_name", "status", "rider_name", "phone", "email", "launch_date", "completion_date", "channel", "question_id", "question_text", "raw_answer", "answer"]
         return _stream_csv(rows, columns, "survey_responses.csv")
     except Exception as e:
@@ -52,16 +65,26 @@ async def export_surveys():
 
 
 @router.get("/transcripts")
-async def export_transcripts():
-    """Export call transcripts as CSV."""
+async def export_transcripts(tenant_id: Optional[str] = Query(None)):
+    """Export call transcripts as CSV. Optionally filter by tenant_id via surveys."""
     try:
-        rows = sql_execute(
-            """SELECT id, survey_id, full_transcript, call_duration_seconds,
-                      call_started_at, call_ended_at, call_status, call_attempts, channel
-               FROM call_transcripts
-               ORDER BY call_started_at DESC""",
-            {},
-        )
+        if tenant_id:
+            rows = sql_execute(
+                """SELECT ct.id, ct.survey_id, ct.full_transcript, ct.call_duration_seconds,
+                          ct.call_started_at, ct.call_ended_at, ct.call_status, ct.call_attempts, ct.channel
+                   FROM call_transcripts ct
+                   JOIN surveys s ON s.id = ct.survey_id AND s.tenant_id = :tid
+                   ORDER BY ct.call_started_at DESC""",
+                {"tid": tenant_id},
+            )
+        else:
+            rows = sql_execute(
+                """SELECT id, survey_id, full_transcript, call_duration_seconds,
+                          call_started_at, call_ended_at, call_status, call_attempts, channel
+                   FROM call_transcripts
+                   ORDER BY call_started_at DESC""",
+                {},
+            )
         columns = ["id", "survey_id", "full_transcript", "call_duration_seconds", "call_started_at", "call_ended_at", "call_status", "call_attempts", "channel"]
         return _stream_csv(rows, columns, "call_transcripts.csv")
     except Exception as e:
@@ -96,12 +119,14 @@ async def export_campaign(campaign_id: str):
 
 
 @router.get("/survey/{survey_id}/responses")
-async def export_survey_responses(survey_id: str):
-    """Export single survey responses as CSV."""
+async def export_survey_responses(survey_id: str, tenant_id: Optional[str] = Query(None)):
+    """Export single survey responses as CSV. Optionally enforce tenant_id for access control."""
     try:
         survey = sql_execute("SELECT * FROM surveys WHERE id = :id", {"id": survey_id})
         if not survey:
             raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
+        if tenant_id and survey[0].get("tenant_id") != tenant_id:
+            raise HTTPException(status_code=403, detail="Survey does not belong to your organization")
 
         rows = sql_execute(
             """SELECT sri.question_id, q.text AS question_text, sri.raw_answer, sri.answer, sri.ord

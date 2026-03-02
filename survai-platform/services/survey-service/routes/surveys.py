@@ -72,6 +72,13 @@ async def get_template_questions(template_name: str) -> dict:
 
 async def get_survey_questions(survey_id: str) -> dict:
     """Get survey questions with answers from DB."""
+    survey_row = sql_execute(
+        "SELECT template_name, name FROM surveys WHERE id = :survey_id",
+        {"survey_id": survey_id},
+    )
+    template_name = ""
+    if survey_row:
+        template_name = survey_row[0].get("template_name") or survey_row[0].get("name") or ""
     sql_query = """SELECT
   q.id AS id,
   q.text,
@@ -87,7 +94,7 @@ async def get_survey_questions(survey_id: str) -> dict:
  FROM survey_response_items sri
  JOIN questions q ON sri.question_id = q.id
  LEFT JOIN (
-   SELECT question_id, json_agg(text ORDER BY text) AS categories
+   SELECT question_id, json_agg(text ORDER BY CASE WHEN lower(text) = 'none of the above' THEN 1 ELSE 0 END, text) AS categories
    FROM question_categories GROUP BY question_id
  ) qc ON qc.question_id = q.id
  LEFT JOIN (
@@ -99,7 +106,7 @@ async def get_survey_questions(survey_id: str) -> dict:
  WHERE sri.survey_id = :survey_id
  ORDER BY sri.ord;"""
     rows = sql_execute(sql_query, {"survey_id": survey_id})
-    return {"SurveyId": survey_id, "Questions": rows}
+    return {"SurveyId": survey_id, "TemplateName": template_name, "Questions": rows}
 
 
 async def get_survey_recipient(survey_id: str) -> dict:
@@ -228,25 +235,39 @@ def _row_to_survey(r: dict) -> SurveyP:
 # ─── Static/literal GET routes (before any {survey_id} routes) ───────────────
 
 @router.get("/surveys/stat", response_model=SurveyStats)
-async def survey_stat():
+async def survey_stat(tenant_id: Optional[str] = None):
     """Survey stats (dashboard uses /surveys/stat)."""
-    return await get_survey_stats()
+    return await get_survey_stats(tenant_id)
 
 
 @router.get("/surveys/stats", response_model=SurveyStats)
-async def get_survey_stats():
-    """Get survey statistics."""
-    rows = sql_execute("""
-        SELECT
-            COUNT(*) FILTER (WHERE TRUE) AS total_surveys,
-            COUNT(*) FILTER (WHERE status = 'Completed') AS total_completed_surveys,
-            COUNT(*) FILTER (WHERE status = 'In-Progress') AS total_active_surveys,
-            COUNT(*) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE) AS completed_surveys_today,
-            COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed')), 0) AS durations_median,
-            COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE)), 0) AS durations_today_median,
-            COALESCE(ROUND(AVG(csat) FILTER (WHERE status = 'Completed')), 0) AS csat_avg
-        FROM surveys
-    """, {})
+async def get_survey_stats(tenant_id: Optional[str] = None):
+    """Get survey statistics. Optionally filter by tenant_id."""
+    if tenant_id:
+        rows = sql_execute("""
+            SELECT
+                COUNT(*) FILTER (WHERE TRUE) AS total_surveys,
+                COUNT(*) FILTER (WHERE status = 'Completed') AS total_completed_surveys,
+                COUNT(*) FILTER (WHERE status = 'In-Progress') AS total_active_surveys,
+                COUNT(*) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE) AS completed_surveys_today,
+                COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed')), 0) AS durations_median,
+                COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE)), 0) AS durations_today_median,
+                COALESCE(ROUND(AVG(csat) FILTER (WHERE status = 'Completed')), 0) AS csat_avg
+            FROM surveys
+            WHERE tenant_id = :tid
+        """, {"tid": tenant_id})
+    else:
+        rows = sql_execute("""
+            SELECT
+                COUNT(*) FILTER (WHERE TRUE) AS total_surveys,
+                COUNT(*) FILTER (WHERE status = 'Completed') AS total_completed_surveys,
+                COUNT(*) FILTER (WHERE status = 'In-Progress') AS total_active_surveys,
+                COUNT(*) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE) AS completed_surveys_today,
+                COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed')), 0) AS durations_median,
+                COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE)), 0) AS durations_today_median,
+                COALESCE(ROUND(AVG(csat) FILTER (WHERE status = 'Completed')), 0) AS csat_avg
+            FROM surveys
+        """, {})
     if not rows:
         return SurveyStats(
             Total_Surveys=0, Total_Active_Surveys=0, Total_Completed_Surveys=0,
@@ -382,7 +403,7 @@ async def get_survey_questions_unanswered(survey_id: str):
                COALESCE(pm.parent_category_texts, null::json) AS parent_category_texts
         FROM survey_response_items sri
         JOIN questions q ON sri.question_id = q.id
-        LEFT JOIN (SELECT question_id, json_agg(text ORDER BY text) AS categories FROM question_categories GROUP BY question_id) qc ON qc.question_id = q.id
+        LEFT JOIN (SELECT question_id, json_agg(text ORDER BY CASE WHEN lower(text) = 'none of the above' THEN 1 ELSE 0 END, text) AS categories FROM question_categories GROUP BY question_id) qc ON qc.question_id = q.id
         LEFT JOIN (SELECT m.child_question_id, json_agg(qc2.text ORDER BY qc2.text) AS parent_category_texts FROM question_category_mappings m JOIN question_categories qc2 ON qc2.id = m.parent_category_id GROUP BY m.child_question_id) pm ON pm.child_question_id = q.id
         WHERE sri.survey_id = :survey_id AND sri.answer IS NULL AND sri.raw_answer IS NULL
         ORDER BY sri.ord
@@ -438,8 +459,8 @@ async def generate_survey(survey_data: SurveyCreateP):
 
     try:
         sql_execute(
-            """INSERT INTO surveys (id, template_name, url, biodata, status, name, recipient, launch_date, rider_name, ride_id, tenant_id)
-            VALUES (:id, :template_name, :url, :biodata, :status, :name, :recipient, :launch_date, :rider_name, :ride_id, :tenant_id)""",
+            """INSERT INTO surveys (id, template_name, url, biodata, status, name, recipient, launch_date, rider_name, ride_id, tenant_id, phone)
+            VALUES (:id, :template_name, :url, :biodata, :status, :name, :recipient, :launch_date, :rider_name, :ride_id, :tenant_id, :phone)""",
             {
                 "id": survey_data.SurveyId,
                 "template_name": survey_data.Name,
@@ -452,6 +473,7 @@ async def generate_survey(survey_data: SurveyCreateP):
                 "rider_name": survey_data.RiderName,
                 "ride_id": survey_data.RideId,
                 "tenant_id": survey_data.TenantId,
+                "phone": survey_data.Phone,
             },
         )
 
@@ -953,7 +975,7 @@ async def get_survey_question_answer(survey_id: str, request: dict):
                COALESCE(pm.parent_category_texts, null::json) AS parent_category_texts
         FROM survey_response_items sri
         JOIN questions q ON sri.question_id = q.id
-        LEFT JOIN (SELECT question_id, json_agg(text ORDER BY text) AS categories FROM question_categories GROUP BY question_id) qc ON qc.question_id = q.id
+        LEFT JOIN (SELECT question_id, json_agg(text ORDER BY CASE WHEN lower(text) = 'none of the above' THEN 1 ELSE 0 END, text) AS categories FROM question_categories GROUP BY question_id) qc ON qc.question_id = q.id
         LEFT JOIN (SELECT m.child_question_id, json_agg(qc2.text ORDER BY qc2.text) AS parent_category_texts FROM question_category_mappings m JOIN question_categories qc2 ON qc2.id = m.parent_category_id GROUP BY m.child_question_id) pm ON pm.child_question_id = q.id
         WHERE sri.survey_id = :survey_id AND sri.question_id = :question_id LIMIT 1
     """, {"survey_id": survey_id, "question_id": que_id})

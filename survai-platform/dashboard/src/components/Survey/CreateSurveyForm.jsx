@@ -17,12 +17,14 @@ import { UploadFile } from "@mui/icons-material";
 
 import { useAlert } from "../../hooks/useAlert";
 import { useSurvey, useTemplates } from "../../hooks/Surveys/useSurvey";
+import { useAuth } from "../../context/AuthContext";
 
 const CreateSurveyForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useMediaQuery("(max-width: 600px)");
   const { alert, showSuccess, showError, closeAlert } = useAlert();
+  const { user } = useAuth();
 
   // Survey and template hooks
   const { generateSurvey, isGenerating, generateSurveyId, validateSurveyForm } = useSurvey();
@@ -33,7 +35,7 @@ const CreateSurveyForm = () => {
   const [recipientName, setRecipientName] = useState("");
   const [riderName, setRiderName] = useState("");
   const [rideId, setRideId] = useState("");
-  const [tenantId, setTenantId] = useState("");
+  const [phone, setPhone] = useState("");
   const [recipientBiodata, setRecipientBiodata] = useState("");
 
   // Load templates on component mount and handle pre-selected template
@@ -59,7 +61,7 @@ const CreateSurveyForm = () => {
   };
 
   const handleGenerateClick = async () => {
-    const validation = validateSurveyForm(selectedTemplate, recipientName, riderName, rideId, tenantId);
+    const validation = validateSurveyForm(selectedTemplate, recipientName, riderName, rideId, phone);
     
     if (!validation.isValid) {
       showError(validation.error);
@@ -75,7 +77,8 @@ const CreateSurveyForm = () => {
         recipient: recipientName.trim(),
         riderName: riderName.trim(),
         rideId: rideId.trim(),
-        tenantId: tenantId.trim(),
+        tenantId: user?.tenantId || "",
+        phone: phone.trim(),
         biodata: recipientBiodata.trim()
       };
       
@@ -377,8 +380,8 @@ const CreateSurveyForm = () => {
               </Typography>
               <TextField
                 fullWidth
-                value={tenantId}
-                onChange={(e) => setTenantId(e.target.value)}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 placeholder="e.g. +1 555 000 0000 (optional)"
                 variant="outlined"
                 sx={{

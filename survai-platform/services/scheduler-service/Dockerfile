@@ -8,4 +8,4 @@ COPY services/scheduler-service/requirements.txt /app/requirements.txt
 RUN uv pip install -r /app/requirements.txt --system --python 3.10
 COPY services/scheduler-service/ /app/
 EXPOSE 8070
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8070"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8070", "--timeout-keep-alive", "75"]

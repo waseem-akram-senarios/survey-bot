@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import SurveyTableService from "../../services/Surveys/surveyTableService";
 import { transformSurveyData, mergeDashboardStats } from "../../utils/Surveys/surveyTableHelpers";
+import { useAuth } from "../../context/AuthContext";
 
-const useSurveyPageData = (statsDataFetcher, tableDataFetcher) => {
+const useSurveyPageData = (statsDataFetcher, tableDataFetcher, tenantId) => {
   const [statsData, setStatsData] = useState({});
   const [tableData, setTableData] = useState([]);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -41,7 +42,7 @@ const useSurveyPageData = (statsDataFetcher, tableDataFetcher) => {
   useEffect(() => {
     fetchStatsData();
     fetchTableData();
-  }, []);
+  }, [tenantId]);
 
   return {
     statsData,
@@ -58,27 +59,36 @@ const useSurveyPageData = (statsDataFetcher, tableDataFetcher) => {
 
 // Hook for Dashboard page - fetches merged stats and survey list
 export const useDashboard = () => {
+  const { user } = useAuth();
+  const tenantId = user?.tenantId ?? null;
   return useSurveyPageData(
     async () => {
-      const { surveyStats, templateStats } = await SurveyTableService.getDashboardData();
+      const { surveyStats, templateStats } = await SurveyTableService.getDashboardData(tenantId);
       return mergeDashboardStats(surveyStats, templateStats);
     },
-    () => SurveyTableService.getSurveyList()
+    () => SurveyTableService.getSurveyList(tenantId),
+    tenantId
   );
 };
 
 // Hook for ManageSurveys page - fetches survey stats and list
 export const useManageSurveys = () => {
+  const { user } = useAuth();
+  const tenantId = user?.tenantId ?? null;
   return useSurveyPageData(
-    () => SurveyTableService.getSurveyStats(),
-    () => SurveyTableService.getSurveyList()
+    () => SurveyTableService.getSurveyStats(tenantId),
+    () => SurveyTableService.getSurveyList(tenantId),
+    tenantId
   );
 };
 
 // Hook for CompletedSurveys page - fetches survey stats and completed surveys
 export const useCompletedSurveys = () => {
+  const { user } = useAuth();
+  const tenantId = user?.tenantId ?? null;
   return useSurveyPageData(
-    () => SurveyTableService.getSurveyStats(),
-    () => SurveyTableService.getCompletedSurveyList()
+    () => SurveyTableService.getSurveyStats(tenantId),
+    () => SurveyTableService.getCompletedSurveyList(tenantId),
+    tenantId
   );
 };
