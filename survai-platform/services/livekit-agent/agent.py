@@ -5,6 +5,7 @@ The agent receives its system prompt from brain-service via dispatch metadata.
 No local prompt templates — brain-service is the single source of truth.
 """
 
+import asyncio
 import os
 import json
 from datetime import datetime
@@ -93,6 +94,7 @@ async def entrypoint(ctx: JobContext):
 
     rider_first_name = platform_recipient.split()[0] if platform_recipient else ""
     org_name = platform_org or ORGANIZATION_NAME
+    call_language = metadata.get("language", "en")
 
     questions_list = metadata.get("questions", [])
     question_ids = [q.get("id", f"q{i+1}") for i, q in enumerate(questions_list) if isinstance(q, dict)]
@@ -136,11 +138,12 @@ async def entrypoint(ctx: JobContext):
         instructions=survey_prompt,
         rider_first_name=rider_first_name,
         organization_name=org_name,
+        language=call_language,
         tools=survey_tools,
     )
 
     session = AgentSession(
-        stt=deepgram.STT(model=STT_MODEL, language=STT_LANGUAGE),
+        stt=deepgram.STT(model=STT_MODEL, language="es" if call_language == "es" else STT_LANGUAGE),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE),
         tts=(
             elevenlabs.TTS(
@@ -161,6 +164,21 @@ async def entrypoint(ctx: JobContext):
         false_interruption_timeout=FALSE_INTERRUPTION_TIMEOUT,
         max_tool_steps=MAX_TOOL_STEPS,
     )
+
+    time_limit_minutes = metadata.get("time_limit_minutes", 8)
+
+    async def _time_limit_watchdog():
+        """Enforce call time limit — gracefully end call if exceeded."""
+        await asyncio.sleep(time_limit_minutes * 60)
+        if not survey_responses.get("end_reason"):
+            logger.warning(f"Time limit reached ({time_limit_minutes}m) — disconnecting")
+            survey_responses["end_reason"] = "time_limit"
+            try:
+                await hangup_call()
+            except Exception:
+                pass
+
+    asyncio.create_task(_time_limit_watchdog())
 
     await session.start(room=ctx.room, agent=survey_agent)
 

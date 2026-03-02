@@ -10,13 +10,16 @@ class ApiBaseHelper {
     }
   });
 
-  static async get(url) {
+  static async get(url, config = {}) {
     try {
+      const { params, ...rest } = config;
       const response = await this.axiosInstance.get(url, {
         headers: {
           'accept': 'application/json',
           'Content-Type': 'application/json',
-        }
+        },
+        params,
+        ...rest
       });
       return response.data;
     } catch (error) {

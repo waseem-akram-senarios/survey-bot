@@ -217,6 +217,9 @@ const SurveyInProgress = () => {
         <SurveyResultsDisplay 
           questions={questions} 
           allowFlowInteraction={true}
+          surveyId={surveyInfo.surveyId}
+          onExportSuccess={() => showSuccess("Survey responses exported successfully.")}
+          onExportError={(err) => showError(err?.message || "Export failed. Please try again.")}
         />
 
         {/* Right Side - Main Information */}

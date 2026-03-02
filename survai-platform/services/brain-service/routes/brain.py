@@ -94,8 +94,9 @@ class SystemPromptRequest(BaseModel):
     questions: List[Dict[str, Any]]
     rider_data: Optional[Dict[str, Any]] = None
     company_name: str = "the transit agency"
-    time_limit_minutes: int = 5
+    time_limit_minutes: int = 8
     restricted_topics: Optional[List[str]] = None
+    language: str = "en"
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
@@ -285,7 +286,7 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
         if restricted_topics:
             restricted_topics_block = "\n".join(f"- NEVER discuss {t}" for t in restricted_topics)
         else:
-            restricted_topics_block = "- No additional topic restrictions"
+            restricted_topics_block = ""
 
         warning_minutes = max(1, req.time_limit_minutes - 2)
         hard_stop_minutes = max(2, req.time_limit_minutes - 1)
@@ -299,6 +300,9 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
             questions_block=questions_block,
             restricted_topics_block=restricted_topics_block,
             rider_name_for_prompt=rider_name_for_prompt,
+            time_limit_minutes=req.time_limit_minutes,
+            warning_minutes=warning_minutes,
+            hard_stop_minutes=hard_stop_minutes,
         )
         return {"system_prompt": prompt}
     except Exception as e:

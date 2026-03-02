@@ -9,9 +9,12 @@ import { useNavigate } from 'react-router-dom';
 import ApiBaseHelper from '../../../network/apiBaseHelper';
 import ApiLinks from '../../../network/apiLinks';
 import { exportAllSurveys, exportTranscripts } from '../../../utils/exportHelper';
+import { useAuth } from '../../../context/AuthContext';
 
 const ImportData = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const tenantId = user?.tenantId ?? null;
   const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState([]);
@@ -257,7 +260,7 @@ const ImportData = () => {
           <Button
             variant="contained" startIcon={<Download />}
             onClick={async () => {
-              try { await exportTranscripts(); } catch { setError('Failed to export transcripts.'); }
+              try { await exportTranscripts(tenantId); } catch { setError('Failed to export transcripts.'); }
             }}
             sx={{
               textTransform: 'none', borderRadius: '10px', fontFamily: 'Poppins, sans-serif',

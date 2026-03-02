@@ -72,6 +72,13 @@ async def get_template_questions(template_name: str) -> dict:
 
 async def get_survey_questions(survey_id: str) -> dict:
     """Get survey questions with answers from DB."""
+    survey_row = sql_execute(
+        "SELECT template_name, name FROM surveys WHERE id = :survey_id",
+        {"survey_id": survey_id},
+    )
+    template_name = ""
+    if survey_row:
+        template_name = survey_row[0].get("template_name") or survey_row[0].get("name") or ""
     sql_query = """SELECT
   q.id AS id,
   q.text,
@@ -99,7 +106,7 @@ async def get_survey_questions(survey_id: str) -> dict:
  WHERE sri.survey_id = :survey_id
  ORDER BY sri.ord;"""
     rows = sql_execute(sql_query, {"survey_id": survey_id})
-    return {"SurveyId": survey_id, "Questions": rows}
+    return {"SurveyId": survey_id, "TemplateName": template_name, "Questions": rows}
 
 
 async def get_survey_recipient(survey_id: str) -> dict:
@@ -228,25 +235,39 @@ def _row_to_survey(r: dict) -> SurveyP:
 # ─── Static/literal GET routes (before any {survey_id} routes) ───────────────
 
 @router.get("/surveys/stat", response_model=SurveyStats)
-async def survey_stat():
+async def survey_stat(tenant_id: Optional[str] = None):
     """Survey stats (dashboard uses /surveys/stat)."""
-    return await get_survey_stats()
+    return await get_survey_stats(tenant_id)
 
 
 @router.get("/surveys/stats", response_model=SurveyStats)
-async def get_survey_stats():
-    """Get survey statistics."""
-    rows = sql_execute("""
-        SELECT
-            COUNT(*) FILTER (WHERE TRUE) AS total_surveys,
-            COUNT(*) FILTER (WHERE status = 'Completed') AS total_completed_surveys,
-            COUNT(*) FILTER (WHERE status = 'In-Progress') AS total_active_surveys,
-            COUNT(*) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE) AS completed_surveys_today,
-            COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed')), 0) AS durations_median,
-            COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE)), 0) AS durations_today_median,
-            COALESCE(ROUND(AVG(csat) FILTER (WHERE status = 'Completed')), 0) AS csat_avg
-        FROM surveys
-    """, {})
+async def get_survey_stats(tenant_id: Optional[str] = None):
+    """Get survey statistics. Optionally filter by tenant_id."""
+    if tenant_id:
+        rows = sql_execute("""
+            SELECT
+                COUNT(*) FILTER (WHERE TRUE) AS total_surveys,
+                COUNT(*) FILTER (WHERE status = 'Completed') AS total_completed_surveys,
+                COUNT(*) FILTER (WHERE status = 'In-Progress') AS total_active_surveys,
+                COUNT(*) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE) AS completed_surveys_today,
+                COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed')), 0) AS durations_median,
+                COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE)), 0) AS durations_today_median,
+                COALESCE(ROUND(AVG(csat) FILTER (WHERE status = 'Completed')), 0) AS csat_avg
+            FROM surveys
+            WHERE tenant_id = :tid
+        """, {"tid": tenant_id})
+    else:
+        rows = sql_execute("""
+            SELECT
+                COUNT(*) FILTER (WHERE TRUE) AS total_surveys,
+                COUNT(*) FILTER (WHERE status = 'Completed') AS total_completed_surveys,
+                COUNT(*) FILTER (WHERE status = 'In-Progress') AS total_active_surveys,
+                COUNT(*) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE) AS completed_surveys_today,
+                COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed')), 0) AS durations_median,
+                COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE)), 0) AS durations_today_median,
+                COALESCE(ROUND(AVG(csat) FILTER (WHERE status = 'Completed')), 0) AS csat_avg
+            FROM surveys
+        """, {})
     if not rows:
         return SurveyStats(
             Total_Surveys=0, Total_Active_Surveys=0, Total_Completed_Surveys=0,

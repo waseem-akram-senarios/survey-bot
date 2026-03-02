@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Box, CircularProgress } from "@mui/material";
+import { Box, CircularProgress, Typography } from "@mui/material";
 import Header from "../../../../../components/Header";
 import WaveAnimation from "../../../../../components/WaveAnimation";
 import ConversationFlow from "../../../../../components/voice/ConversationFlow";
@@ -41,6 +41,7 @@ import {
   calculateSessionDuration,
   scrollToBottom,
 } from "../../../../../utils/voiceSurveyUtils";
+import { detectLanguage } from "../../../../lib/i18n";
 import {
   startSurveySession,
   calculateSessionDuration as calcSessionDuration,
@@ -137,7 +138,8 @@ export default function VoiceSurveyPage() {
       synth.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1;
-      utterance.lang = "en-US";
+      const lang = detectLanguage(surveyData?.TemplateName);
+      utterance.lang = lang === "es" ? "es-ES" : "en-US";
 
       setIsSpeaking(true);
       utterance.onend = () => {
@@ -346,7 +348,8 @@ export default function VoiceSurveyPage() {
     try {
       setIsProcessing(true);
       console.log(`Audio blob: ${blob.size} bytes, type: ${blob.type}`);
-      const transcript = await transcribeAudio(blob);
+      const lang = detectLanguage(surveyData?.TemplateName);
+      const transcript = await transcribeAudio(blob, undefined, lang);
       
       if (!transcript.trim()) throw new Error("No transcription returned.");
       handleAnswer(transcript);

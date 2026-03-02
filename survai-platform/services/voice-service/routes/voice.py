@@ -103,6 +103,7 @@ async def make_call(
         "callback_url": callback_url,
         "survey_url": survey_url,
         "rider_email": rider_email,
+        "time_limit_minutes": template_config.get("time_limit_minutes", 8),
     }
 
     try:
@@ -116,6 +117,9 @@ async def make_call(
         if survey_biodata and not rider_data.get("biodata"):
             rider_data["biodata"] = survey_biodata
 
+        time_limit = template_config.get("time_limit_minutes", 8)
+        restricted_topics = template_config.get("restricted_topics") or []
+
         client = _get_brain_client()
         resp = await client.post(
             "/api/brain/build-system-prompt",
@@ -124,6 +128,9 @@ async def make_call(
                 "questions": questions,
                 "rider_data": rider_data,
                 "company_name": company_name,
+                "time_limit_minutes": time_limit,
+                "restricted_topics": restricted_topics,
+                "language": language,
             },
         )
         if resp.status_code == 200:
@@ -173,6 +180,27 @@ async def get_survey_transcript(survey_id: str):
             detail=f"No transcript found for survey {survey_id}",
         )
     return transcript
+
+
+@router.post("/store-transcript")
+async def api_store_transcript(
+    survey_id: str,
+    full_transcript: str,
+    call_duration_seconds: int = 0,
+    call_status: str = "completed",
+):
+    """Store a call transcript after the voice call ends."""
+    try:
+        tid = store_transcript(
+            survey_id=survey_id,
+            full_transcript=full_transcript,
+            call_duration_seconds=call_duration_seconds,
+            call_status=call_status,
+        )
+        return {"status": "stored", "transcript_id": tid}
+    except Exception as e:
+        logger.error(f"Failed to store transcript: {e}")
+        raise HTTPException(status_code=500, detail="Failed to store transcript")
 
 
 @router.post("/send-email-fallback")

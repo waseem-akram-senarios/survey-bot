@@ -105,7 +105,7 @@ def create_survey_tools(
         The call will stay connected for a few more seconds so the person hears your farewell.
 
         Args:
-            reason: Why the call is ending — completed, wrong_person, declined, callback_scheduled, link_sent
+            reason: Why the call is ending — completed, wrong_person, declined, callback_scheduled, link_sent, time_limit
         """
         logger.info(f"📞 Ending call — reason: {reason} (hanging up in {HANGUP_DELAY_SECONDS}s)")
         survey_responses["end_reason"] = reason
@@ -120,6 +120,20 @@ def create_survey_tools(
                 f"{VOICE_SERVICE_URL}/api/voice/complete-survey",
                 {"survey_id": survey_id, "reason": reason},
             )
+
+            transcript_lines = []
+            for qid, ans in survey_responses.get("answers", {}).items():
+                transcript_lines.append(f"Q[{qid}]: {ans}")
+            full_transcript = "\n".join(transcript_lines)
+            asyncio.create_task(_call_service(
+                f"{VOICE_SERVICE_URL}/api/voice/store-transcript",
+                {
+                    "survey_id": survey_id,
+                    "full_transcript": full_transcript,
+                    "call_duration_seconds": str(int(call_duration)),
+                    "call_status": reason,
+                },
+            ))
 
         await asyncio.sleep(HANGUP_DELAY_SECONDS)
 

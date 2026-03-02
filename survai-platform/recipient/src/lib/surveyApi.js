@@ -26,6 +26,7 @@ export async function getSurveyQuestions(surveyId) {
     
     return {
       SurveyId: data.SurveyId,
+      TemplateName: data.TemplateName,
       Questions: questionsWithAnswers,
     };
   } catch (error) {
@@ -218,10 +219,12 @@ export async function getSympathizeResponse(question, userResponse) {
   }
 }
 
-export async function transcribeAudio(blob, contentType) {
+export async function transcribeAudio(blob, contentType, language = "en") {
   try {
     const ct = contentType || blob.type || "audio/webm";
-    const response = await fetch("/api/transcribe", {
+    const url = new URL("/api/transcribe", window.location.origin);
+    url.searchParams.set("language", language);
+    const response = await fetch(url.toString(), {
       method: "POST",
       headers: {
         "Content-Type": ct,

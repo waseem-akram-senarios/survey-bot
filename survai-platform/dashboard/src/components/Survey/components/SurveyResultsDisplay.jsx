@@ -1,12 +1,30 @@
 import { useState, useEffect } from "react";
-import { Box, Typography, useMediaQuery } from "@mui/material";
+import { Box, Typography, useMediaQuery, Button } from "@mui/material";
 import QuestionRenderer from "../../QuestionRenderer";
+import { exportSurveyResponses } from "../../../utils/exportHelper";
+import { useAuth } from "../../../context/AuthContext";
 
-const SurveyResultsDisplay = ({ questions, rawApiQuestions = [], allowFlowInteraction = true }) => {
+const SurveyResultsDisplay = ({ questions, rawApiQuestions = [], allowFlowInteraction = true, surveyId, onExportSuccess, onExportError }) => {
   const isMobile = useMediaQuery("(max-width: 600px)");
+  const { user } = useAuth();
+  const tenantId = user?.tenantId ?? null;
   
   const [flowSelections, setFlowSelections] = useState({});
-  
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportCSV = async () => {
+    if (!surveyId) return;
+    setIsExporting(true);
+    try {
+      await exportSurveyResponses(surveyId, tenantId);
+      onExportSuccess?.();
+    } catch (error) {
+      onExportError?.(error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Initialize flow selections on component mount and when questions change
   useEffect(() => {
     const initialSelections = {};
@@ -221,18 +239,33 @@ const SurveyResultsDisplay = ({ questions, rawApiQuestions = [], allowFlowIntera
         maxHeight: "100%",
       }}
     >
-      <Typography
-        sx={{
-          fontFamily: "Poppins, sans-serif",
-          fontWeight: 500,
-          fontSize: "18px",
-          lineHeight: "100%",
-          color: "#1E1E1E",
-          mb: 3,
-        }}
-      >
-        Survey Results
-      </Typography>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
+        <Typography
+          sx={{
+            fontFamily: "Poppins, sans-serif",
+            fontWeight: 500,
+            fontSize: "18px",
+            lineHeight: "100%",
+            color: "#1E1E1E",
+          }}
+        >
+          Survey Results
+        </Typography>
+        {surveyId && (
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleExportCSV}
+            disabled={isExporting}
+            sx={{
+              fontFamily: "Poppins, sans-serif",
+              textTransform: "none",
+            }}
+          >
+            {isExporting ? "Exporting…" : "Export CSV"}
+          </Button>
+        )}
+      </Box>
 
       {/* Render Questions with Results */}
       {parentQuestionsOnly.length > 0 ? (
