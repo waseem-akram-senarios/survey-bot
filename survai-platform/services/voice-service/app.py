@@ -6,7 +6,7 @@ Handles all voice/call operations:
 - Transcript storage and retrieval
 - Email fallback
 
-Gets its intelligence from brain-service. No AI/LLM logic here.
+Builds survey prompts locally via prompt_builder. No brain-service calls needed.
 """
 
 import logging

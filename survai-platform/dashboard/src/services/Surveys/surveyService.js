@@ -13,6 +13,7 @@ class SurveyService {
         RiderName: surveyData.riderName,
         RideId: surveyData.rideId,
         TenantId: surveyData.tenantId,
+        Phone: (surveyData.phone || "").replace(/\s+/g, ""),
         URL: `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyData.surveyId}`
       });
 

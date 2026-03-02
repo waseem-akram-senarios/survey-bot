@@ -272,7 +272,7 @@ async def api_record_answer(survey_id: str, question_id: str, answer: str):
 @router.post("/complete-survey")
 async def api_complete_survey(survey_id: str, reason: str = "completed"):
     """Mark a voice survey as completed (or other status) in the database."""
-    status = "Completed" if reason == "completed" else "In Progress"
+    status = "Completed" if reason == "completed" else "In-Progress"
     ok = update_survey_status(survey_id, status)
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to update survey status")
