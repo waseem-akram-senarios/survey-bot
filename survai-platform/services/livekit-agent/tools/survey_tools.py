@@ -21,7 +21,8 @@ from utils.storage import save_survey_responses
 
 logger = get_logger()
 
-HANGUP_DELAY_SECONDS = 5.0
+HANGUP_DELAY_SECONDS = 6.0
+AUTO_END_DELAY_SECONDS = 12.0
 VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
 SCHEDULER_SERVICE_URL = os.getenv("SCHEDULER_SERVICE_URL", "http://scheduler-service:8070")
 
@@ -95,11 +96,44 @@ def create_survey_tools(
                     f"Do NOT call end_survey. Ask the next question NOW."
                 )
             else:
+                async def _auto_end():
+                    """Wait for goodbye speech to finish, then auto-end."""
+                    await asyncio.sleep(AUTO_END_DELAY_SECONDS)
+                    if not survey_responses.get("end_reason"):
+                        logger.info("Auto-ending call after goodbye speech delay")
+                        survey_responses["end_reason"] = "completed"
+                        survey_responses["completed"] = True
+                        call_duration = (datetime.now() - call_start_time).total_seconds()
+                        save_survey_responses(caller_number, survey_responses, call_duration)
+                        cleanup_logging_fn(log_handler)
+                        if survey_id:
+                            await _call_service(
+                                f"{VOICE_SERVICE_URL}/api/voice/complete-survey",
+                                {"survey_id": survey_id, "reason": "completed"},
+                            )
+                            transcript_lines = []
+                            for qid, ans in survey_responses.get("answers", {}).items():
+                                transcript_lines.append(f"Q[{qid}]: {ans}")
+                            asyncio.create_task(_call_service(
+                                f"{VOICE_SERVICE_URL}/api/voice/store-transcript",
+                                {
+                                    "survey_id": survey_id,
+                                    "full_transcript": "\n".join(transcript_lines),
+                                    "call_duration_seconds": str(int(call_duration)),
+                                    "call_status": "completed",
+                                },
+                            ))
+                        if disconnect_fn:
+                            await disconnect_fn()
+
+                asyncio.create_task(_auto_end())
+
                 return (
                     f"RECORDED. ALL {total_questions} questions are DONE. "
-                    f"✅ ALL DONE — Say your goodbye: \"Thanks so much for sharing your thoughts. "
+                    f"✅ ALL DONE — Now say your full goodbye to the person: "
+                    f"\"Thanks so much for sharing your thoughts. "
                     f"I really appreciate your time, and I hope you have a great rest of your day!\" "
-                    f"Then call end_survey(reason='completed')."
+                    f"Do NOT call any tools. Just speak your goodbye. The call will end automatically."
                 )
         return f"Recorded {question_id}."
 
