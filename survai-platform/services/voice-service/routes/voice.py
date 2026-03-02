@@ -262,6 +262,27 @@ async def send_email_fallback(
     return {"status": "failed", "error": "All email providers failed", "survey_url": survey_url}
 
 
+# ─── Agent callback endpoints (livekit-agent writes answers back to DB) ───────
+
+@router.post("/record-answer")
+async def api_record_answer(survey_id: str, question_id: str, answer: str):
+    """Record a single answer from the voice agent into the database."""
+    ok = record_answer(survey_id, question_id, answer)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to record answer")
+    return {"status": "recorded", "survey_id": survey_id, "question_id": question_id}
+
+
+@router.post("/complete-survey")
+async def api_complete_survey(survey_id: str, reason: str = "completed"):
+    """Mark a voice survey as completed (or other status) in the database."""
+    status = "Completed" if reason == "completed" else "In Progress"
+    ok = update_survey_status(survey_id, status)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to update survey status")
+    return {"status": status, "survey_id": survey_id}
+
+
 # ─── Direct call endpoint (dashboard calls this via gateway, skipping survey-service hop)
 
 @router.post("/direct-call")

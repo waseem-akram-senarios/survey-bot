@@ -7,9 +7,11 @@ Only two tools:
 """
 
 import asyncio
+import os
 from datetime import datetime
-from typing import Callable, List
+from typing import Callable, List, Optional
 
+import aiohttp
 from livekit.agents import function_tool, RunContext
 
 from utils.logging import get_logger
@@ -18,6 +20,23 @@ from utils.storage import save_survey_responses
 logger = get_logger()
 
 HANGUP_DELAY_SECONDS = 5.0
+VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8015")
+
+
+async def _notify_voice_service(path: str, params: dict):
+    """Fire-and-forget callback to voice-service so answers are persisted in the DB."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{VOICE_SERVICE_URL}{path}",
+                params=params,
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    logger.warning(f"Voice-service {path} returned {resp.status}: {body}")
+    except Exception as e:
+        logger.warning(f"Voice-service callback {path} failed: {e}")
 
 
 def create_survey_tools(
@@ -28,6 +47,7 @@ def create_survey_tools(
     cleanup_logging_fn: Callable,
     disconnect_fn: Callable = None,
     question_ids: List[str] = None,
+    survey_id: Optional[str] = None,
 ):
     total_questions = len(question_ids) if question_ids else 0
 
@@ -44,6 +64,12 @@ def create_survey_tools(
         done = list(survey_responses["answers"].keys())
         done_count = len(done)
         logger.info(f"✅ [{question_id}] ({done_count}/{total_questions}) {answer[:120]}")
+
+        if survey_id:
+            asyncio.create_task(_notify_voice_service(
+                "/api/voice/record-answer",
+                {"survey_id": survey_id, "question_id": question_id, "answer": answer},
+            ))
 
         if question_ids:
             remaining = [q for q in question_ids if q not in done]
@@ -81,7 +107,12 @@ def create_survey_tools(
         save_survey_responses(caller_number, survey_responses, call_duration)
         cleanup_logging_fn(log_handler)
 
-        # Wait long enough for TTS to finish speaking the goodbye
+        if survey_id:
+            await _notify_voice_service(
+                "/api/voice/complete-survey",
+                {"survey_id": survey_id, "reason": reason},
+            )
+
         await asyncio.sleep(HANGUP_DELAY_SECONDS)
 
         if disconnect_fn:

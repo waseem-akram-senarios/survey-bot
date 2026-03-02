@@ -87,7 +87,7 @@ async def get_survey_questions(survey_id: str) -> dict:
  FROM survey_response_items sri
  JOIN questions q ON sri.question_id = q.id
  LEFT JOIN (
-   SELECT question_id, json_agg(text ORDER BY text) AS categories
+   SELECT question_id, json_agg(text ORDER BY CASE WHEN lower(text) = 'none of the above' THEN 1 ELSE 0 END, text) AS categories
    FROM question_categories GROUP BY question_id
  ) qc ON qc.question_id = q.id
  LEFT JOIN (
@@ -382,7 +382,7 @@ async def get_survey_questions_unanswered(survey_id: str):
                COALESCE(pm.parent_category_texts, null::json) AS parent_category_texts
         FROM survey_response_items sri
         JOIN questions q ON sri.question_id = q.id
-        LEFT JOIN (SELECT question_id, json_agg(text ORDER BY text) AS categories FROM question_categories GROUP BY question_id) qc ON qc.question_id = q.id
+        LEFT JOIN (SELECT question_id, json_agg(text ORDER BY CASE WHEN lower(text) = 'none of the above' THEN 1 ELSE 0 END, text) AS categories FROM question_categories GROUP BY question_id) qc ON qc.question_id = q.id
         LEFT JOIN (SELECT m.child_question_id, json_agg(qc2.text ORDER BY qc2.text) AS parent_category_texts FROM question_category_mappings m JOIN question_categories qc2 ON qc2.id = m.parent_category_id GROUP BY m.child_question_id) pm ON pm.child_question_id = q.id
         WHERE sri.survey_id = :survey_id AND sri.answer IS NULL AND sri.raw_answer IS NULL
         ORDER BY sri.ord
@@ -953,7 +953,7 @@ async def get_survey_question_answer(survey_id: str, request: dict):
                COALESCE(pm.parent_category_texts, null::json) AS parent_category_texts
         FROM survey_response_items sri
         JOIN questions q ON sri.question_id = q.id
-        LEFT JOIN (SELECT question_id, json_agg(text ORDER BY text) AS categories FROM question_categories GROUP BY question_id) qc ON qc.question_id = q.id
+        LEFT JOIN (SELECT question_id, json_agg(text ORDER BY CASE WHEN lower(text) = 'none of the above' THEN 1 ELSE 0 END, text) AS categories FROM question_categories GROUP BY question_id) qc ON qc.question_id = q.id
         LEFT JOIN (SELECT m.child_question_id, json_agg(qc2.text ORDER BY qc2.text) AS parent_category_texts FROM question_category_mappings m JOIN question_categories qc2 ON qc2.id = m.parent_category_id GROUP BY m.child_question_id) pm ON pm.child_question_id = q.id
         WHERE sri.survey_id = :survey_id AND sri.question_id = :question_id LIMIT 1
     """, {"survey_id": survey_id, "question_id": que_id})

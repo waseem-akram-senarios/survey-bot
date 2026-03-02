@@ -214,6 +214,7 @@ const DashboardTable = ({ tableData = [], onRowClick, onDataChange }) => {
         surveyName={selectedSurvey?.Name}
         isSendingEmail={isSendingEmail}
         isSendingPhone={isSendingSMS}
+        surveyStatus={selectedSurvey?.Status}
       />
 
       {/* Delete Confirmation Dialog */}

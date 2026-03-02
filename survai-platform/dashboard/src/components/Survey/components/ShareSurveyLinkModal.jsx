@@ -20,20 +20,32 @@ const ShareSurveyLinkModal = ({ open, onClose, surveyLink = "https://survey.ai/s
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(surveyLink);
+        setCopied(true);
       } else {
         const textArea = document.createElement("textarea");
         textArea.value = surveyLink;
         textArea.style.position = "fixed";
         textArea.style.left = "-9999px";
+        textArea.style.top = "-9999px";
+        textArea.style.opacity = "0";
         document.body.appendChild(textArea);
+        textArea.focus();
         textArea.select();
-        document.execCommand("copy");
+        textArea.setSelectionRange(0, textArea.value.length);
+        const success = document.execCommand("copy");
         document.body.removeChild(textArea);
+        if (success) {
+          setCopied(true);
+        } else {
+          window.prompt("Copy this link:", surveyLink);
+          setCopied(true);
+        }
       }
-      setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy: ', err);
+      window.prompt("Copy this link:", surveyLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 

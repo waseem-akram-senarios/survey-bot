@@ -351,6 +351,7 @@ services:
       - TTS_MODEL=${TTS_MODEL:-eleven_flash_v2_5}
       - LOG_DIR=survey_logs
       - RESPONSES_DIR=survey_responses
+      - VOICE_SERVICE_URL=http://voice-service:8015
     volumes:
       - livekit-agent-logs:/app/survey_logs
       - livekit-agent-responses:/app/survey_responses

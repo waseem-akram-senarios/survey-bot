@@ -57,6 +57,7 @@ MINIMAL_FALLBACK_PROMPT = (
 async def entrypoint(ctx: JobContext):
     metadata = json.loads(ctx.job.metadata or "{}")
     phone_number = metadata.get("phone_number")
+    survey_id = metadata.get("survey_id")
 
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
@@ -123,6 +124,7 @@ async def entrypoint(ctx: JobContext):
         cleanup_logging_fn=cleanup_survey_logging,
         disconnect_fn=hangup_call,
         question_ids=question_ids,
+        survey_id=survey_id,
     )
 
     survey_agent = SurveyAgent(

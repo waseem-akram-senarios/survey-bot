@@ -249,6 +249,7 @@ const SurveyInProgress = () => {
         surveyName={selectedSurvey?.Name}
         isSendingEmail={isSendingEmail}
         isSendingPhone={isSendingSMS}
+        surveyStatus={surveyInfo.status}
       />
 
       {/* Alert Snackbar */}

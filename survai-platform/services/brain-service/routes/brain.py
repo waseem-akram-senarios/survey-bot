@@ -290,19 +290,15 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
         warning_minutes = max(1, req.time_limit_minutes - 2)
         hard_stop_minutes = max(2, req.time_limit_minutes - 1)
 
+        rider_name_for_prompt = rider_name if rider_name else "the person"
+
         prompt = AGENT_SYSTEM_PROMPT_TEMPLATE.format(
             company_name=req.company_name,
             survey_name=req.survey_name,
             rider_context=rider_context,
             questions_block=questions_block,
             restricted_topics_block=restricted_topics_block,
-            time_limit_minutes=req.time_limit_minutes,
-            warning_minutes=warning_minutes,
-            hard_stop_minutes=hard_stop_minutes,
-            absolute_max_minutes=req.time_limit_minutes,
-            rider_name=rider_name,
-            rider_greeting=rider_greeting,
-            max_questions=MAX_SURVEY_QUESTIONS,
+            rider_name_for_prompt=rider_name_for_prompt,
         )
         return {"system_prompt": prompt}
     except Exception as e:

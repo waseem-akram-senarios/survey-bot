@@ -23,7 +23,9 @@ const SendSurveyDialog = ({
   surveyId,
   isSendingEmail,
   isSendingPhone,
+  surveyStatus,
 }) => {
+  const isCompleted = surveyStatus?.toLowerCase() === "completed";
   const isMobile = useMediaQuery("(max-width: 600px)");
   const [currentState, setCurrentState] = useState("default"); // "default", "email", "phone"
   const [email, setEmail] = useState("");
@@ -46,11 +48,11 @@ const SendSurveyDialog = ({
 
   const validatePhone = (value) => {
     if (!value.trim()) return "Phone number is required";
+    if (!value.startsWith('+')) return "Phone number must start with + and country code (e.g. +1 for US)";
     const digits = value.replace(/[^\d]/g, '');
-    if (digits.length < 7) return "Phone number must have at least 7 digits";
+    if (digits.length < 10) return "Phone number must have at least 10 digits (including country code)";
     if (digits.length > 15) return "Phone number cannot exceed 15 digits";
-    if (!/^\+?[\d\s\-()]+$/.test(value)) return "Only digits, +, spaces, hyphens and parentheses allowed";
-    if (!/^\+?[1-9]/.test(value.replace(/[\s\-()]/g, ''))) return "Phone number must start with a valid country code";
+    if (!/^\+[\d\s\-()]+$/.test(value)) return "Only digits, +, spaces, hyphens and parentheses allowed";
     return "";
   };
 
@@ -192,6 +194,26 @@ const SendSurveyDialog = ({
               Send Survey
             </Typography>
           </Box>
+
+          {/* Completed Survey Warning */}
+          {isCompleted && (
+            <Box
+              sx={{
+                mb: 3,
+                p: 2,
+                backgroundColor: "#FFF3E0",
+                borderRadius: "12px",
+                border: "1px solid #FF9800",
+              }}
+            >
+              <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "13px", color: "#E65100", fontWeight: 500, mb: 0.5 }}>
+                Survey Already Completed
+              </Typography>
+              <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "12px", color: "#BF360C" }}>
+                This survey was already completed on the dashboard. Sending the link via email will show the recipient that it's already done. To collect new responses, please create a new survey.
+              </Typography>
+            </Box>
+          )}
 
           {/* Copy Link Section */}
           <Box sx={{ mb: 4 }}>
