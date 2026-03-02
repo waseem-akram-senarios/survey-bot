@@ -106,6 +106,7 @@ class SurveyBaseP(BaseModel):
     RiderName: str = ""
     RideId: str = ""
     TenantId: str = ""
+    Phone: str = ""
 
 
 class SurveyCreateP(SurveyBaseP):

@@ -459,8 +459,8 @@ async def generate_survey(survey_data: SurveyCreateP):
 
     try:
         sql_execute(
-            """INSERT INTO surveys (id, template_name, url, biodata, status, name, recipient, launch_date, rider_name, ride_id, tenant_id)
-            VALUES (:id, :template_name, :url, :biodata, :status, :name, :recipient, :launch_date, :rider_name, :ride_id, :tenant_id)""",
+            """INSERT INTO surveys (id, template_name, url, biodata, status, name, recipient, launch_date, rider_name, ride_id, tenant_id, phone)
+            VALUES (:id, :template_name, :url, :biodata, :status, :name, :recipient, :launch_date, :rider_name, :ride_id, :tenant_id, :phone)""",
             {
                 "id": survey_data.SurveyId,
                 "template_name": survey_data.Name,
@@ -473,6 +473,7 @@ async def generate_survey(survey_data: SurveyCreateP):
                 "rider_name": survey_data.RiderName,
                 "ride_id": survey_data.RideId,
                 "tenant_id": survey_data.TenantId,
+                "phone": survey_data.Phone,
             },
         )
 
