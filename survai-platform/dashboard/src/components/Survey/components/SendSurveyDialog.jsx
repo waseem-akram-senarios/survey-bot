@@ -71,6 +71,8 @@ const SendSurveyDialog = ({
     }
   };
 
+  const formatPhoneForApi = (value) => value.replace(/[\s\-()]/g, '');
+
   const handlePhoneChange = (e) => {
     const value = e.target.value.replace(/[^\d\s\-+()]/g, '');
     setPhone(value);
@@ -107,7 +109,8 @@ const SendSurveyDialog = ({
     const error = validatePhone(phone);
     setPhoneError(error);
     if (error) return;
-    onConfirmPhone(phone.trim(), voiceProvider);
+    const cleanNumber = formatPhoneForApi(phone.trim());
+    onConfirmPhone(cleanNumber, voiceProvider);
   };
 
   const [copied, setCopied] = useState(false);
@@ -335,17 +338,17 @@ const SendSurveyDialog = ({
               >
                 Enter Phone Number
               </Typography>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <img src={PhoneIcon} alt="Phone-Icon" style={{ marginRight: '7.5px' }} />
                 <TextField
                   fullWidth
-                  placeholder="+1 234 567 8901"
+                  placeholder="+12345678901"
                   type="tel"
                   value={phone}
                   onChange={handlePhoneChange}
                   onBlur={handlePhoneBlur}
                   error={!!phoneError}
-                  helperText={phoneError || "Include country code, e.g. +1 for US"}
+                  helperText={phoneError || "Format: +[country code][number] e.g. +12345678901"}
                   disabled={isLoading}
                   color={phoneTouched && phone && !phoneError ? "success" : undefined}
                   inputProps={{ maxLength: 20 }}
@@ -362,6 +365,11 @@ const SendSurveyDialog = ({
                   }}
                 />
               </Box>
+              {phone && !phoneError && (
+                <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "12px", color: "#4CAF50", ml: 4.5 }}>
+                  Will call: {formatPhoneForApi(phone.trim())}
+                </Typography>
+              )}
               
             </Box>
           )}
