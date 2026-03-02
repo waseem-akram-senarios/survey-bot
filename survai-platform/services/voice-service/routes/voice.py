@@ -17,6 +17,9 @@ from db import (
     get_survey_with_questions,
     get_template_config,
     get_transcript,
+    store_transcript,
+    record_answer as db_record_answer,
+    update_survey_status,
 )
 from prompt_builder import build_survey_prompt
 
@@ -71,13 +74,10 @@ async def make_call(
     company_name = template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves")
     callback_url = os.getenv("SURVEY_SUBMIT_URL", "http://survey-service:8020/api/answers/qna_phone")
 
-<<<<<<< HEAD
     rider_first_name = _extract_rider_first_name(rider_name)
-=======
     public_url = os.getenv("NEXT_PUBLIC_API_BASE_URL", os.getenv("PUBLIC_URL", ""))
     survey_url = f"{public_url}/survey/{survey_id}" if public_url else ""
-    rider_email = survey.get("email") or (rider_data or {}).get("email", "") if rider_data else ""
->>>>>>> 7948bce065967078c112681abfc6578b36faaa4d
+    rider_email = survey.get("email", "")
 
     survey_context = {
         "recipient_name": rider_name or "",
@@ -92,39 +92,11 @@ async def make_call(
     }
 
     try:
-<<<<<<< HEAD
         system_prompt = build_survey_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
             survey_name=template_name or f"Survey {survey_id}",
             questions=questions,
-=======
-        if not rider_data:
-            rider_data = {}
-        if not rider_data.get("name") and rider_name:
-            rider_data["name"] = rider_name
-        if not rider_data.get("phone") and rider_phone:
-            rider_data["phone"] = rider_phone
-        survey_biodata = survey.get("biodata", "")
-        if survey_biodata and not rider_data.get("biodata"):
-            rider_data["biodata"] = survey_biodata
-
-        time_limit = template_config.get("time_limit_minutes", 8)
-        restricted_topics = template_config.get("restricted_topics") or []
-
-        client = _get_brain_client()
-        resp = await client.post(
-            "/api/brain/build-system-prompt",
-            json={
-                "survey_name": template_name or f"Survey {survey_id}",
-                "questions": questions,
-                "rider_data": rider_data,
-                "company_name": company_name,
-                "time_limit_minutes": time_limit,
-                "restricted_topics": restricted_topics,
-                "language": language,
-            },
->>>>>>> 7948bce065967078c112681abfc6578b36faaa4d
         )
         survey_context["system_prompt"] = system_prompt
         logger.info(f"Built local prompt for LiveKit call ({len(system_prompt)} chars)")
@@ -291,7 +263,7 @@ async def send_email_fallback(
 @router.post("/record-answer")
 async def api_record_answer(survey_id: str, question_id: str, answer: str):
     """Record a single answer from the voice agent into the database."""
-    ok = record_answer(survey_id, question_id, answer)
+    ok = db_record_answer(survey_id, question_id, answer)
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to record answer")
     return {"status": "recorded", "survey_id": survey_id, "question_id": question_id}
