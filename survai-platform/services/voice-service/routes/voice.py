@@ -90,6 +90,10 @@ async def make_call(
     company_name = template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves")
     callback_url = os.getenv("SURVEY_SUBMIT_URL", "http://survey-service:8020/api/answers/qna_phone")
 
+    public_url = os.getenv("NEXT_PUBLIC_API_BASE_URL", os.getenv("PUBLIC_URL", ""))
+    survey_url = f"{public_url}/survey/{survey_id}" if public_url else ""
+    rider_email = survey.get("email") or (rider_data or {}).get("email", "") if rider_data else ""
+
     survey_context = {
         "recipient_name": rider_name or "",
         "template_name": template_name,
@@ -97,6 +101,8 @@ async def make_call(
         "language": language,
         "questions": questions,
         "callback_url": callback_url,
+        "survey_url": survey_url,
+        "rider_email": rider_email,
     }
 
     try:

@@ -116,6 +116,9 @@ async def entrypoint(ctx: JobContext):
             logger.error(f"Room delete failed: {e}")
             await ctx.room.disconnect()
 
+    survey_url = metadata.get("survey_url", "")
+    rider_email = metadata.get("rider_email", "")
+
     survey_tools = create_survey_tools(
         survey_responses=survey_responses,
         caller_number=caller_number,
@@ -125,6 +128,8 @@ async def entrypoint(ctx: JobContext):
         disconnect_fn=hangup_call,
         question_ids=question_ids,
         survey_id=survey_id,
+        survey_url=survey_url,
+        rider_email=rider_email,
     )
 
     survey_agent = SurveyAgent(

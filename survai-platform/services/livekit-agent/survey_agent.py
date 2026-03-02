@@ -45,12 +45,12 @@ class SurveyAgent(Agent):
         org = self.organization_name
         if self._is_real_name(name):
             greeting = (
-                f"Hello! This is Cameron, calling on behalf of {org}. "
-                f"Am I speaking with {name}?"
+                f"Hi, this is Cameron with {org}. "
+                f"Am I speaking to {name}?"
             )
         else:
             greeting = (
-                f"Hello! This is Cameron, calling on behalf of {org}. "
+                f"Hi, this is Cameron with {org}. "
                 f"I'm reaching out to get your quick feedback. Is now a good time?"
             )
         await self.session.say(greeting)

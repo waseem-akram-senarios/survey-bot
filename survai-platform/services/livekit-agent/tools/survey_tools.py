@@ -1,9 +1,11 @@
 """
-Survey function tools — minimal, generic, aligned with brain-service prompt.
+Survey function tools — aligned with brain-service prompt.
 
-Only two tools:
-  - record_answer(question_id, answer) — store any survey answer
-  - end_survey(reason)                 — end the call and disconnect
+Tools:
+  - record_answer(question_id, answer)  — store any survey answer
+  - end_survey(reason)                  — end the call and disconnect
+  - schedule_callback(preferred_time)   — schedule a callback for later
+  - send_survey_link()                  — send the survey link via email/text
 """
 
 import asyncio
@@ -20,23 +22,27 @@ from utils.storage import save_survey_responses
 logger = get_logger()
 
 HANGUP_DELAY_SECONDS = 5.0
-VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8015")
+VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
+SCHEDULER_SERVICE_URL = os.getenv("SCHEDULER_SERVICE_URL", "http://scheduler-service:8070")
 
 
-async def _notify_voice_service(path: str, params: dict):
-    """Fire-and-forget callback to voice-service so answers are persisted in the DB."""
+async def _call_service(url: str, params: dict):
+    """POST to an internal service endpoint."""
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{VOICE_SERVICE_URL}{path}",
+                url,
                 params=params,
-                timeout=aiohttp.ClientTimeout(total=5),
+                timeout=aiohttp.ClientTimeout(total=8),
             ) as resp:
                 if resp.status != 200:
                     body = await resp.text()
-                    logger.warning(f"Voice-service {path} returned {resp.status}: {body}")
+                    logger.warning(f"{url} returned {resp.status}: {body}")
+                    return False
+                return True
     except Exception as e:
-        logger.warning(f"Voice-service callback {path} failed: {e}")
+        logger.warning(f"Service call {url} failed: {e}")
+        return False
 
 
 def create_survey_tools(
@@ -48,6 +54,8 @@ def create_survey_tools(
     disconnect_fn: Callable = None,
     question_ids: List[str] = None,
     survey_id: Optional[str] = None,
+    survey_url: Optional[str] = None,
+    rider_email: Optional[str] = None,
 ):
     total_questions = len(question_ids) if question_ids else 0
 
@@ -66,8 +74,8 @@ def create_survey_tools(
         logger.info(f"✅ [{question_id}] ({done_count}/{total_questions}) {answer[:120]}")
 
         if survey_id:
-            asyncio.create_task(_notify_voice_service(
-                "/api/voice/record-answer",
+            asyncio.create_task(_call_service(
+                f"{VOICE_SERVICE_URL}/api/voice/record-answer",
                 {"survey_id": survey_id, "question_id": question_id, "answer": answer},
             ))
 
@@ -97,7 +105,7 @@ def create_survey_tools(
         The call will stay connected for a few more seconds so the person hears your farewell.
 
         Args:
-            reason: Why the call is ending — completed, wrong_person, declined, not_available
+            reason: Why the call is ending — completed, wrong_person, declined, callback_scheduled, link_sent
         """
         logger.info(f"📞 Ending call — reason: {reason} (hanging up in {HANGUP_DELAY_SECONDS}s)")
         survey_responses["end_reason"] = reason
@@ -108,8 +116,8 @@ def create_survey_tools(
         cleanup_logging_fn(log_handler)
 
         if survey_id:
-            await _notify_voice_service(
-                "/api/voice/complete-survey",
+            await _call_service(
+                f"{VOICE_SERVICE_URL}/api/voice/complete-survey",
                 {"survey_id": survey_id, "reason": reason},
             )
 
@@ -120,4 +128,62 @@ def create_survey_tools(
 
         return "Call ended."
 
-    return [record_answer, end_survey]
+    @function_tool()
+    async def schedule_callback(context: RunContext, preferred_time: str):
+        """
+        Schedule a callback for the person at their preferred time.
+        Use this when the person says they are busy but would like a call back later.
+
+        Args:
+            preferred_time: When they want to be called back (e.g. "tomorrow at 3pm", "next Monday morning")
+        """
+        logger.info(f"📅 Scheduling callback for {caller_number} at: {preferred_time}")
+        survey_responses["callback_requested"] = True
+        survey_responses["callback_time"] = preferred_time
+
+        if survey_id:
+            delay = 3600
+            time_lower = preferred_time.lower()
+            if "hour" in time_lower:
+                try:
+                    hours = int("".join(c for c in time_lower.split("hour")[0] if c.isdigit()) or "1")
+                    delay = hours * 3600
+                except ValueError:
+                    pass
+            elif "tomorrow" in time_lower:
+                delay = 86400
+            elif "minute" in time_lower:
+                try:
+                    mins = int("".join(c for c in time_lower.split("minute")[0] if c.isdigit()) or "30")
+                    delay = mins * 60
+                except ValueError:
+                    pass
+
+            await _call_service(
+                f"{SCHEDULER_SERVICE_URL}/scheduler/schedule-call",
+                {"survey_id": survey_id, "phone": caller_number, "delay_seconds": str(delay)},
+            )
+
+        return f"Callback scheduled for {preferred_time}. Now say goodbye and call end_survey(reason='callback_scheduled')."
+
+    @function_tool()
+    async def send_survey_link(context: RunContext):
+        """
+        Send the survey link to the person via email or text so they can fill it out at their convenience.
+        Use this when the person declines a callback but agrees to receive the survey link.
+        """
+        logger.info(f"📧 Sending survey link for survey={survey_id} to {rider_email or caller_number}")
+
+        sent = False
+        if survey_id and survey_url and rider_email:
+            sent = await _call_service(
+                f"{VOICE_SERVICE_URL}/api/voice/send-email-fallback",
+                {"survey_id": survey_id, "email": rider_email, "survey_url": survey_url},
+            )
+
+        if sent:
+            return "Survey link sent successfully. Now say goodbye and call end_survey(reason='link_sent')."
+        else:
+            return "Could not send link (no email on file). Apologize and say goodbye, then call end_survey(reason='link_sent')."
+
+    return [record_answer, end_survey, schedule_callback, send_survey_link]
