@@ -7,44 +7,35 @@ Handles LiveKit call lifecycle:
 - Email fallback
 """
 
-import asyncio
 import logging
 import os
-from typing import Optional
 
-import httpx
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 
 from db import (
-    get_rider_data,
+    async_execute,
     get_survey_with_questions,
     get_template_config,
     get_transcript,
-    record_answer,
-    sql_execute,
-    async_execute,
     store_transcript,
+    record_answer as db_record_answer,
     update_survey_status,
 )
+from prompt_builder import build_survey_prompt
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 
-BRAIN_SERVICE_URL = os.getenv("BRAIN_SERVICE_URL", "http://brain-service:8016")
 
-_brain_client: Optional[httpx.AsyncClient] = None
-
-
-def _get_brain_client() -> httpx.AsyncClient:
-    """Singleton HTTP client for brain-service — reuses TCP connections."""
-    global _brain_client
-    if _brain_client is None or _brain_client.is_closed:
-        _brain_client = httpx.AsyncClient(
-            base_url=BRAIN_SERVICE_URL,
-            timeout=15.0,
-            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
-        )
-    return _brain_client
+def _extract_rider_first_name(rider_name: str) -> str:
+    """Return the first word of a name, stripped and validated."""
+    if not rider_name:
+        return ""
+    first = rider_name.strip().split()[0]
+    _placeholders = {"customer", "unknown", "user", "recipient", "test", "n/a", "na", "none", "name"}
+    if first.lower() in _placeholders or len(first.replace("-", "").replace("'", "")) < 2:
+        return ""
+    return first
 
 
 @router.post("/make-call")
@@ -68,18 +59,11 @@ async def make_call(
 
     template_name = survey.get("template_name", "")
     rider_name = survey.get("rider_name") or survey.get("recipient") or ""
-    rider_phone = survey.get("phone") or phone
 
-    coros = []
     if template_name:
-        coros.append(get_template_config(template_name))
-    coros.append(get_rider_data(rider_name, rider_phone))
-
-    results = await asyncio.gather(*coros)
-    if template_name:
-        template_config, rider_data = results[0], results[1]
+        template_config = await get_template_config(template_name)
     else:
-        template_config, rider_data = {}, results[0]
+        template_config = {}
 
     language = "en"
     if template_name:
@@ -90,9 +74,10 @@ async def make_call(
     company_name = template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves")
     callback_url = os.getenv("SURVEY_SUBMIT_URL", "http://survey-service:8020/api/answers/qna_phone")
 
+    rider_first_name = _extract_rider_first_name(rider_name)
     public_url = os.getenv("NEXT_PUBLIC_API_BASE_URL", os.getenv("PUBLIC_URL", ""))
     survey_url = f"{public_url}/survey/{survey_id}" if public_url else ""
-    rider_email = survey.get("email") or (rider_data or {}).get("email", "") if rider_data else ""
+    rider_email = survey.get("email", "")
 
     survey_context = {
         "recipient_name": rider_name or "",
@@ -107,39 +92,16 @@ async def make_call(
     }
 
     try:
-        if not rider_data:
-            rider_data = {}
-        if not rider_data.get("name") and rider_name:
-            rider_data["name"] = rider_name
-        if not rider_data.get("phone") and rider_phone:
-            rider_data["phone"] = rider_phone
-        survey_biodata = survey.get("biodata", "")
-        if survey_biodata and not rider_data.get("biodata"):
-            rider_data["biodata"] = survey_biodata
-
-        time_limit = template_config.get("time_limit_minutes", 8)
-        restricted_topics = template_config.get("restricted_topics") or []
-
-        client = _get_brain_client()
-        resp = await client.post(
-            "/api/brain/build-system-prompt",
-            json={
-                "survey_name": template_name or f"Survey {survey_id}",
-                "questions": questions,
-                "rider_data": rider_data,
-                "company_name": company_name,
-                "time_limit_minutes": time_limit,
-                "restricted_topics": restricted_topics,
-                "language": language,
-            },
+        system_prompt = build_survey_prompt(
+            organization_name=company_name,
+            rider_first_name=rider_first_name,
+            survey_name=template_name or f"Survey {survey_id}",
+            questions=questions,
         )
-        if resp.status_code == 200:
-            survey_context["system_prompt"] = resp.json().get("system_prompt", "")
-            logger.info(f"Built brain-service prompt for LiveKit call ({len(survey_context['system_prompt'])} chars)")
-        else:
-            logger.warning(f"Brain-service prompt failed ({resp.status_code}), agent will use defaults")
+        survey_context["system_prompt"] = system_prompt
+        logger.info(f"Built local prompt for LiveKit call ({len(system_prompt)} chars)")
     except Exception as e:
-        logger.warning(f"Brain-service unreachable for LiveKit prompt: {e}, agent will use defaults")
+        logger.warning(f"Local prompt build failed: {e}, agent will use defaults")
 
     try:
         from livekit_dispatcher import dispatch_livekit_call
@@ -301,7 +263,7 @@ async def send_email_fallback(
 @router.post("/record-answer")
 async def api_record_answer(survey_id: str, question_id: str, answer: str):
     """Record a single answer from the voice agent into the database."""
-    ok = record_answer(survey_id, question_id, answer)
+    ok = db_record_answer(survey_id, question_id, answer)
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to record answer")
     return {"status": "recorded", "survey_id": survey_id, "question_id": question_id}

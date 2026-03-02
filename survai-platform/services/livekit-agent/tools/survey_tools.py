@@ -1,9 +1,7 @@
 """
-Survey function tools — aligned with brain-service prompt.
-
-Tools:
+Survey function tools for the full call lifecycle:
   - record_answer(question_id, answer)  — store any survey answer
-  - end_survey(reason)                  — end the call and disconnect
+  - end_survey(reason)                  — save data, speak farewell, wait for playout, hang up
   - schedule_callback(preferred_time)   — schedule a callback for later
   - send_survey_link()                  — send the survey link via email/text
 """
@@ -21,8 +19,7 @@ from utils.storage import save_survey_responses
 
 logger = get_logger()
 
-HANGUP_DELAY_SECONDS = 6.0
-AUTO_END_DELAY_SECONDS = 14.0
+POST_FAREWELL_BUFFER_SECONDS = 2.0
 VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
 SCHEDULER_SERVICE_URL = os.getenv("SCHEDULER_SERVICE_URL", "http://scheduler-service:8070")
 
@@ -63,21 +60,16 @@ def create_survey_tools(
     total_questions = len(question_ids) if question_ids else 0
     qmap = questions_map or {}
     person_name = rider_name or "there"
-    survey_finished = {"done": False}
 
-    async def _save_and_disconnect(reason: str = "completed"):
-        """Save results, notify backend, disconnect."""
+    async def _save_and_notify(reason: str, call_duration: float):
+        """Save results and notify backend services."""
         if survey_responses.get("_finalized"):
-            logger.info("Already finalized, skipping duplicate _save_and_disconnect")
-            if disconnect_fn:
-                await disconnect_fn()
+            logger.info("Already finalized, skipping duplicate save")
             return
         survey_responses["_finalized"] = True
-        logger.info(f"Finalizing survey: reason={reason}")
 
         survey_responses["end_reason"] = reason
         survey_responses["completed"] = reason == "completed"
-        call_duration = (datetime.now() - call_start_time).total_seconds()
         save_survey_responses(caller_number, survey_responses, call_duration)
         cleanup_logging_fn(log_handler)
 
@@ -102,11 +94,6 @@ def create_survey_tools(
             except Exception as e:
                 logger.warning(f"Failed to store transcript: {e}")
 
-        logger.info(f"Disconnecting call in {HANGUP_DELAY_SECONDS}s")
-        await asyncio.sleep(HANGUP_DELAY_SECONDS)
-        if disconnect_fn:
-            await disconnect_fn()
-
     @function_tool()
     async def record_answer(context: RunContext, question_id: str, answer: str):
         """
@@ -117,12 +104,6 @@ def create_survey_tools(
             question_id: The question identifier from the survey
             answer: The caller's response in their own words
         """
-        if survey_finished["done"]:
-            return (
-                f"The survey is already complete. Say goodbye to {person_name} warmly "
-                f"then call end_survey(\"completed\") to hang up."
-            )
-
         if question_id in survey_responses["answers"]:
             done = list(survey_responses["answers"].keys())
             if question_ids:
@@ -135,17 +116,16 @@ def create_survey_tools(
                         f"Move on — ask this next: \"{next_text}\" (question_id: {next_id})."
                     )
                 else:
-                    survey_finished["done"] = True
                     return (
-                        f"All questions are already answered. Say goodbye to {person_name} now, "
-                        f"then call end_survey(\"completed\")."
+                        f"All questions are already answered. "
+                        f"Call end_survey(\"completed\") now."
                     )
             return f"Already recorded {question_id}. Move to the next question."
 
         survey_responses["answers"][question_id] = answer
         done = list(survey_responses["answers"].keys())
         done_count = len(done)
-        logger.info(f"✅ [{question_id}] ({done_count}/{total_questions}) {answer[:120]}")
+        logger.info(f"[{question_id}] ({done_count}/{total_questions}) {answer[:120]}")
 
         if survey_id:
             asyncio.create_task(_call_service(
@@ -160,33 +140,74 @@ def create_survey_tools(
                 next_text = qmap.get(next_id, "")
                 return (
                     f"RECORDED ({done_count}/{total_questions}). "
-                    f"⚠️ {len(remaining)} questions left. "
-                    f"NEXT QUESTION → \"{next_text}\" (question_id: {next_id}). "
+                    f"{len(remaining)} questions left. "
+                    f"NEXT QUESTION: \"{next_text}\" (question_id: {next_id}). "
                     f"Ask it now."
                 )
             else:
-                survey_finished["done"] = True
-                logger.info(f"✅ ALL {total_questions} questions answered — telling agent to close")
-
+                logger.info(f"ALL {total_questions} questions answered")
                 return (
                     f"RECORDED ({done_count}/{total_questions}). "
-                    f"✅ ALL DONE. Now do these two things IN ORDER: "
-                    f"1) Say: \"Thanks so much for sharing your thoughts, {person_name}. "
-                    f"I really appreciate your time, and I hope you have a great rest of your day!\" "
-                    f"2) Then call end_survey(\"completed\")."
+                    f"ALL DONE. Call end_survey(\"completed\") now."
                 )
         return f"Recorded {question_id}."
 
     @function_tool()
     async def end_survey(context: RunContext, reason: str = "completed"):
         """
-        End the survey call and hang up. Say your full goodbye BEFORE calling this.
+        End the call: save survey data, speak farewell, wait for it to finish, then hang up.
+        This is the ONLY way to end a call. One call to this tool does everything.
 
         Args:
-            reason: Why the call is ending — completed, wrong_person, declined, callback_scheduled, link_sent
+            reason: Why the call is ending — completed, wrong_person, declined, not_available, callback_scheduled, link_sent
         """
-        logger.info(f"📞 end_survey called — reason: {reason}")
-        await _save_and_disconnect(reason)
+        if reason == "completed" and question_ids:
+            done = set(survey_responses["answers"].keys())
+            remaining = [q for q in question_ids if q not in done]
+            if remaining:
+                logger.warning(
+                    f"end_survey(completed) blocked — {len(remaining)} required questions unanswered: "
+                    f"{', '.join(remaining)}"
+                )
+                return (
+                    f"Cannot end as 'completed' yet — {len(remaining)} required question(s) still unanswered: "
+                    f"{', '.join(remaining)}. "
+                    f"You MUST ask these before ending. Next to ask: {remaining[0]}."
+                )
+
+        logger.info(f"end_survey called — reason: {reason}")
+
+        call_duration = (datetime.now() - call_start_time).total_seconds()
+        await _save_and_notify(reason, call_duration)
+
+        rider = survey_responses.get("rider_name", "").strip()
+        name_part = f", {rider}" if rider else ""
+
+        if reason == "completed":
+            farewell = (
+                f"Thanks so much for sharing your thoughts{name_part}! "
+                "I really appreciate your time, and I hope you have a great rest of your day! Goodbye!"
+            )
+        elif reason in ("not_available", "callback_scheduled"):
+            farewell = "Fantastic! We'll be in touch. Thank you for your time, and have a wonderful day! Goodbye!"
+        elif reason == "wrong_person":
+            farewell = "I apologize for the mix-up! Have a great day! Goodbye!"
+        elif reason == "link_sent":
+            farewell = "Great! We'll send that over. Thank you for your time, and have a wonderful day! Goodbye!"
+        else:
+            farewell = "Of course, no problem at all! Thanks for your time — have a great day! Goodbye!"
+
+        logger.info(f"[FAREWELL] {farewell}")
+        speech_handle = context.session.say(farewell)
+        await speech_handle.wait_for_playout()
+        logger.info("[FAREWELL] playout finished — person heard the full goodbye")
+
+        await asyncio.sleep(POST_FAREWELL_BUFFER_SECONDS)
+
+        logger.info("Disconnecting call now")
+        if disconnect_fn:
+            await disconnect_fn()
+
         return "Call ended."
 
     @function_tool()
@@ -194,11 +215,12 @@ def create_survey_tools(
         """
         Schedule a callback for the person at their preferred time.
         Use this when the person says they are busy but would like a call back later.
+        After this returns, call end_survey(reason='callback_scheduled') to end the call.
 
         Args:
             preferred_time: When they want to be called back (e.g. "tomorrow at 3pm", "next Monday morning")
         """
-        logger.info(f"📅 Scheduling callback for {caller_number} at: {preferred_time}")
+        logger.info(f"Scheduling callback for {caller_number} at: {preferred_time}")
         survey_responses["callback_requested"] = True
         survey_responses["callback_time"] = preferred_time
 
@@ -225,15 +247,16 @@ def create_survey_tools(
                 {"survey_id": survey_id, "phone": caller_number, "delay_seconds": str(delay)},
             )
 
-        return f"Callback scheduled for {preferred_time}. Now say goodbye and call end_survey(reason='callback_scheduled')."
+        return "Callback scheduled. Now call end_survey(reason='callback_scheduled') to end the call."
 
     @function_tool()
     async def send_survey_link(context: RunContext):
         """
         Send the survey link to the person via email or text so they can fill it out at their convenience.
         Use this when the person declines a callback but agrees to receive the survey link.
+        After this returns, call end_survey(reason='link_sent') to end the call.
         """
-        logger.info(f"📧 Sending survey link for survey={survey_id} to {rider_email or caller_number}")
+        logger.info(f"Sending survey link for survey={survey_id} to {rider_email or caller_number}")
 
         sent = False
         if survey_id and survey_url and rider_email:
@@ -243,8 +266,8 @@ def create_survey_tools(
             )
 
         if sent:
-            return "Survey link sent successfully. Now say goodbye and call end_survey(reason='link_sent')."
+            return "Survey link sent. Now call end_survey(reason='link_sent') to end the call."
         else:
-            return "Could not send link (no email on file). Apologize and say goodbye, then call end_survey(reason='link_sent')."
+            return "Could not send link (no email on file). Apologize, then call end_survey(reason='link_sent') to end the call."
 
     return [record_answer, end_survey, schedule_callback, send_survey_link]
