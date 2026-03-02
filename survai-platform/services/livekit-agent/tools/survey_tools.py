@@ -53,19 +53,22 @@ def create_survey_tools(
     cleanup_logging_fn: Callable,
     disconnect_fn: Callable = None,
     question_ids: List[str] = None,
+    questions_map: dict = None,
     survey_id: Optional[str] = None,
     survey_url: Optional[str] = None,
     rider_email: Optional[str] = None,
 ):
     total_questions = len(question_ids) if question_ids else 0
+    qmap = questions_map or {}
 
     @function_tool()
     async def record_answer(context: RunContext, question_id: str, answer: str):
         """
         Record the caller's answer to a survey question.
+        IMPORTANT: After calling this, read the response carefully — it tells you EXACTLY what to ask next. Do NOT end the survey until the response says ALL DONE.
 
         Args:
-            question_id: The question identifier (e.g. "q1", "overall_satisfaction")
+            question_id: The question identifier from the survey
             answer: The caller's response in their own words
         """
         survey_responses["answers"][question_id] = answer
@@ -82,27 +85,30 @@ def create_survey_tools(
         if question_ids:
             remaining = [q for q in question_ids if q not in done]
             if remaining:
+                next_id = remaining[0]
+                next_text = qmap.get(next_id, "")
                 return (
-                    f"Recorded {question_id}. "
-                    f"Progress: {done_count}/{total_questions} done. "
-                    f"ALREADY ASKED (do NOT repeat): {', '.join(done)}. "
-                    f"NEXT question to ask: {remaining[0]}. "
-                    f"Remaining: {', '.join(remaining)}."
+                    f"RECORDED. Progress: {done_count}/{total_questions}. "
+                    f"⚠️ NOT DONE YET — {len(remaining)} questions left. "
+                    f"YOUR NEXT QUESTION: Ask the person this → \"{next_text}\" "
+                    f"(question_id: {next_id}). "
+                    f"Do NOT call end_survey. Ask the next question NOW."
                 )
             else:
                 return (
-                    f"Recorded {question_id}. "
-                    f"ALL {total_questions} questions are done. "
-                    f"Say your full goodbye message to the person, then call end_survey(reason='completed')."
+                    f"RECORDED. ALL {total_questions} questions are DONE. "
+                    f"✅ ALL DONE — Say your goodbye: \"Thanks so much for sharing your thoughts. "
+                    f"I really appreciate your time, and I hope you have a great rest of your day!\" "
+                    f"Then call end_survey(reason='completed')."
                 )
         return f"Recorded {question_id}."
 
     @function_tool()
     async def end_survey(context: RunContext, reason: str = "completed"):
         """
-        Save survey data and schedule the call to hang up after a delay.
-        IMPORTANT: Only call this AFTER you have already spoken your full goodbye message.
-        The call will stay connected for a few more seconds so the person hears your farewell.
+        End the survey call and hang up.
+        ⚠️ ONLY call this when: 1) record_answer told you ALL DONE, 2) person is wrong_person, or 3) person declined.
+        NEVER call this if there are still questions remaining. Say goodbye FIRST, then call this.
 
         Args:
             reason: Why the call is ending — completed, wrong_person, declined, callback_scheduled, link_sent, time_limit

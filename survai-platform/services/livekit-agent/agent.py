@@ -98,6 +98,11 @@ async def entrypoint(ctx: JobContext):
 
     questions_list = metadata.get("questions", [])
     question_ids = [q.get("id", f"q{i+1}") for i, q in enumerate(questions_list) if isinstance(q, dict)]
+    questions_map = {}
+    for i, q in enumerate(questions_list):
+        if isinstance(q, dict):
+            qid = q.get("id", f"q{i+1}")
+            questions_map[qid] = q.get("text") or q.get("question_text") or f"Question {i+1}"
 
     logger.info(f"Recipient: '{rider_first_name}' | Org: '{org_name}' | Phone: {caller_number} | Questions: {len(question_ids)}")
     if platform_prompt:
@@ -129,6 +134,7 @@ async def entrypoint(ctx: JobContext):
         cleanup_logging_fn=cleanup_survey_logging,
         disconnect_fn=hangup_call,
         question_ids=question_ids,
+        questions_map=questions_map,
         survey_id=survey_id,
         survey_url=survey_url,
         rider_email=rider_email,
