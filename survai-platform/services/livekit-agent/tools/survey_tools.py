@@ -58,9 +58,11 @@ def create_survey_tools(
     survey_id: Optional[str] = None,
     survey_url: Optional[str] = None,
     rider_email: Optional[str] = None,
+    rider_name: Optional[str] = None,
 ):
     total_questions = len(question_ids) if question_ids else 0
     qmap = questions_map or {}
+    person_name = rider_name or "there"
 
     @function_tool()
     async def record_answer(context: RunContext, question_id: str, answer: str):
@@ -130,10 +132,10 @@ def create_survey_tools(
 
                 return (
                     f"RECORDED. ALL {total_questions} questions are DONE. "
-                    f"✅ ALL DONE — Now say your full goodbye to the person: "
-                    f"\"Thanks so much for sharing your thoughts. "
+                    f"✅ ALL DONE — Now say your full goodbye to the person BY NAME: "
+                    f"\"Thanks so much for sharing your thoughts, {person_name}. "
                     f"I really appreciate your time, and I hope you have a great rest of your day!\" "
-                    f"Do NOT call any tools. Just speak your goodbye. The call will end automatically."
+                    f"Do NOT call any tools. Just speak your goodbye with their name. The call will end automatically."
                 )
         return f"Recorded {question_id}."
 

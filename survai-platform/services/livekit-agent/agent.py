@@ -138,6 +138,7 @@ async def entrypoint(ctx: JobContext):
         survey_id=survey_id,
         survey_url=survey_url,
         rider_email=rider_email,
+        rider_name=rider_first_name,
     )
 
     survey_agent = SurveyAgent(

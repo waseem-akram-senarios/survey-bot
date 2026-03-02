@@ -270,7 +270,7 @@ async def build_system_prompt_endpoint(req: SystemPromptRequest):
                 )
             elif criteria == "scale":
                 line = QUESTION_FORMAT_SCALE.format(
-                    order=order, question_id=qid, question_text=text, scale_max=q.get("scales", 5),
+                    order=order, question_id=qid, question_text=text, scale_max=q.get("scales") or 5,
                 )
             elif criteria == "categorical":
                 categories = q.get("categories", [])
