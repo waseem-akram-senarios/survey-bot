@@ -22,7 +22,7 @@ from utils.storage import save_survey_responses
 logger = get_logger()
 
 HANGUP_DELAY_SECONDS = 6.0
-AUTO_END_DELAY_SECONDS = 12.0
+AUTO_END_DELAY_SECONDS = 14.0
 VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
 SCHEDULER_SERVICE_URL = os.getenv("SCHEDULER_SERVICE_URL", "http://scheduler-service:8070")
 
@@ -63,17 +63,76 @@ def create_survey_tools(
     total_questions = len(question_ids) if question_ids else 0
     qmap = questions_map or {}
     person_name = rider_name or "there"
+    survey_finished = {"done": False}
+
+    async def _finalize_and_disconnect(reason: str = "completed"):
+        """Save results, notify backend, disconnect after delay."""
+        if survey_responses.get("_finalized"):
+            return
+        survey_responses["_finalized"] = True
+
+        survey_responses["end_reason"] = reason
+        survey_responses["completed"] = reason == "completed"
+        call_duration = (datetime.now() - call_start_time).total_seconds()
+        save_survey_responses(caller_number, survey_responses, call_duration)
+        cleanup_logging_fn(log_handler)
+
+        if survey_id:
+            await _call_service(
+                f"{VOICE_SERVICE_URL}/api/voice/complete-survey",
+                {"survey_id": survey_id, "reason": reason},
+            )
+            transcript_lines = []
+            for qid, ans in survey_responses.get("answers", {}).items():
+                transcript_lines.append(f"Q[{qid}]: {ans}")
+            asyncio.create_task(_call_service(
+                f"{VOICE_SERVICE_URL}/api/voice/store-transcript",
+                {
+                    "survey_id": survey_id,
+                    "full_transcript": "\n".join(transcript_lines),
+                    "call_duration_seconds": str(int(call_duration)),
+                    "call_status": reason,
+                },
+            ))
+
+        if disconnect_fn:
+            await disconnect_fn()
 
     @function_tool()
     async def record_answer(context: RunContext, question_id: str, answer: str):
         """
         Record the caller's answer to a survey question.
-        IMPORTANT: After calling this, read the response carefully — it tells you EXACTLY what to ask next. Do NOT end the survey until the response says ALL DONE.
+        IMPORTANT: After calling this, read the response carefully — it tells you EXACTLY what to do next.
 
         Args:
             question_id: The question identifier from the survey
             answer: The caller's response in their own words
         """
+        if survey_finished["done"]:
+            return (
+                f"The survey is already complete. Just say goodbye to {person_name} warmly "
+                f"and thank them for their time. Do NOT call any more tools."
+            )
+
+        if question_id in survey_responses["answers"]:
+            done = list(survey_responses["answers"].keys())
+            if question_ids:
+                remaining = [q for q in question_ids if q not in done]
+                if remaining:
+                    next_id = remaining[0]
+                    next_text = qmap.get(next_id, "")
+                    return (
+                        f"Already recorded {question_id}. "
+                        f"Move on — ask this next: \"{next_text}\" (question_id: {next_id})."
+                    )
+                else:
+                    survey_finished["done"] = True
+                    return (
+                        f"All questions are already answered. Say goodbye to {person_name} now. "
+                        f"Do NOT call any tools."
+                    )
+            return f"Already recorded {question_id}. Move to the next question."
+
         survey_responses["answers"][question_id] = answer
         done = list(survey_responses["answers"].keys())
         done_count = len(done)
@@ -91,51 +150,27 @@ def create_survey_tools(
                 next_id = remaining[0]
                 next_text = qmap.get(next_id, "")
                 return (
-                    f"RECORDED. Progress: {done_count}/{total_questions}. "
-                    f"⚠️ NOT DONE YET — {len(remaining)} questions left. "
-                    f"YOUR NEXT QUESTION: Ask the person this → \"{next_text}\" "
-                    f"(question_id: {next_id}). "
-                    f"Do NOT call end_survey. Ask the next question NOW."
+                    f"RECORDED ({done_count}/{total_questions}). "
+                    f"⚠️ {len(remaining)} questions left. "
+                    f"NEXT QUESTION → \"{next_text}\" (question_id: {next_id}). "
+                    f"Ask it now."
                 )
             else:
+                survey_finished["done"] = True
+
                 async def _auto_end():
-                    """Wait for goodbye speech to finish, then auto-end."""
                     await asyncio.sleep(AUTO_END_DELAY_SECONDS)
-                    if not survey_responses.get("end_reason"):
-                        logger.info("Auto-ending call after goodbye speech delay")
-                        survey_responses["end_reason"] = "completed"
-                        survey_responses["completed"] = True
-                        call_duration = (datetime.now() - call_start_time).total_seconds()
-                        save_survey_responses(caller_number, survey_responses, call_duration)
-                        cleanup_logging_fn(log_handler)
-                        if survey_id:
-                            await _call_service(
-                                f"{VOICE_SERVICE_URL}/api/voice/complete-survey",
-                                {"survey_id": survey_id, "reason": "completed"},
-                            )
-                            transcript_lines = []
-                            for qid, ans in survey_responses.get("answers", {}).items():
-                                transcript_lines.append(f"Q[{qid}]: {ans}")
-                            asyncio.create_task(_call_service(
-                                f"{VOICE_SERVICE_URL}/api/voice/store-transcript",
-                                {
-                                    "survey_id": survey_id,
-                                    "full_transcript": "\n".join(transcript_lines),
-                                    "call_duration_seconds": str(int(call_duration)),
-                                    "call_status": "completed",
-                                },
-                            ))
-                        if disconnect_fn:
-                            await disconnect_fn()
+                    logger.info("Auto-ending call after goodbye speech")
+                    await _finalize_and_disconnect("completed")
 
                 asyncio.create_task(_auto_end())
 
                 return (
-                    f"RECORDED. ALL {total_questions} questions are DONE. "
-                    f"✅ ALL DONE — Now say your full goodbye to the person BY NAME: "
+                    f"RECORDED ({done_count}/{total_questions}). "
+                    f"✅ ALL DONE. Say this now: "
                     f"\"Thanks so much for sharing your thoughts, {person_name}. "
                     f"I really appreciate your time, and I hope you have a great rest of your day!\" "
-                    f"Do NOT call any tools. Just speak your goodbye with their name. The call will end automatically."
+                    f"Then STOP. Do NOT call any tools. The call ends automatically."
                 )
         return f"Recorded {question_id}."
 
@@ -143,45 +178,19 @@ def create_survey_tools(
     async def end_survey(context: RunContext, reason: str = "completed"):
         """
         End the survey call and hang up.
-        ⚠️ ONLY call this when: 1) record_answer told you ALL DONE, 2) person is wrong_person, or 3) person declined.
-        NEVER call this if there are still questions remaining. Say goodbye FIRST, then call this.
+        ONLY use for: wrong_person, declined, callback_scheduled, or link_sent.
+        Do NOT call this after finishing all questions — the call ends automatically.
 
         Args:
-            reason: Why the call is ending — completed, wrong_person, declined, callback_scheduled, link_sent, time_limit
+            reason: Why the call is ending — wrong_person, declined, callback_scheduled, link_sent
         """
-        logger.info(f"📞 Ending call — reason: {reason} (hanging up in {HANGUP_DELAY_SECONDS}s)")
-        survey_responses["end_reason"] = reason
-        survey_responses["completed"] = reason == "completed"
+        logger.info(f"📞 end_survey called — reason: {reason}")
 
-        call_duration = (datetime.now() - call_start_time).total_seconds()
-        save_survey_responses(caller_number, survey_responses, call_duration)
-        cleanup_logging_fn(log_handler)
-
-        if survey_id:
-            await _call_service(
-                f"{VOICE_SERVICE_URL}/api/voice/complete-survey",
-                {"survey_id": survey_id, "reason": reason},
-            )
-
-            transcript_lines = []
-            for qid, ans in survey_responses.get("answers", {}).items():
-                transcript_lines.append(f"Q[{qid}]: {ans}")
-            full_transcript = "\n".join(transcript_lines)
-            asyncio.create_task(_call_service(
-                f"{VOICE_SERVICE_URL}/api/voice/store-transcript",
-                {
-                    "survey_id": survey_id,
-                    "full_transcript": full_transcript,
-                    "call_duration_seconds": str(int(call_duration)),
-                    "call_status": reason,
-                },
-            ))
+        if reason == "completed" and survey_finished["done"]:
+            return "Survey already ending automatically. Just say goodbye."
 
         await asyncio.sleep(HANGUP_DELAY_SECONDS)
-
-        if disconnect_fn:
-            await disconnect_fn()
-
+        await _finalize_and_disconnect(reason)
         return "Call ended."
 
     @function_tool()
