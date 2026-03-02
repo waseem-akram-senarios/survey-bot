@@ -44,7 +44,7 @@ TTS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9")
 # ===========================================
 PREEMPTIVE_GENERATION = True
 RESUME_FALSE_INTERRUPTION = True
-FALSE_INTERRUPTION_TIMEOUT = 1.5
+FALSE_INTERRUPTION_TIMEOUT = 2.5
 MAX_TOOL_STEPS = 15
 
 # VAD tuning for phone calls

@@ -1,8 +1,9 @@
 """
 Survey Voice Bot — Main Entry Point
 
-The agent receives its system prompt from brain-service via dispatch metadata.
-No local prompt templates — brain-service is the single source of truth.
+The agent receives its complete system prompt from voice-service via dispatch metadata.
+No local prompt logic — voice-service is the single source of truth for prompts.
+Tools: record_answer, end_survey.
 """
 
 import os
@@ -50,7 +51,7 @@ MINIMAL_FALLBACK_PROMPT = (
     "You are Cameron, a friendly AI survey assistant. "
     "The greeting has already been spoken. Conduct a brief feedback survey. "
     "Use record_answer(question_id, answer) to save each response. "
-    "When done, say goodbye and call end_survey(reason='completed') immediately."
+    "When done, call end_survey(reason='completed') — it says goodbye and hangs up automatically."
 )
 
 
@@ -94,13 +95,18 @@ async def entrypoint(ctx: JobContext):
     org_name = platform_org or ORGANIZATION_NAME
 
     questions_list = metadata.get("questions", [])
-    question_ids = [q.get("id", f"q{i+1}") for i, q in enumerate(questions_list) if isinstance(q, dict)]
+    # Only non-conditional questions count as "required" — conditional ones depend on prior answers
+    question_ids = [
+        q.get("id", f"q{i+1}")
+        for i, q in enumerate(questions_list)
+        if isinstance(q, dict) and not q.get("parent_id")
+    ]
 
     logger.info(f"Recipient: '{rider_first_name}' | Org: '{org_name}' | Phone: {caller_number} | Questions: {len(question_ids)}")
     if platform_prompt:
-        logger.info(f"Brain-service prompt loaded ({len(platform_prompt)} chars)")
+        logger.info(f"System prompt loaded from voice-service ({len(platform_prompt)} chars)")
     else:
-        logger.warning("No brain-service prompt — using minimal fallback")
+        logger.warning("No system prompt in metadata — using minimal fallback")
 
     survey_prompt = platform_prompt or MINIMAL_FALLBACK_PROMPT
     survey_responses = create_empty_response_dict(rider_first_name, caller_number)
@@ -154,6 +160,13 @@ async def entrypoint(ctx: JobContext):
         false_interruption_timeout=FALSE_INTERRUPTION_TIMEOUT,
         max_tool_steps=MAX_TOOL_STEPS,
     )
+
+    @session.on("user_input_transcribed")
+    def _on_user_input(ev) -> None:
+        transcript = getattr(ev, "transcript", None) or str(ev)
+        is_final = getattr(ev, "is_final", True)
+        if is_final and transcript.strip():
+            logger.info(f"[USER] {transcript.strip()[:400]}")
 
     await session.start(room=ctx.room, agent=survey_agent)
 

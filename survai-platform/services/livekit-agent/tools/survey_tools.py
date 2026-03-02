@@ -1,9 +1,7 @@
 """
-Survey function tools — minimal, generic, aligned with brain-service prompt.
-
-Only two tools:
+Survey function tools — two tools that cover the full call lifecycle:
   - record_answer(question_id, answer) — store any survey answer
-  - end_survey(reason)                 — end the call and disconnect
+  - end_survey(reason)                 — save data, speak farewell, wait for playout, hang up
 """
 
 import asyncio
@@ -17,7 +15,7 @@ from utils.storage import save_survey_responses
 
 logger = get_logger()
 
-HANGUP_DELAY_SECONDS = 5.0
+POST_FAREWELL_BUFFER_SECONDS = 2.0
 
 
 def create_survey_tools(
@@ -43,7 +41,7 @@ def create_survey_tools(
         survey_responses["answers"][question_id] = answer
         done = list(survey_responses["answers"].keys())
         done_count = len(done)
-        logger.info(f"✅ [{question_id}] ({done_count}/{total_questions}) {answer[:120]}")
+        logger.info(f"[{question_id}] ({done_count}/{total_questions}) {answer[:120]}")
 
         if question_ids:
             remaining = [q for q in question_ids if q not in done]
@@ -59,21 +57,34 @@ def create_survey_tools(
                 return (
                     f"Recorded {question_id}. "
                     f"ALL {total_questions} questions are done. "
-                    f"Say your full goodbye message to the person, then call end_survey(reason='completed')."
+                    f"Call end_survey(reason='completed') now."
                 )
         return f"Recorded {question_id}."
 
     @function_tool()
     async def end_survey(context: RunContext, reason: str = "completed"):
         """
-        Save survey data and schedule the call to hang up after a delay.
-        IMPORTANT: Only call this AFTER you have already spoken your full goodbye message.
-        The call will stay connected for a few more seconds so the person hears your farewell.
+        End the call: save survey data, speak farewell, wait for it to finish, then hang up.
+        This is the ONLY way to end a call. One call to this tool does everything.
 
         Args:
             reason: Why the call is ending — completed, wrong_person, declined, not_available
         """
-        logger.info(f"📞 Ending call — reason: {reason} (hanging up in {HANGUP_DELAY_SECONDS}s)")
+        if reason == "completed" and question_ids:
+            done = set(survey_responses["answers"].keys())
+            remaining = [q for q in question_ids if q not in done]
+            if remaining:
+                logger.warning(
+                    f"end_survey(completed) blocked — {len(remaining)} required questions unanswered: "
+                    f"{', '.join(remaining)}"
+                )
+                return (
+                    f"Cannot end as 'completed' yet — {len(remaining)} required question(s) still unanswered: "
+                    f"{', '.join(remaining)}. "
+                    f"You MUST ask these before ending. Next to ask: {remaining[0]}."
+                )
+
+        logger.info(f"end_survey called — reason: {reason}")
         survey_responses["end_reason"] = reason
         survey_responses["completed"] = reason == "completed"
 
@@ -81,9 +92,29 @@ def create_survey_tools(
         save_survey_responses(caller_number, survey_responses, call_duration)
         cleanup_logging_fn(log_handler)
 
-        # Wait long enough for TTS to finish speaking the goodbye
-        await asyncio.sleep(HANGUP_DELAY_SECONDS)
+        rider_name = survey_responses.get("rider_name", "").strip()
+        name_part = f", {rider_name}" if rider_name else ""
 
+        if reason == "completed":
+            farewell = (
+                f"Thanks so much for sharing your thoughts{name_part}! "
+                "I really appreciate your time, and I hope you have a great rest of your day! Goodbye!"
+            )
+        elif reason in ("not_available", "callback_scheduled"):
+            farewell = "Fantastic! We'll be in touch. Thank you for your time, and have a wonderful day! Goodbye!"
+        elif reason == "wrong_person":
+            farewell = "I apologize for the mix-up! Have a great day! Goodbye!"
+        else:
+            farewell = "Of course, no problem at all! Thanks for your time — have a great day! Goodbye!"
+
+        logger.info(f"[FAREWELL] {farewell}")
+        speech_handle = context.session.say(farewell)
+        await speech_handle.wait_for_playout()
+        logger.info("[FAREWELL] playout finished — person heard the full goodbye")
+
+        await asyncio.sleep(POST_FAREWELL_BUFFER_SECONDS)
+
+        logger.info("Disconnecting call now")
         if disconnect_fn:
             await disconnect_fn()
 
