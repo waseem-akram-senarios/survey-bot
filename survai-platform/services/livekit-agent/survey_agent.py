@@ -9,6 +9,9 @@ import re
 from livekit.agents.voice import Agent
 
 from config.settings import ORGANIZATION_NAME
+from utils.logging import get_logger
+
+logger = get_logger()
 
 PLACEHOLDER_NAMES = {
     "customer", "unknown", "user", "recipient", "test",
@@ -68,5 +71,5 @@ class SurveyAgent(Agent):
                     f"Hi, this is Cameron with {org}. "
                     f"I'm reaching out to get your quick feedback. Is now a good time?"
                 )
+        logger.info(f"[AGENT] {greeting}")
         await self.session.say(greeting)
-
