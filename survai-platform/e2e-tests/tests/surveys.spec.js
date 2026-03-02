@@ -159,13 +159,45 @@ test.describe('Surveys UI', () => {
     expect(bodyText && bodyText.length > 10).toBeTruthy();
   });
 
-  test('manage surveys page loads', async ({ page }) => {
+  test('manage surveys page loads with stats', async ({ page }) => {
     await page.goto(`${BASE}/surveys/manage`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
     const bodyText = await page.textContent('body');
     expect(bodyText && bodyText.length > 10).toBeTruthy();
+    expect(bodyText).toContain('Total Surveys');
+  });
+
+  test('manage surveys has Send Survey icon buttons for in-progress surveys', async ({ page }) => {
+    await page.goto(`${BASE}/surveys/manage`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    // Action buttons use <img alt="Send Survey"> inside MUI IconButton
+    const sendBtns = page.locator('img[alt="Send Survey"]');
+    const count = await sendBtns.count();
+    expect(count).toBeGreaterThan(0);
+  });
+
+  test('manage surveys has Delete Survey buttons', async ({ page }) => {
+    await page.goto(`${BASE}/surveys/manage`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    const deleteBtns = page.locator('button[aria-label="Delete Survey"]');
+    const count = await deleteBtns.count();
+    expect(count).toBeGreaterThan(0);
+  });
+
+  test('manage surveys table has action icons', async ({ page }) => {
+    await page.goto(`${BASE}/surveys/manage`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    const actionIcons = page.locator('table tbody tr svg, table tbody tr img[alt]');
+    const count = await actionIcons.count();
+    expect(count).toBeGreaterThan(0);
   });
 
   test('completed surveys page loads', async ({ page }) => {
@@ -177,6 +209,15 @@ test.describe('Surveys UI', () => {
     expect(bodyText && bodyText.length > 10).toBeTruthy();
   });
 
+  test('completed surveys page shows only completed status', async ({ page }) => {
+    await page.goto(`${BASE}/surveys/completed`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    const bodyText = await page.textContent('body');
+    expect(bodyText).not.toContain('In-Progress');
+  });
+
   test('launch survey page loads', async ({ page }) => {
     await page.goto(`${BASE}/surveys/launch`);
     await page.waitForLoadState('networkidle');
@@ -184,5 +225,14 @@ test.describe('Surveys UI', () => {
 
     const bodyText = await page.textContent('body');
     expect(bodyText && bodyText.length > 10).toBeTruthy();
+  });
+
+  test('launch survey page has template selector and form fields', async ({ page }) => {
+    await page.goto(`${BASE}/surveys/launch`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    const bodyText = await page.textContent('body');
+    expect(bodyText).toContain('Select Template');
   });
 });

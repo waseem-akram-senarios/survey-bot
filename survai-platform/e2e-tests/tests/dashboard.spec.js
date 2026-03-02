@@ -22,14 +22,11 @@ test.describe('Dashboard Home', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
-    // Should show stats like "Created Templates", "Active Surveys", etc.
     const bodyText = await page.textContent('body');
     expect(bodyText).toBeTruthy();
-    const hasStats =
-      bodyText.includes('Templates') ||
-      bodyText.includes('Surveys') ||
-      bodyText.includes('Dashboard');
-    expect(hasStats).toBeTruthy();
+    expect(bodyText).toContain('Created Templates');
+    expect(bodyText).toContain('Active Surveys');
+    expect(bodyText).toContain('Completed Surveys');
   });
 
   test('dashboard has sidebar with navigation links', async ({ page }) => {
@@ -65,6 +62,32 @@ test.describe('Dashboard Home', () => {
 
     const bodyText = await page.textContent('body');
     expect(bodyText).toContain('Active Surveys');
+  });
+
+  test('dashboard table has expected columns', async ({ page }) => {
+    await page.goto(`${BASE}/dashboard`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    const headers = await page.locator('table thead th').allInnerTexts();
+    expect(headers.length).toBeGreaterThanOrEqual(5);
+    expect(headers.join(',')).toContain('Name');
+    expect(headers.join(',')).toContain('Status');
+  });
+
+  test('dashboard search filters table rows', async ({ page }) => {
+    await page.goto(`${BASE}/dashboard`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    const searchInput = page.locator('input[placeholder*="earch" i]');
+    if (await searchInput.count() > 0) {
+      const rowsBefore = await page.locator('table tbody tr').count();
+      await searchInput.first().fill('NONEXISTENT_TERM_XYZ');
+      await page.waitForTimeout(1000);
+      const rowsAfter = await page.locator('table tbody tr').count();
+      expect(rowsAfter).toBeLessThanOrEqual(rowsBefore);
+    }
   });
 });
 

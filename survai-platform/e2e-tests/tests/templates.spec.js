@@ -140,7 +140,6 @@ test.describe('Templates UI', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
-    // Page should contain template-related content
     const pageText = await page.textContent('body');
     expect(pageText && pageText.length > 10).toBeTruthy();
     const hasTemplateContent =
@@ -150,12 +149,60 @@ test.describe('Templates UI', () => {
     expect(hasTemplateContent).toBeTruthy();
   });
 
+  test('templates page shows stats cards', async ({ page }) => {
+    await page.goto(`${BASE}/templates/manage`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    const bodyText = await page.textContent('body');
+    expect(bodyText).toContain('Total Templates');
+  });
+
+  test('templates table has Launch Survey icon buttons', async ({ page }) => {
+    await page.goto(`${BASE}/templates/manage`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    // Action buttons use <img alt="Launch Survey"> inside MUI IconButton
+    const launchBtns = page.locator('img[alt="Launch Survey"]');
+    const count = await launchBtns.count();
+    expect(count).toBeGreaterThan(0);
+  });
+
+  test('templates table has Clone icon buttons', async ({ page }) => {
+    await page.goto(`${BASE}/templates/manage`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    const cloneBtns = page.locator('img[alt="Clone"]');
+    const count = await cloneBtns.count();
+    expect(count).toBeGreaterThan(0);
+  });
+
+  test('Launch Survey button navigates to create survey form', async ({ page }) => {
+    await page.goto(`${BASE}/templates/manage`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    const launchBtn = page.locator('img[alt="Launch Survey"]').first();
+    if (await launchBtn.count() > 0) {
+      await launchBtn.click();
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(2000);
+      const bodyText = await page.textContent('body');
+      const isOnForm =
+        bodyText.includes('Select Template') ||
+        bodyText.includes('Recipient') ||
+        bodyText.includes('Launch New Survey');
+      expect(isOnForm).toBeTruthy();
+    }
+  });
+
   test('create template page loads', async ({ page }) => {
     await page.goto(`${BASE}/templates/create`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
-    // Verify page rendered (no blank screen)
     const bodyText = await page.textContent('body');
     expect(bodyText && bodyText.length > 10).toBeTruthy();
   });
