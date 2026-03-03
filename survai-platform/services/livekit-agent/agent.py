@@ -1,9 +1,11 @@
 """
-Survey Voice Bot — Main Entry Point
+Survey Voice Bot — Main Entry Point (Multi-Agent)
 
-The agent receives its complete system prompt from voice-service via dispatch metadata.
-No local prompt logic — voice-service is the single source of truth for prompts.
-Tools: record_answer, end_survey.
+Two agents handle the call:
+  GreeterAgent  — identity confirmation + availability check (~300-token prompt)
+  QuestionsAgent — survey questions + answer recording (~900-token prompt)
+
+Prompts come from voice-service via dispatch metadata (greeter_prompt / questions_prompt).
 """
 
 import asyncio
@@ -18,8 +20,9 @@ from livekit.agents import (
     cli,
     AutoSubscribe,
 )
+from livekit.agents.voice.room_io import RoomOptions, AudioInputOptions
 from livekit.agents.voice import AgentSession
-from livekit.plugins import deepgram, openai, silero, elevenlabs
+from livekit.plugins import deepgram, openai, silero, elevenlabs, noise_cancellation
 
 from config.settings import (
     ORGANIZATION_NAME,
@@ -41,17 +44,24 @@ from config.settings import (
     VAD_MIN_SPEECH_DURATION,
     VAD_ACTIVATION_THRESHOLD,
 )
+from agents import SurveyCallData, GreeterAgent, QuestionsAgent
 from tools.survey_tools import create_survey_tools
 from utils.logging import get_logger, setup_survey_logging, cleanup_survey_logging
+from utils.metrics_logger import log_pipeline_metrics
 from utils.storage import create_empty_response_dict
-from survey_agent import SurveyAgent
 
 logger = get_logger()
 
-MINIMAL_FALLBACK_PROMPT = (
+MINIMAL_GREETER_PROMPT = (
+    "You are Cameron, a friendly survey caller. "
+    "Confirm the person's identity and ask if they have time for a brief survey. "
+    "Call to_questions() once they confirm availability."
+)
+
+MINIMAL_QUESTIONS_PROMPT = (
     "You are Cameron, a friendly AI survey assistant. "
-    "The greeting has already been spoken. Conduct a brief feedback survey. "
-    "Use record_answer(question_id, answer) to save each response. "
+    "Identity and availability are already confirmed. "
+    "Conduct the survey questions. Use record_answer(question_id, answer) to save each response. "
     "When done, call end_survey(reason='completed') — it says goodbye and hangs up automatically."
 )
 
@@ -89,13 +99,15 @@ async def entrypoint(ctx: JobContext):
     log_filename, log_handler = setup_survey_logging(ctx.room.name, caller_number)
     call_start_time = datetime.now()
 
-    platform_prompt = metadata.get("system_prompt")
     platform_recipient = metadata.get("recipient_name", "")
     platform_org = metadata.get("organization_name", "")
 
     rider_first_name = platform_recipient.split()[0] if platform_recipient else ""
     org_name = platform_org or ORGANIZATION_NAME
     call_language = metadata.get("language", "en")
+
+    greeter_prompt = metadata.get("greeter_prompt") or metadata.get("system_prompt") or MINIMAL_GREETER_PROMPT
+    questions_prompt = metadata.get("questions_prompt") or MINIMAL_QUESTIONS_PROMPT
 
     questions_list = metadata.get("questions", [])
     question_ids = [q.get("id", f"q{i+1}") for i, q in enumerate(questions_list) if isinstance(q, dict)]
@@ -105,13 +117,12 @@ async def entrypoint(ctx: JobContext):
             qid = q.get("id", f"q{i+1}")
             questions_map[qid] = q.get("text") or q.get("question_text") or f"Question {i+1}"
 
-    logger.info(f"Recipient: '{rider_first_name}' | Org: '{org_name}' | Phone: {caller_number} | Questions: {len(question_ids)}")
-    if platform_prompt:
-        logger.info(f"System prompt loaded from voice-service ({len(platform_prompt)} chars)")
-    else:
-        logger.warning("No system prompt in metadata — using minimal fallback")
+    logger.info(
+        f"Recipient: '{rider_first_name}' | Org: '{org_name}' | Phone: {caller_number} | "
+        f"Questions: {len(question_ids)} | Greeter prompt: {len(greeter_prompt)} chars | "
+        f"Questions prompt: {len(questions_prompt)} chars"
+    )
 
-    survey_prompt = platform_prompt or MINIMAL_FALLBACK_PROMPT
     survey_responses = create_empty_response_dict(rider_first_name, caller_number)
 
     async def hangup_call():
@@ -127,7 +138,8 @@ async def entrypoint(ctx: JobContext):
     survey_url = metadata.get("survey_url", "")
     rider_email = metadata.get("rider_email", "")
 
-    survey_tools = create_survey_tools(
+    # Build shared state
+    call_data = SurveyCallData(
         survey_responses=survey_responses,
         caller_number=caller_number,
         call_start_time=call_start_time,
@@ -142,17 +154,44 @@ async def entrypoint(ctx: JobContext):
         rider_name=rider_first_name,
     )
 
-    survey_agent = SurveyAgent(
-        instructions=survey_prompt,
+    # Create tools — split into greeter and questions sets
+    greeter_tools, question_tools = create_survey_tools(
+        survey_responses=survey_responses,
+        caller_number=caller_number,
+        call_start_time=call_start_time,
+        log_handler=log_handler,
+        cleanup_logging_fn=cleanup_survey_logging,
+        disconnect_fn=hangup_call,
+        question_ids=question_ids,
+        questions_map=questions_map,
+        survey_id=survey_id,
+        survey_url=survey_url,
+        rider_email=rider_email,
+        rider_name=rider_first_name,
+    )
+
+    # Build both agents and register them in call_data
+    greeter_agent = GreeterAgent(
+        instructions=greeter_prompt,
         rider_first_name=rider_first_name,
         organization_name=org_name,
         language=call_language,
-        tools=survey_tools,
+        tools=greeter_tools,
     )
+    questions_agent = QuestionsAgent(
+        instructions=questions_prompt,
+        tools=question_tools,
+    )
+    call_data.agents["greeter"] = greeter_agent
+    call_data.agents["questions"] = questions_agent
 
-    session = AgentSession(
-        stt=deepgram.STT(model=STT_MODEL, language="es" if call_language == "es" else STT_LANGUAGE),
-        llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE),
+    session = AgentSession[SurveyCallData](
+        userdata=call_data,
+        stt=deepgram.STT(
+            model=STT_MODEL,
+            language="es" if call_language == "es" else STT_LANGUAGE,
+        ),
+        llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
         tts=(
             elevenlabs.TTS(
                 voice_id=TTS_VOICE_ID,
@@ -179,6 +218,15 @@ async def entrypoint(ctx: JobContext):
         is_final = getattr(ev, "is_final", True)
         if is_final and transcript.strip():
             logger.info(f"[USER] {transcript.strip()[:400]}")
+
+    @session.on("metrics_collected")
+    def _on_metrics(ev) -> None:
+        log_pipeline_metrics(ev.metrics)
+
+    @session.on("agent_state_changed")
+    def _on_agent_state(ev) -> None:
+        logger.info("[STATE] %s → %s", ev.old_state, ev.new_state)
+
     time_limit_minutes = metadata.get("time_limit_minutes", 8)
 
     async def _time_limit_watchdog():
@@ -194,7 +242,14 @@ async def entrypoint(ctx: JobContext):
 
     asyncio.create_task(_time_limit_watchdog())
 
-    await session.start(room=ctx.room, agent=survey_agent)
+    await session.start(
+        room=ctx.room,
+        agent=call_data.agents["greeter"],
+        room_options=RoomOptions(
+            audio_input=AudioInputOptions(noise_cancellation=noise_cancellation.BVC()),
+            close_on_disconnect=False,
+        ),
+    )
 
 
 if __name__ == "__main__":

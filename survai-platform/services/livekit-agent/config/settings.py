@@ -32,7 +32,7 @@ STT_MODEL = os.getenv("STT_MODEL", "nova-3")
 STT_LANGUAGE = os.getenv("STT_LANGUAGE", "en")
 
 # Large Language Model (OpenAI)
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4.1-mini")
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))
 
 # Text-to-Speech
@@ -44,7 +44,7 @@ TTS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9")
 # ===========================================
 PREEMPTIVE_GENERATION = True
 RESUME_FALSE_INTERRUPTION = True
-FALSE_INTERRUPTION_TIMEOUT = 2.5
+FALSE_INTERRUPTION_TIMEOUT = 0.3
 MAX_TOOL_STEPS = 15
 
 # VAD tuning for phone calls

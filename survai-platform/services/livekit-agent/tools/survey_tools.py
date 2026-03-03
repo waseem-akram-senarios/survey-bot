@@ -111,16 +111,10 @@ def create_survey_tools(
                 if remaining:
                     next_id = remaining[0]
                     next_text = qmap.get(next_id, "")
-                    return (
-                        f"Already recorded {question_id}. "
-                        f"Move on — ask this next: \"{next_text}\" (question_id: {next_id})."
-                    )
+                    return f"Already recorded. Ask: \"{next_text}\" (id:{next_id})"
                 else:
-                    return (
-                        f"All questions are already answered. "
-                        f"Call end_survey(\"completed\") now."
-                    )
-            return f"Already recorded {question_id}. Move to the next question."
+                    return "All questions answered. Call end_survey(\"completed\") now."
+            return "Already recorded. Continue."
 
         survey_responses["answers"][question_id] = answer
         done = list(survey_responses["answers"].keys())
@@ -138,19 +132,11 @@ def create_survey_tools(
             if remaining:
                 next_id = remaining[0]
                 next_text = qmap.get(next_id, "")
-                return (
-                    f"RECORDED ({done_count}/{total_questions}). "
-                    f"{len(remaining)} questions left. "
-                    f"NEXT QUESTION: \"{next_text}\" (question_id: {next_id}). "
-                    f"Ask it now."
-                )
+                return f"Recorded. Ask: \"{next_text}\" (id:{next_id})"
             else:
                 logger.info(f"ALL {total_questions} questions answered")
-                return (
-                    f"RECORDED ({done_count}/{total_questions}). "
-                    f"ALL DONE. Call end_survey(\"completed\") now."
-                )
-        return f"Recorded {question_id}."
+                return "All questions answered. Call end_survey(\"completed\") now."
+        return "Recorded."
 
     @function_tool()
     async def end_survey(context: RunContext, reason: str = "completed"):
@@ -166,14 +152,11 @@ def create_survey_tools(
             remaining = [q for q in question_ids if q not in done]
             if remaining:
                 logger.warning(
-                    f"end_survey(completed) blocked — {len(remaining)} required questions unanswered: "
+                    f"end_survey(completed) — {len(remaining)} questions unanswered, marking as skipped: "
                     f"{', '.join(remaining)}"
                 )
-                return (
-                    f"Cannot end as 'completed' yet — {len(remaining)} required question(s) still unanswered: "
-                    f"{', '.join(remaining)}. "
-                    f"You MUST ask these before ending. Next to ask: {remaining[0]}."
-                )
+                for qid in remaining:
+                    survey_responses["answers"][qid] = "__skipped__"
 
         logger.info(f"end_survey called — reason: {reason}")
 
@@ -243,7 +226,7 @@ def create_survey_tools(
                     pass
 
             await _call_service(
-                f"{SCHEDULER_SERVICE_URL}/scheduler/schedule-call",
+                f"{SCHEDULER_SERVICE_URL}/api/scheduler/schedule-call",
                 {"survey_id": survey_id, "phone": caller_number, "delay_seconds": str(delay)},
             )
 
@@ -270,4 +253,17 @@ def create_survey_tools(
         else:
             return "Could not send link (no email on file). Apologize, then call end_survey(reason='link_sent') to end the call."
 
-    return [record_answer, end_survey, schedule_callback, send_survey_link]
+    @function_tool()
+    async def to_questions(context: RunContext):
+        """
+        Hand off to the survey questions agent.
+        Call this ONLY after the person has confirmed their identity AND confirmed they are available for the survey.
+        Do NOT call before both confirmations are complete.
+        """
+        call_data = context.userdata
+        call_data.prev_agent = context.session.current_agent
+        return call_data.agents["questions"]
+
+    greeter_tools = [end_survey, schedule_callback, send_survey_link, to_questions]
+    question_tools = [record_answer, end_survey]
+    return greeter_tools, question_tools

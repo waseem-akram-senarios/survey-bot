@@ -21,7 +21,7 @@ from db import (
     record_answer as db_record_answer,
     update_survey_status,
 )
-from prompt_builder import build_survey_prompt
+from prompt_builder import build_greeter_prompt, build_questions_prompt
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/voice", tags=["voice"])
@@ -92,14 +92,23 @@ async def make_call(
     }
 
     try:
-        system_prompt = build_survey_prompt(
+        greeter_prompt = build_greeter_prompt(
+            organization_name=company_name,
+            rider_first_name=rider_first_name,
+        )
+        questions_prompt = build_questions_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
             survey_name=template_name or f"Survey {survey_id}",
             questions=questions,
         )
-        survey_context["system_prompt"] = system_prompt
-        logger.info(f"Built local prompt for LiveKit call ({len(system_prompt)} chars)")
+        survey_context["greeter_prompt"] = greeter_prompt
+        survey_context["questions_prompt"] = questions_prompt
+        survey_context["system_prompt"] = greeter_prompt  # backward compat
+        logger.info(
+            f"Built prompts for LiveKit call — greeter: {len(greeter_prompt)} chars, "
+            f"questions: {len(questions_prompt)} chars"
+        )
     except Exception as e:
         logger.warning(f"Local prompt build failed: {e}, agent will use defaults")
 
