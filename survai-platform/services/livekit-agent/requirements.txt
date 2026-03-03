@@ -13,6 +13,12 @@ livekit-plugins-elevenlabs==1.4.2
 # VAD (Voice Activity Detection)
 livekit-plugins-silero==1.4.2
 
+# Turn detection (multilingual: English + Spanish + 12 other languages)
+livekit-plugins-turn-detector==1.4.2
+
+# Noise cancellation (BVC — reduces VAD false triggers on phone calls)
+livekit-plugins-noise-cancellation>=0.2.3
+
 # Environment variables
 python-dotenv==1.2.1
 

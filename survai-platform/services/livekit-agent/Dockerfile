@@ -13,6 +13,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Pre-download MultilingualModel weights (~396 MB) so the container is ready on first call
+RUN python agent.py download-files
+
 RUN mkdir -p survey_logs survey_responses
 
 ENV PYTHONPATH=/app
