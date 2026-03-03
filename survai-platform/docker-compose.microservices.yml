@@ -328,8 +328,8 @@ services:
       context: ./services/livekit-agent
     container_name: livekit-agent
     restart: unless-stopped
-    mem_limit: 512m
-    cpus: 1.0
+    mem_limit: 2g
+    cpus: 1.5
     ports:
       - "8083:8083"
       - "8000:8000"
