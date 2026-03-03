@@ -3,7 +3,8 @@ Questions Agent — second agent in the call, activated after identity + availab
 
 Responsibilities:
   - Copy chat history from the GreeterAgent so the LLM has full context
-  - Inject a system message to kick off Q1 immediately
+  - Speak Q1 directly via TTS, then inject it as an assistant turn so the LLM
+    knows Q1 was already asked and simply waits for the caller's answer
   - Ask all survey questions, record answers, handle mid-call exits
   - End call via end_survey("completed") or end_survey("declined")
 
@@ -28,8 +29,12 @@ class QuestionsAgent(Agent):
 
     async def on_enter(self) -> None:
         """
-        Copy greeter's chat history so the LLM knows who it's speaking with,
-        then inject a system nudge to start Q1 without re-introducing.
+        Copy greeter's chat history so the LLM has full context,
+        speak Q1 directly via TTS, then inject it as an assistant turn.
+
+        Injecting Q1 as an assistant message prevents preemptive_generation
+        from firing an LLM response that would double-ask Q1 or jump to Q2
+        before the user has answered anything.
         """
         userdata = self.session.userdata
         chat_ctx = self.chat_ctx.copy()
@@ -42,6 +47,35 @@ class QuestionsAgent(Agent):
             new_items = [item for item in truncated.items if item.id not in existing_ids]
             chat_ctx.items.extend(new_items)
 
+        if userdata.question_ids:
+            first_q_id = userdata.question_ids[0]
+            first_q_text = userdata.questions_map.get(first_q_id, "")
+            if first_q_text:
+                intro = f"Great, let's get started! {first_q_text}"
+
+                # Tell the LLM Q1 is already being spoken — do NOT generate it again
+                chat_ctx.add_message(
+                    role="system",
+                    content=(
+                        "Identity and availability have been confirmed by the greeter. "
+                        "Do NOT re-introduce yourself or ask for availability again. "
+                        f"Q1 is already being spoken to the caller verbatim: \"{first_q_text}\". "
+                        "Do NOT repeat Q1. Wait silently for the caller's answer."
+                    ),
+                )
+                await self.update_chat_ctx(chat_ctx)
+
+                # Speak Q1 and wait for full audio playout before returning
+                await self.session.say(intro).wait_for_playout()
+
+                # Inject Q1 as an assistant message so the LLM sees it was spoken
+                # and won't generate a duplicate or jump to Q2 unprompted
+                chat_ctx2 = self.chat_ctx.copy()
+                chat_ctx2.add_message(role="assistant", content=intro)
+                await self.update_chat_ctx(chat_ctx2)
+                return
+
+        # Fallback: let LLM ask the first question if no questions are pre-loaded
         chat_ctx.add_message(
             role="system",
             content=(
@@ -51,16 +85,4 @@ class QuestionsAgent(Agent):
             ),
         )
         await self.update_chat_ctx(chat_ctx)
-
-        # Speak Q1 directly via TTS — skips one full LLM round-trip
-        userdata = self.session.userdata
-        if userdata.question_ids:
-            first_q_id = userdata.question_ids[0]
-            first_q_text = userdata.questions_map.get(first_q_id, "")
-            if first_q_text:
-                intro = f"Great, let's get started! {first_q_text}"
-                await self.session.say(intro).wait_for_playout()
-                return
-
-        # Fallback: let LLM ask the first question if no questions are pre-loaded
         await self.session.generate_reply()
