@@ -65,11 +65,8 @@ async def make_call(
     else:
         template_config = {}
 
-    language = "en"
-    if template_name:
-        tname_lower = template_name.lower()
-        if "spanish" in tname_lower or "_es" in tname_lower:
-            language = "es"
+    bilingual = True  # hardcoded for now — will come from template config later
+    language = "en"  # calls always start in English
 
     company_name = template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves")
     callback_url = os.getenv("SURVEY_SUBMIT_URL", "http://survey-service:8020/api/answers/qna_phone")
@@ -84,6 +81,7 @@ async def make_call(
         "template_name": template_name,
         "organization_name": company_name,
         "language": language,
+        "bilingual": bilingual,
         "questions": questions,
         "callback_url": callback_url,
         "survey_url": survey_url,
@@ -95,12 +93,14 @@ async def make_call(
         greeter_prompt = build_greeter_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
+            bilingual=bilingual,
         )
-        questions_prompt = build_questions_prompt(
+        questions_prompt = await build_questions_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
             survey_name=template_name or f"Survey {survey_id}",
             questions=questions,
+            bilingual=bilingual,
         )
         survey_context["greeter_prompt"] = greeter_prompt
         survey_context["questions_prompt"] = questions_prompt

@@ -44,13 +44,15 @@ TTS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9")
 # ===========================================
 PREEMPTIVE_GENERATION = True
 RESUME_FALSE_INTERRUPTION = True
-FALSE_INTERRUPTION_TIMEOUT = 0.3
+FALSE_INTERRUPTION_TIMEOUT = 1.0
 MAX_TOOL_STEPS = 15
 
 # VAD tuning for phone calls
+# min_speech_duration: 0.25s filters phone-line click/noise artifacts (was 0.08s which fires on pickup sounds)
+# activation_threshold: 0.55 requires stronger signal to avoid preemptive LLM triggers during TTS
 VAD_MIN_SILENCE_DURATION = float(os.getenv("VAD_MIN_SILENCE_DURATION", "0.35"))
-VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.08"))
-VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.45"))
+VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.25"))
+VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.55"))
 
 # ===========================================
 # FILE/DIRECTORY PATHS

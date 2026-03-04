@@ -239,6 +239,7 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-noreply@aidevlab.com}
       - SMTP_FROM_NAME=${SMTP_FROM_NAME:-SurvAI}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - BRAIN_SERVICE_URL=http://brain-service:8016
       - SURVEY_SUBMIT_URL=${PUBLIC_URL}/pg/api/answers/qna_phone
       - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}

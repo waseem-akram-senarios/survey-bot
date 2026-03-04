@@ -105,6 +105,7 @@ async def entrypoint(ctx: JobContext):
     rider_first_name = platform_recipient.split()[0] if platform_recipient else ""
     org_name = platform_org or ORGANIZATION_NAME
     call_language = metadata.get("language", "en")
+    bilingual = metadata.get("bilingual", False)
 
     greeter_prompt = metadata.get("greeter_prompt") or metadata.get("system_prompt") or MINIMAL_GREETER_PROMPT
     questions_prompt = metadata.get("questions_prompt") or MINIMAL_QUESTIONS_PROMPT
@@ -176,6 +177,7 @@ async def entrypoint(ctx: JobContext):
         rider_first_name=rider_first_name,
         organization_name=org_name,
         language=call_language,
+        bilingual=bilingual,
         tools=greeter_tools,
     )
     questions_agent = QuestionsAgent(
@@ -189,13 +191,15 @@ async def entrypoint(ctx: JobContext):
         userdata=call_data,
         stt=deepgram.STT(
             model=STT_MODEL,
-            language="es" if call_language == "es" else STT_LANGUAGE,
+            language="multi" if bilingual else (
+                "es" if call_language == "es" else STT_LANGUAGE
+            ),
         ),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
         tts=(
             elevenlabs.TTS(
                 voice_id=TTS_VOICE_ID,
-                model=TTS_MODEL,
+                model="eleven_multilingual_v2" if bilingual else TTS_MODEL,
                 apply_text_normalization="on",
             )
             if os.getenv("ELEVEN_API_KEY")
