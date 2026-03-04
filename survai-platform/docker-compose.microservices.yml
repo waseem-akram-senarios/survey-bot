@@ -110,6 +110,7 @@ services:
       - TEMPLATE_SERVICE_URL=http://template-service:8040
       - QUESTION_SERVICE_URL=http://question-service:8030
       - SCHEDULER_SERVICE_URL=http://scheduler-service:8070
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
