@@ -12,8 +12,10 @@ Tools: end_survey, schedule_callback, send_survey_link, to_questions
 
 import asyncio
 import re
+from typing import Annotated
 
 from livekit.agents.voice import Agent
+from livekit.agents import function_tool
 
 from config.settings import ORGANIZATION_NAME
 from utils.logging import get_logger
@@ -54,12 +56,26 @@ class GreeterAgent(Agent):
         rider_first_name: str,
         organization_name: str = None,
         language: str = "en",
+        bilingual: bool = False,
         **kwargs,
     ):
         super().__init__(instructions=instructions, **kwargs)
         self.rider_first_name = rider_first_name
         self.organization_name = organization_name or ORGANIZATION_NAME
         self.language = language
+        self.bilingual = bilingual
+
+    @function_tool
+    async def set_language(
+        self,
+        language: Annotated[str, "Language code: 'en' for English, 'es' for Spanish"],
+    ) -> str:
+        """Record the recipient's language preference for the rest of the call."""
+        self.session.userdata.detected_language = language
+        logger.info(f"[LANGUAGE] Recipient selected: {language}")
+        if language == "es":
+            return "Language preference set to Spanish. Respond entirely in Spanish from now on."
+        return "Language preference set to English. Respond entirely in English from now on."
 
     async def on_enter(self) -> None:
         """Speak the opening greeting and wait for full playout before LLM takes over."""

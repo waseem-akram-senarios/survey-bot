@@ -26,3 +26,5 @@ class SurveyCallData:
     agents: Dict[str, Any] = field(default_factory=dict)
     # set by to_questions tool so QuestionsAgent can copy chat history
     prev_agent: Optional[Any] = None
+    # set by set_language() tool after recipient chooses their preferred language
+    detected_language: str = "en"
