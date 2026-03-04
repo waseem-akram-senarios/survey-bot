@@ -24,6 +24,7 @@ import Dashboard from '../assets/dashboard.svg';
 import SelectedDashboard from '../assets/selectedDashboard.svg';
 import Templates from '../assets/template.svg';
 import SelectedTemplate from '../assets/selectedTemplate.svg';
+import AnalyticsIcon from '../assets/Analytics.svg';
 import Hide from '../assets/Hide.svg';
 import logo from '../assets/logo.png';
 
@@ -153,6 +154,41 @@ const Sidebar = () => {
               }}
             >
               Dashboard
+            </Typography>
+          )}
+        </Button>
+
+        {/* Analytics */}
+        <Button
+          component={Link}
+          to="/analytics"
+          sx={{
+            width: '100%',
+            height: '48px',
+            justifyContent: isMinimized ? 'center' : 'flex-start',
+            mx: 1,
+            borderRadius: '15px',
+            backgroundColor: isActive('/analytics') ? '#e3f2fd' : 'transparent',
+            '&:hover': {
+              backgroundColor: '#f5f5f5',
+            },
+            textTransform: 'none',
+            py: 1,
+          }}
+        >
+          <img src={AnalyticsIcon} alt="analytics-icon" style={{marginRight: isMinimized ? '0' : '10px', width: 22, height: 22, filter: isActive('/analytics') ? 'invert(29%) sepia(93%) saturate(4946%) hue-rotate(220deg) brightness(97%) contrast(95%)' : 'none'}} />
+          {!isMinimized && (
+            <Typography
+              sx={{
+                fontFamily: 'Poppins, sans-serif',
+                fontWeight: 500,
+                fontSize: '14px',
+                lineHeight: '100%',
+                letterSpacing: '0',
+                color: isActive('/analytics') ? '#1958F7' : '#7d7d7d',
+              }}
+            >
+              Analytics
             </Typography>
           )}
         </Button>

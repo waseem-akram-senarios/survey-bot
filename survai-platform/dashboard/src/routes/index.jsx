@@ -18,6 +18,7 @@ import SurveyProgressPage from '../pages/main/Surveys/SurveyProgressPage';
 import SurveyQuestionAnalytics from '../pages/main/Templates/TemplateAnalytics';
 import ImportData from '../pages/main/Surveys/ImportData';
 import EditSurvey from '../pages/main/Surveys/EditSurvey';
+import Analytics from '../pages/main/Analytics/Analytics';
 
 const routes = [
     {
@@ -114,6 +115,12 @@ const routes = [
           path: '/surveys/edit/:surveyId',
           element: (
               <EditSurvey />
+          )
+        },
+        {
+          path: '/analytics',
+          element: (
+              <Analytics />
           )
         },
       ]
