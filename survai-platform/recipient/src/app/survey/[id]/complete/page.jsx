@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import { Box, CircularProgress } from '@mui/material';
+import { detectLanguage, t } from '../../../../lib/i18n';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -17,6 +18,8 @@ export default function Survey() {
   const [statusError, setStatusError] = useState(null);
   const [existingCSAT, setExistingCSAT] = useState(null);
   const [hasExistingCSAT, setHasExistingCSAT] = useState(false);
+  const [companyName, setCompanyName] = useState("");
+  const [lang, setLang] = useState("en");
   
   const searchParams = useSearchParams();
   const params = useParams();
@@ -64,8 +67,16 @@ export default function Survey() {
   };
 
   useEffect(() => {
-    // Check survey status first
     checkSurveyStatus();
+    const urlLang = searchParams.get("lang");
+    if (urlLang) setLang(urlLang);
+    fetch(`${API_BASE_URL}/api/surveys/${surveyId}/recipient`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.CompanyName) setCompanyName(data.CompanyName);
+        if (!urlLang && data?.Name) setLang(detectLanguage(data.Name));
+      })
+      .catch(() => {});
   }, [surveyId, router]);
 
   useEffect(() => {
@@ -204,25 +215,25 @@ export default function Survey() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-normal text-gray-800 mb-2" style={{ fontFamily: 'Saira, sans-serif' }}>
-            IT Curves
+            {companyName || "SurvAI"}
           </h1>
           <p className="text-base text-gray-500" style={{ fontFamily: 'Poppins, sans-serif' }}>
-            Customer Satisfaction Survey
+            {t('customerSurvey', lang)}
           </p>
         </div>
 
         {/* Main content centered */}
         <div className="text-center max-w-2xl w-full">
           <h2 className="text-3xl md:text-4xl font-bold text-blue-800 mb-6" style={{ fontFamily: 'Segoe UI, sans-serif' }}>
-            Survey Complete
+            {t('surveyCompleteTitle', lang)}
           </h2>
           
           <p className="text-base md:text-lg text-gray-600 leading-relaxed mb-8" style={{ fontFamily: 'Poppins, sans-serif' }}>
-            Congratulations. You have successfully completed the survey. We will use this data to make our products and services even better in the future.
+            {t('congratulations', lang)}
           </p>
 
           <p className="text-sm text-gray-400 mb-12" style={{ fontFamily: 'Poppins, sans-serif' }}>
-            You can safely close this window.
+            {lang === 'es' ? 'Puede cerrar esta ventana de forma segura.' : 'You can safely close this window.'}
           </p>
 
           {/* Rating section */}
@@ -231,7 +242,7 @@ export default function Survey() {
               // Show existing CSAT score
               <>
                 <p className="text-base font-medium text-gray-700 mb-6 leading-relaxed" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                  Thank you for your feedback! You rated our survey:
+                  {t('thankYouFeedback', lang)} {lang === 'es' ? 'Calificaste nuestra encuesta:' : 'You rated our survey:'}
                 </p>
                 
                 <div className="flex justify-center items-center mb-4">
@@ -240,7 +251,9 @@ export default function Survey() {
                 
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-600" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                    ⭐ You gave us {existingCSAT} star{existingCSAT !== 1 ? 's' : ''}! We appreciate your feedback.
+                    {lang === 'es'
+                      ? `⭐ ¡Nos diste ${existingCSAT} estrella${existingCSAT !== 1 ? 's' : ''}! Agradecemos tus comentarios.`
+                      : `⭐ You gave us ${existingCSAT} star${existingCSAT !== 1 ? 's' : ''}! We appreciate your feedback.`}
                   </p>
                 </div>
               </>
@@ -248,7 +261,7 @@ export default function Survey() {
               // Show rating form
               <>
                 <p className="text-base font-medium text-gray-700 mb-6 leading-relaxed" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                  To further improve our surveys, please tell us how satisfied were you with it?
+                  {t('rateExperience', lang)}
                 </p>
                 
                 <div className="flex justify-center items-center mb-4">
@@ -260,7 +273,7 @@ export default function Survey() {
                   <div className="flex justify-center items-center mt-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
                     <p className="text-sm text-gray-600 ml-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                      Saving your feedback...
+                      {lang === 'es' ? 'Guardando sus comentarios...' : 'Saving your feedback...'}
                     </p>
                   </div>
                 )}
@@ -269,7 +282,9 @@ export default function Survey() {
                 {submitSuccess && (
                   <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                     <p className="text-sm text-green-600 animate-fade-in" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                      ✅ Thank you for rating us {rating} star{rating !== 1 ? 's' : ''}! Your feedback has been saved successfully.
+                      {lang === 'es'
+                        ? `✅ ¡Gracias por calificarnos con ${rating} estrella${rating !== 1 ? 's' : ''}! Sus comentarios se han guardado correctamente.`
+                        : `✅ Thank you for rating us ${rating} star${rating !== 1 ? 's' : ''}! Your feedback has been saved successfully.`}
                     </p>
                   </div>
                 )}

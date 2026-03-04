@@ -1,4 +1,5 @@
 import { Box, Typography, Button } from "@mui/material";
+import { t } from "../src/lib/i18n";
 
 export default function Header({
   progress = 0,
@@ -8,6 +9,9 @@ export default function Header({
   onSubmit,
   showSubmitButton = false,
   submitDisabled = false,
+  companyName = "",
+  surveyTitle = "",
+  lang = "en",
 }) {
   return (
     <Box>
@@ -19,7 +23,7 @@ export default function Header({
             fontWeight: "400",
           }}
         >
-          IT Curves
+          {companyName || "SurvAI"}
         </Typography>
         <Typography
           sx={{
@@ -30,7 +34,7 @@ export default function Header({
             color: "#929292",
           }}
         >
-          Customer Satisfaction Survey
+          {surveyTitle || t("customerSurvey", lang)}
         </Typography>
       </Box>
       
@@ -63,7 +67,7 @@ export default function Header({
                 color: "#929292",
               }}
             >
-              Progress
+              {t("progress", lang)}
             </Typography>
             
             <Box
@@ -95,11 +99,10 @@ export default function Header({
                 whiteSpace: "nowrap",
               }}
             >
-              {currentQuestion}/{totalQuestions} Questions
+              {currentQuestion}/{totalQuestions} {t("questions", lang)}
             </Typography>
           </Box>
           
-          {/* Submit Button */}
           {showSubmitButton && (
             <Button
               variant="contained"
@@ -127,7 +130,7 @@ export default function Header({
                 },
               }}
             >
-              Submit Survey
+              {t("submitSurvey", lang)}
             </Button>
           )}
         </Box>

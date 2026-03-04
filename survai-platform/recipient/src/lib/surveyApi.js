@@ -190,7 +190,7 @@ export function hasQuestionOptions(question) {
   );
 }
 
-export async function getSympathizeResponse(question, userResponse) {
+export async function getSympathizeResponse(question, userResponse, language = "en") {
   try {
     const response = await fetch(
       `${API_BASE_URL}/api/questions/sympathize`,
@@ -202,7 +202,8 @@ export async function getSympathizeResponse(question, userResponse) {
         },
         body: JSON.stringify({
           Question: question,
-          Response: userResponse
+          Response: userResponse,
+          Language: language
         })
       }
     );
@@ -212,10 +213,10 @@ export async function getSympathizeResponse(question, userResponse) {
     }
 
     const data = await response.json();
-    return data.response || data.message || "Thank you for your response.";
+    return data.response || data.message || (language === "es" ? "Gracias por su respuesta." : "Thank you for your response.");
   } catch (error) {
     console.error('Error getting sympathize response:', error);
-    return "Thank you for your response."; // Fallback message
+    return language === "es" ? "Gracias por su respuesta." : "Thank you for your response.";
   }
 }
 

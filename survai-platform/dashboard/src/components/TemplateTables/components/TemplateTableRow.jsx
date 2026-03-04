@@ -1,5 +1,5 @@
 import { TableRow, TableCell, Typography, Chip, IconButton, Tooltip } from "@mui/material";
-import DeleteIcon from '../../../assets/DeleteRow.svg';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CloneIcon from '../../../assets/Clone.svg';
 import LaunchSurvey from '../../../assets/LaunchSurvey.svg';
 import PublishIcon from '@mui/icons-material/PublishOutlined';
@@ -130,7 +130,7 @@ const TemplateTableRow = ({
               '&:hover': { backgroundColor: '#FFF0F0', borderColor: '#D32F2F' },
             }}
           >
-            <img src={DeleteIcon} alt="Delete" style={{ width: 18, height: 18 }} />
+            <DeleteOutlineIcon sx={{ fontSize: 18, color: '#D32F2F' }} />
           </IconButton>
         </Tooltip>
       </TableCell>

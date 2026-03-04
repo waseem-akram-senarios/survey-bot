@@ -183,25 +183,52 @@ def process_survey_question(question: dict) -> dict:
 
 def build_html_email(url: str) -> str:
     """Build HTML email body for survey link."""
-    return f"""
-    <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <h2 style="color: #4CAF50;">We'd love your input!</h2>
-            <p>We value your feedback and would appreciate it if you could take a few moments to answer a survey:</p>
-            <p>Click the link below to complete the survey:</p>
-            <p><a href="{url}">Survey Link</a></p>
-            <p>Thank you for your time and insights!</p>
-        </body>
-    </html>
-    """
+    return f"""\
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background-color:#1958F7;padding:30px 40px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">We'd Love Your Feedback</h1>
+        </td></tr>
+        <tr><td style="padding:32px 40px;">
+          <p style="margin:0 0 16px;font-size:16px;color:#333333;line-height:1.6;">
+            We value your opinion and would appreciate a few minutes of your time to complete a short survey.
+          </p>
+          <p style="margin:0 0 24px;font-size:16px;color:#333333;line-height:1.6;">
+            Your responses help us improve our products and services.
+          </p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+            <tr><td style="background-color:#1958F7;border-radius:8px;text-align:center;">
+              <a href="{url}" style="display:inline-block;padding:14px 36px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;">Take the Survey</a>
+            </td></tr>
+          </table>
+          <p style="margin:24px 0 0;font-size:14px;color:#666666;line-height:1.5;">
+            If the button above doesn't work, copy and paste this link into your browser:
+            <br><a href="{url}" style="color:#1958F7;word-break:break-all;">{url}</a>
+          </p>
+        </td></tr>
+        <tr><td style="padding:20px 40px;background-color:#f9f9f9;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#999999;">Thank you for your time and insights.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
 
 
 def build_text_email(url: str) -> str:
     """Build plain text email body for survey link."""
     return (
-        "We'd love your input!\n\n"
-        "We value your feedback and would appreciate it if you could take a few moments to answer a survey:\n\n"
-        f"Click the link below to complete the survey:\n\n{url}\n\n"
+        "We'd Love Your Feedback\n\n"
+        "We value your opinion and would appreciate a few minutes of your time "
+        "to complete a short survey.\n\n"
+        "Your responses help us improve our products and services.\n\n"
+        f"Take the survey: {url}\n\n"
         "Thank you for your time and insights!"
     )
 

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Box,
   CircularProgress,
@@ -37,7 +37,9 @@ import {
 export default function TextSurveyPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const surveyId = params.id || "102";
+  const urlLang = searchParams.get("lang");
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -55,7 +57,9 @@ export default function TextSurveyPage() {
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [surveyDuration, setSurveyDuration] = useState(0);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(urlLang || "en");
+  const [companyName, setCompanyName] = useState("");
+  const [surveyTitle, setSurveyTitle] = useState("");
 
   // Helper function to check if a question should be visible based on parent conditions
   const shouldQuestionBeVisible = (question, currentAnswers) => {
@@ -130,8 +134,7 @@ export default function TextSurveyPage() {
         console.log("Loaded survey data:", data);
         setSurveyData(data);
 
-        // Detect language from template name
-        if (data && data.TemplateName) {
+        if (!urlLang && data && data.TemplateName) {
           setLang(detectLanguage(data.TemplateName));
         }
 
@@ -154,13 +157,22 @@ export default function TextSurveyPage() {
         startSurvey(data);
       } catch (error) {
         console.error("Failed to load survey:", error);
-        setSubmissionError("Sorry, there was an error loading the survey. Please try again later.");
+        setSubmissionError(lang === 'es'
+          ? "Lo sentimos, hubo un error al cargar la encuesta. Por favor intente de nuevo más tarde."
+          : "Sorry, there was an error loading the survey. Please try again later.");
       } finally {
         setIsLoading(false);
       }
     };
 
     loadSurvey();
+    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/surveys/${surveyId}/recipient`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.CompanyName) setCompanyName(data.CompanyName);
+        if (data?.Name) setSurveyTitle(data.Name);
+      })
+      .catch(() => {});
   }, [surveyId]);
 
   const startSurvey = (data = surveyData) => {
@@ -268,7 +280,9 @@ export default function TextSurveyPage() {
       await handleSurveyCompletion(currentSessionStartTime);
     } catch (error) {
       console.error("Error submitting survey:", error);
-      setSubmissionError("There was an error submitting your survey. Please try again.");
+      setSubmissionError(lang === 'es'
+        ? "Hubo un error al enviar su encuesta. Por favor intente de nuevo."
+        : "There was an error submitting your survey. Please try again.");
       setIsSubmitting(false);
     }
   };
@@ -300,16 +314,18 @@ export default function TextSurveyPage() {
       setIsSubmitting(false);
 
       setTimeout(() => {
-        router.push(`/survey/${surveyId}/complete?duration=${duration}`);
+        router.push(`/survey/${surveyId}/complete?duration=${duration}&lang=${lang}`);
       }, 1000);
     } catch (error) {
       console.error("Error completing survey:", error);
-      setSubmissionError("There was an error finalizing your survey. Your responses have been saved, but please contact support if needed.");
+      setSubmissionError(lang === 'es'
+        ? "Hubo un error al finalizar su encuesta. Sus respuestas han sido guardadas, pero contacte a soporte si es necesario."
+        : "There was an error finalizing your survey. Your responses have been saved, but please contact support if needed.");
       setIsSubmitting(false);
 
       setTimeout(() => {
         const duration = calculateSessionDuration(startTime || sessionStartTime);
-        router.push(`/survey/${surveyId}/complete?duration=${duration}`);
+        router.push(`/survey/${surveyId}/complete?duration=${duration}&lang=${lang}`);
       }, 3000);
     }
   };
@@ -337,7 +353,7 @@ export default function TextSurveyPage() {
         alignItems="center"
         minHeight="50vh"
       >
-        <Alert severity="info">No questions available for this survey.</Alert>
+        <Alert severity="info">{lang === 'es' ? 'No hay preguntas disponibles para esta encuesta.' : 'No questions available for this survey.'}</Alert>
       </Box>
     );
   }
@@ -381,7 +397,7 @@ export default function TextSurveyPage() {
               textAlign: 'center',
             }}
           >
-            {lang === 'es' ? 'Enviando su encuesta...' : 'Submitting your survey...'}
+            {t('submittingSurvey', lang)}
           </Typography>
           <Typography 
             variant="body2" 
@@ -406,6 +422,9 @@ export default function TextSurveyPage() {
           onSubmit={handleHeaderSubmit}
           showSubmitButton={true}
           submitDisabled={!isCurrentQuestionAnswered() || isSubmitting}
+          companyName={companyName}
+          surveyTitle={surveyTitle}
+          lang={lang}
         />
 
         {submissionError && (
@@ -457,6 +476,7 @@ export default function TextSurveyPage() {
                       onCategorySelect={onCategorySelect}
                       onRatingSelect={onRatingSelect}
                       onTextChange={onTextChange}
+                      lang={lang}
                     />
                   </Box>
                 );
@@ -556,6 +576,7 @@ export default function TextSurveyPage() {
         onClose={() => setShowSubmitModal(false)}
         onConfirm={handleSubmitConfirm}
         disabled={isSubmitting}
+        lang={lang}
       />
     </Box>
   );

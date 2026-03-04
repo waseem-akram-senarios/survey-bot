@@ -179,14 +179,17 @@ def summarize_response(question: str, response: str) -> str:
 
 # ─── Sympathize ───────────────────────────────────────────────────────────────
 
-def sympathize(question: str, response: str) -> str:
+def sympathize(question: str, response: str, language: str = "en") -> str:
     """Generate an empathetic acknowledgment for a user's answer."""
     client = _get_client()
+    lang_instruction = ""
+    if language == "es":
+        lang_instruction = "\n\nIMPORTANT: You MUST respond ONLY in Spanish (Español)."
     try:
         resp = client.chat.completions.create(
             model="gpt-4.1-mini",
             messages=[
-                {"role": "system", "content": SYMPATHIZE_PROMPT},
+                {"role": "system", "content": SYMPATHIZE_PROMPT + lang_instruction},
                 {
                     "role": "user",
                     "content": f"Question: {question}\nUser said: {response}",
@@ -198,7 +201,7 @@ def sympathize(question: str, response: str) -> str:
         return resp.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"sympathize error: {e}")
-        return "Thank you for sharing that."
+        return "Gracias por compartir eso." if language == "es" else "Thank you for sharing that."
 
 
 # ─── Translate ────────────────────────────────────────────────────────────────

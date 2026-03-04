@@ -24,8 +24,9 @@ class QuestionsAgent(Agent):
     Receives a ~900-token prompt with the full questions block.
     """
 
-    def __init__(self, instructions: str, **kwargs):
+    def __init__(self, instructions: str, language: str = "en", **kwargs):
         super().__init__(instructions=instructions, **kwargs)
+        self._language = language
 
     async def on_enter(self) -> None:
         """
@@ -51,18 +52,27 @@ class QuestionsAgent(Agent):
             first_q_id = userdata.question_ids[0]
             first_q_text = userdata.questions_map.get(first_q_id, "")
             if first_q_text:
-                intro = f"Great, let's get started! {first_q_text}"
+                if self._language == "es":
+                    intro = f"¡Perfecto, comencemos! {first_q_text}"
+                else:
+                    intro = f"Great, let's get started! {first_q_text}"
 
-                # Tell the LLM Q1 is already being spoken — do NOT generate it again
-                chat_ctx.add_message(
-                    role="system",
-                    content=(
+                if self._language == "es":
+                    system_msg = (
+                        "La identidad y disponibilidad han sido confirmadas por el saludo inicial. "
+                        "NO te vuelvas a presentar ni preguntes por disponibilidad. "
+                        f"La primera pregunta ya se está pronunciando al llamante textualmente: \"{first_q_text}\". "
+                        "NO repitas la primera pregunta. Espera en silencio la respuesta del llamante. "
+                        "DEBES responder SIEMPRE en español."
+                    )
+                else:
+                    system_msg = (
                         "Identity and availability have been confirmed by the greeter. "
                         "Do NOT re-introduce yourself or ask for availability again. "
                         f"Q1 is already being spoken to the caller verbatim: \"{first_q_text}\". "
                         "Do NOT repeat Q1. Wait silently for the caller's answer."
-                    ),
-                )
+                    )
+                chat_ctx.add_message(role="system", content=system_msg)
                 await self.update_chat_ctx(chat_ctx)
 
                 # Speak Q1 and wait for full audio playout before returning
@@ -75,14 +85,19 @@ class QuestionsAgent(Agent):
                 await self.update_chat_ctx(chat_ctx2)
                 return
 
-        # Fallback: let LLM ask the first question if no questions are pre-loaded
-        chat_ctx.add_message(
-            role="system",
-            content=(
+        if self._language == "es":
+            fallback_msg = (
+                "La identidad y disponibilidad han sido confirmadas por el saludo inicial. "
+                "NO te vuelvas a presentar ni preguntes por disponibilidad. "
+                "Comienza la encuesta inmediatamente con la primera pregunta. "
+                "DEBES responder SIEMPRE en español."
+            )
+        else:
+            fallback_msg = (
                 "Identity and availability have been confirmed by the greeter. "
                 "Do NOT re-introduce yourself or ask for availability again. "
                 "Start the survey immediately with Q1."
-            ),
-        )
+            )
+        chat_ctx.add_message(role="system", content=fallback_msg)
         await self.update_chat_ctx(chat_ctx)
         await self.session.generate_reply()

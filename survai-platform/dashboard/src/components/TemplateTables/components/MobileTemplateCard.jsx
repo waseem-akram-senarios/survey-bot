@@ -1,5 +1,5 @@
 import { Paper, Box, Typography, Chip, IconButton } from "@mui/material";
-import DeleteIcon from '../../../assets/DeleteRow.svg';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CloneIcon from '../../../assets/Clone.svg';
 import LaunchSurvey from '../../../assets/LaunchSurvey.svg';
 
@@ -105,7 +105,7 @@ const MobileTemplateCard = ({
               height: "40px",
             }}
           >
-            <img src={DeleteIcon} alt="Delete" />
+            <DeleteOutlineIcon sx={{ fontSize: 20, color: '#D32F2F' }} />
           </IconButton>
         )}
       </Box>

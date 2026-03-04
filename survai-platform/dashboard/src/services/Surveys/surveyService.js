@@ -116,6 +116,47 @@ class SurveyService {
     }
   }
 
+  static async updateSurveyDetails(surveyId, { recipient, riderName, phone }) {
+    try {
+      const params = new URLSearchParams();
+      if (recipient) params.append("recipient", recipient);
+      if (riderName) params.append("rider_name", riderName);
+      if (phone) params.append("phone", phone);
+      await ApiBaseHelper.patch(`${ApiLinks.SURVEY_UPDATE_DETAILS(surveyId)}?${params.toString()}`);
+      return { success: true, message: "Survey updated successfully" };
+    } catch (error) {
+      console.error("Error updating survey:", error);
+      throw new Error("Failed to update survey. Please try again.");
+    }
+  }
+
+  static async cloneSurvey(originalSurvey) {
+    try {
+      const newSurveyId = crypto.randomUUID();
+      const response = await ApiBaseHelper.post(ApiLinks.SURVEY_GENERATE, {
+        SurveyId: newSurveyId,
+        Biodata: originalSurvey.Biodata || "",
+        Recipient: `${originalSurvey.Recipient || originalSurvey.Name} (Copy)`,
+        Name: originalSurvey.Name || originalSurvey.TemplateName || "",
+        RiderName: originalSurvey.RiderName || "",
+        RideId: originalSurvey.RideId || "",
+        TenantId: originalSurvey.TenantId || "",
+        Phone: originalSurvey.Phone || "",
+        URL: `${import.meta.env.VITE_RECIPIENT_URL}/survey/${newSurveyId}`,
+      });
+
+      return {
+        success: true,
+        surveyId: newSurveyId,
+        message: "Survey cloned successfully",
+        apiResponse: response,
+      };
+    } catch (error) {
+      console.error("Error cloning survey:", error);
+      throw new Error("Failed to clone survey. Please try again.");
+    }
+  }
+
   static async sendSurveyBySMS(surveyId, phone, provider = "livekit") {
     try {
       const queryParams = new URLSearchParams({

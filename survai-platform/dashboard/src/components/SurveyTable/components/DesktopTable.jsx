@@ -17,6 +17,8 @@ import {
 } from '@mui/material';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import { truncateText, formatDate } from '../../../utils/Surveys/surveyTableHelpers';
 import SendSurveyButton from '../../../assets/SendSurvey.svg';
 
@@ -28,6 +30,8 @@ const DesktopTable = ({
   onSort,
   onSendEmail,
   onDeleteSurvey,
+  onEditSurvey,
+  onCloneSurvey,
 }) => {
   const columns = [
     { id: "SurveyId", label: "ID", sortable: true },
@@ -154,18 +158,26 @@ const DesktopTable = ({
               </TableCell>
               <TableCell>{truncateText(item.Recipient, 25)}</TableCell>
               <TableCell>
-                <Chip
-                  label={item.Status}
-                  sx={{
-                    backgroundColor: item.statusBgColor,
-                    color: item.statusColor,
-                    fontWeight: 500,
-                    fontFamily: "Poppins, sans-serif",
-                    borderRadius: "6px",
-                    fontSize: "13px",
-                    height: "30px",
-                  }}
-                />
+                <Box sx={{ display: "flex", gap: 0.5, alignItems: "center", flexWrap: "wrap" }}>
+                  <Chip
+                    label={item.Status}
+                    sx={{
+                      backgroundColor: item.statusBgColor,
+                      color: item.statusColor,
+                      fontWeight: 500,
+                      fontFamily: "Poppins, sans-serif",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                      height: "30px",
+                    }}
+                  />
+                  {item.EndReason === "link_sent" && (
+                    <Chip label="Email Requested" size="small" sx={{ backgroundColor: "#FFF3E0", color: "#E65100", fontFamily: "Poppins, sans-serif", fontSize: "11px", height: "22px" }} />
+                  )}
+                  {item.EndReason === "callback_scheduled" && (
+                    <Chip label="Callback" size="small" sx={{ backgroundColor: "#E3F2FD", color: "#1565C0", fontFamily: "Poppins, sans-serif", fontSize: "11px", height: "22px" }} />
+                  )}
+                </Box>
               </TableCell>
               <TableCell>
                 <Box className="action-buttons" sx={{ display: "flex", gap: 1, alignItems: "center" }}>
@@ -193,8 +205,41 @@ const DesktopTable = ({
                       </IconButton>
                     </Tooltip>
                   )}
+                  {item.Status !== "Completed" && onEditSurvey && (
+                    <Tooltip title="Edit Survey">
+                      <IconButton
+                        onClick={(e) => { e.stopPropagation(); onEditSurvey(item); }}
+                        sx={{
+                          borderRadius: '10px',
+                          border: '1px solid #E0E0E0',
+                          width: '36px',
+                          height: '36px',
+                          '&:hover': { backgroundColor: '#F0F4FF', borderColor: '#1958F7' },
+                        }}
+                      >
+                        <EditOutlinedIcon sx={{ fontSize: 18, color: '#1958F7' }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {onCloneSurvey && (
+                    <Tooltip title="Clone Survey">
+                      <IconButton
+                        onClick={(e) => { e.stopPropagation(); onCloneSurvey(item); }}
+                        sx={{
+                          borderRadius: '10px',
+                          border: '1px solid #E0E0E0',
+                          width: '36px',
+                          height: '36px',
+                          '&:hover': { backgroundColor: '#E8F5E9', borderColor: '#00A857' },
+                        }}
+                      >
+                        <ContentCopyOutlinedIcon sx={{ fontSize: 18, color: '#00A857' }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                   <Tooltip title="Delete Survey">
                     <IconButton
+                      aria-label="Delete Survey"
                       onClick={(e) => handleDeleteSurvey(item, e)}
                       sx={{
                         borderRadius: '10px',

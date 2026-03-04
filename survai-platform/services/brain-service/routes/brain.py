@@ -55,6 +55,7 @@ class SummarizeResponse(BaseModel):
 class SympathizeRequest(BaseModel):
     question: str
     response: str
+    language: str = "en"
 
 class SympathizeResponse(BaseModel):
     message: str
@@ -141,7 +142,7 @@ async def summarize_endpoint(req: SummarizeRequest):
 async def sympathize_endpoint(req: SympathizeRequest):
     """Generate empathetic acknowledgment for a user's answer."""
     try:
-        message = llm.sympathize(req.question, req.response)
+        message = llm.sympathize(req.question, req.response, language=req.language)
         return SympathizeResponse(message=message)
     except Exception as e:
         logger.error(f"Sympathize error: {e}")

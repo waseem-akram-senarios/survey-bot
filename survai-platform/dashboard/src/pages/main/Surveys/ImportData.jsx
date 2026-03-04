@@ -8,6 +8,7 @@ import { CloudUpload, Download, CheckCircle, Error as ErrorIcon, ArrowBack } fro
 import { useNavigate } from 'react-router-dom';
 import ApiBaseHelper from '../../../network/apiBaseHelper';
 import ApiLinks from '../../../network/apiLinks';
+import SurveyService from '../../../services/Surveys/surveyService';
 import { exportAllSurveys, exportTranscripts } from '../../../utils/exportHelper';
 import { useAuth } from '../../../context/AuthContext';
 
@@ -94,7 +95,22 @@ const ImportData = () => {
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
 
-      setResult(response.data);
+      const created = response.data?.surveys || [];
+      let emailSent = 0;
+      for (const survey of created) {
+        const email = survey.email;
+        if (email) {
+          try {
+            await SurveyService.sendSurveyByEmail(survey.survey_id, email);
+            emailSent++;
+          } catch { /* send failures are non-blocking */ }
+        }
+      }
+
+      setResult({
+        ...response.data,
+        message: `Created ${created.length} surveys${emailSent > 0 ? `, sent ${emailSent} via email` : ""}.`,
+      });
     } catch (err) {
       console.error('Bulk survey error:', err);
       setError(err.response?.data?.detail || 'Bulk survey creation failed. Please check your CSV format.');

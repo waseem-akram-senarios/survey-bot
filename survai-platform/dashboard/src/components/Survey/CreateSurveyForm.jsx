@@ -27,7 +27,7 @@ const CreateSurveyForm = () => {
   const { user } = useAuth();
 
   // Survey and template hooks
-  const { generateSurvey, isGenerating, generateSurveyId, validateSurveyForm } = useSurvey();
+  const { generateSurvey, launchSurvey, sendSurveyByEmail, isGenerating, isLaunching, generateSurveyId, validateSurveyForm } = useSurvey();
   const { availableTemplates, isLoadingTemplates, fetchTemplates } = useTemplates();
 
   // Form state
@@ -36,7 +36,9 @@ const CreateSurveyForm = () => {
   const [riderName, setRiderName] = useState("");
   const [rideId, setRideId] = useState("");
   const [phone, setPhone] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [recipientBiodata, setRecipientBiodata] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Load templates on component mount and handle pre-selected template
   useEffect(() => {
@@ -68,6 +70,7 @@ const CreateSurveyForm = () => {
       return;
     }
 
+    setIsProcessing(true);
     try {
       const surveyId = generateSurveyId();
       
@@ -83,16 +86,38 @@ const CreateSurveyForm = () => {
       };
       
       const generatedSurveyData = await generateSurvey(surveyData);
-      
-      showSuccess("Survey generated successfully!");
-      
-      navigate('/surveys/generated', { 
-        state: { surveyData: generatedSurveyData } 
-      });
+
+      const launchResponse = await launchSurvey(
+        generatedSurveyData,
+        generatedSurveyData.questions || [],
+        true
+      );
+
+      if (!launchResponse.success) {
+        throw new Error(launchResponse.message || "Failed to launch survey");
+      }
+
+      const email = recipientEmail.trim();
+      if (email) {
+        try {
+          await sendSurveyByEmail(surveyId, email);
+        } catch {
+          showError("Survey launched but email delivery failed. You can resend from Manage Surveys.");
+        }
+      }
+
+      showSuccess(
+        email
+          ? "Survey generated, launched, and sent to recipient!"
+          : "Survey generated and launched!"
+      );
+      navigate('/surveys/manage');
       
     } catch (error) {
       console.error("Failed to generate survey:", error);
       showError(error.message || "Failed to generate survey. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -409,6 +434,46 @@ const CreateSurveyForm = () => {
             </Box>
           </Box>
 
+          {/* Recipient Email */}
+          <Box sx={{ mb: 4 }}>
+            <Typography
+              sx={{
+                fontFamily: "Poppins, sans-serif",
+                fontWeight: 400,
+                fontSize: "14px",
+                lineHeight: "100%",
+                color: "#1E1E1E",
+                mb: 1.5,
+              }}
+            >
+              Recipient Email <span style={{ color: "#7D7D7D", fontSize: "12px" }}>(optional — survey will be emailed automatically)</span>
+            </Typography>
+            <TextField
+              fullWidth
+              type="email"
+              value={recipientEmail}
+              onChange={(e) => setRecipientEmail(e.target.value)}
+              placeholder="e.g. recipient@email.com"
+              variant="outlined"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  backgroundColor: "#fff",
+                  borderRadius: "15px",
+                  boxShadow: "0px 4px 20px 0px #0000000D",
+                  "& fieldset": { border: "none" },
+                  "& .MuiInputBase-input": {
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: 400,
+                    fontSize: "14px",
+                    lineHeight: "100%",
+                    color: "#1E1E1E",
+                    "&::placeholder": { color: "#7D7D7D", opacity: 1 },
+                  },
+                },
+              }}
+            />
+          </Box>
+
           {/* Recipient Biodata */}
           <Box sx={{ mb: 4 }}>
             <Typography
@@ -472,7 +537,7 @@ const CreateSurveyForm = () => {
             <Button
               variant="outlined"
               onClick={handleBack}
-              disabled={isGenerating}
+              disabled={isGenerating || isProcessing}
               sx={{
                 textTransform: "none",
                 color: "#1E1E1E",
@@ -495,26 +560,26 @@ const CreateSurveyForm = () => {
             <Button
               variant="contained"
               onClick={handleGenerateClick}
-              disabled={isGenerating}
+              disabled={isGenerating || isProcessing}
               sx={{
                 textTransform: "none",
                 color: "#fff",
-                width: "134px",
+                minWidth: "160px",
                 height: "48px",
-                backgroundColor: isGenerating ? "#ccc" : "#1958F7",
+                backgroundColor: (isGenerating || isProcessing) ? "#ccc" : "#1958F7",
                 borderRadius: "17px",
                 fontFamily: "Poppins, sans-serif",
                 fontWeight: 400,
                 fontSize: "14px",
                 "&:hover": {
-                  backgroundColor: isGenerating ? "#ccc" : "#1443D1",
+                  backgroundColor: (isGenerating || isProcessing) ? "#ccc" : "#1443D1",
                 },
                 "&:disabled": {
                   backgroundColor: "#ccc",
                 },
               }}
             >
-              {isGenerating ? "Generating..." : "Generate"}
+              {isProcessing ? "Sending..." : isGenerating ? "Generating..." : "Generate & Send"}
             </Button>
           </Box>
         </Box>

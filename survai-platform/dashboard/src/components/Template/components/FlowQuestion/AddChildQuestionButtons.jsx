@@ -66,7 +66,7 @@ const AddChildQuestionButtons = ({ onAddChildQuestion }) => {
             color: "#1E1E1E",
           }}
         >
-          Add Category Question
+          Add Multiple Choice Question
         </Typography>
       </Button>
 

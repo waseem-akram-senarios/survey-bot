@@ -408,7 +408,7 @@ export const validateQuestion = (question) => {
       if (!question.options || question.options.length < 2) {
         return {
           isValid: false,
-          error: "Category questions must have at least 2 options",
+          error: "Multiple choice questions must have at least 2 options",
         };
       }
       break;

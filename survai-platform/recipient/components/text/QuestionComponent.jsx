@@ -139,7 +139,7 @@ export const RatingQuestion = ({ question, isMobile, onRatingSelect }) => {
 };
 
 // Open Question Component
-export const OpenQuestion = ({ question, isMobile, onTextChange }) => {
+export const OpenQuestion = ({ question, isMobile, onTextChange, lang = "en" }) => {
   return (
     <Box
       key={question.id}
@@ -169,7 +169,7 @@ export const OpenQuestion = ({ question, isMobile, onTextChange }) => {
         multiline
         rows={4}
         value={question.answer || ""}
-        placeholder="Enter answer"
+        placeholder={lang === 'es' ? 'Ingrese su respuesta' : 'Enter answer'}
         onChange={(e) => onTextChange(question.id, e.target.value)}
         variant="outlined"
         sx={{
@@ -195,15 +195,15 @@ export const OpenQuestion = ({ question, isMobile, onTextChange }) => {
 };
 
 // Question Renderer Component
-export const QuestionRenderer = ({ question, isMobile, onCategorySelect, onRatingSelect, onTextChange }) => {
+export const QuestionRenderer = ({ question, isMobile, onCategorySelect, onRatingSelect, onTextChange, lang = "en" }) => {
   switch (question.criteria?.toLowerCase()) {
     case 'categorical':
       return <CategoryQuestion question={question} isMobile={isMobile} onCategorySelect={onCategorySelect} />;
     case 'scale':
       return <RatingQuestion question={question} isMobile={isMobile} onRatingSelect={onRatingSelect} />;
     case 'open':
-      return <OpenQuestion question={question} isMobile={isMobile} onTextChange={onTextChange} />;
+      return <OpenQuestion question={question} isMobile={isMobile} onTextChange={onTextChange} lang={lang} />;
     default:
-      return <OpenQuestion question={question} isMobile={isMobile} onTextChange={onTextChange} />;
+      return <OpenQuestion question={question} isMobile={isMobile} onTextChange={onTextChange} lang={lang} />;
   }
 };
