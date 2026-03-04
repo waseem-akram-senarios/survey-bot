@@ -98,7 +98,7 @@ const CategoryQuestionModal = ({
             fontSize: '18px',
             color: '#1E1E1E'
           }}>
-            {editingQuestion ? 'Edit Category Question' : 'Add Category Question'}
+            {editingQuestion ? 'Edit Multiple Choice Question' : 'Add Multiple Choice Question'}
           </Typography>
         </Box>
 

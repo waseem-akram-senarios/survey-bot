@@ -114,7 +114,7 @@ async def import_bulk_surveys(file: UploadFile = File(...)):
                     {"survey_id": survey_id, "question_id": t["question_id"], "ord": t["ord"]},
                 )
 
-            created.append({"survey_id": survey_id, "rider_name": rider_name, "phone": phone, "template_name": template_name})
+            created.append({"survey_id": survey_id, "rider_name": rider_name, "phone": phone, "email": email, "template_name": template_name})
 
         return {"status": "created", "count": len(created), "surveys": created}
     except HTTPException:

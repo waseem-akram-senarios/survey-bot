@@ -41,12 +41,12 @@ import {
   calculateSessionDuration,
   scrollToBottom,
 } from "../../../../../utils/voiceSurveyUtils";
-import { detectLanguage } from "../../../../lib/i18n";
+import { detectLanguage, t } from "../../../../lib/i18n";
 import {
   startSurveySession,
   calculateSessionDuration as calcSessionDuration,
 } from "../../../../../utils/textSurveyUtils.js";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 export default function VoiceSurveyPage() {
   const [surveyData, setSurveyData] = useState(null);
@@ -72,7 +72,10 @@ export default function VoiceSurveyPage() {
 
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const surveyId = params.id || "102";
+  const urlLang = searchParams.get("lang");
+  const [lang, setLang] = useState(urlLang || "en");
   
   const shouldQuestionBeVisible = (question, currentAnswers) => {
     if (!question.parent_id || !question.parent_category_texts || question.parent_category_texts.length === 0) {
@@ -138,8 +141,8 @@ export default function VoiceSurveyPage() {
       synth.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1;
-      const lang = detectLanguage(surveyData?.TemplateName);
-      utterance.lang = lang === "es" ? "es-ES" : "en-US";
+      const effectiveLang = urlLang || detectLanguage(surveyData?.TemplateName);
+      utterance.lang = effectiveLang === "es" ? "es-ES" : "en-US";
 
       setIsSpeaking(true);
       utterance.onend = () => {
@@ -204,7 +207,9 @@ export default function VoiceSurveyPage() {
       setIsLoading(true);
       try {
         const data = await getSurveyQuestions(surveyId);
-        
+        if (!urlLang && data?.TemplateName) {
+          setLang(detectLanguage(data.TemplateName));
+        }
         if (data && data.Questions) {
           const initializedQuestions = data.Questions.map(question => ({
             ...question,
@@ -265,7 +270,7 @@ export default function VoiceSurveyPage() {
           addToSpeechQueue(question.text);
         }, 1000);
       } else {
-        const messageItem = createMessageItem("It looks like you have already answered all the questions.");
+        const messageItem = createMessageItem(t('completedAlready', lang));
         setConversationItems([messageItem]);
         setSurveyCompleted(true);
       }
@@ -348,17 +353,18 @@ export default function VoiceSurveyPage() {
     try {
       setIsProcessing(true);
       console.log(`Audio blob: ${blob.size} bytes, type: ${blob.type}`);
-      const lang = detectLanguage(surveyData?.TemplateName);
-      const transcript = await transcribeAudio(blob, undefined, lang);
+      const effectiveLang = urlLang || detectLanguage(surveyData?.TemplateName);
+      const transcript = await transcribeAudio(blob, undefined, effectiveLang);
       
       if (!transcript.trim()) throw new Error("No transcription returned.");
       handleAnswer(transcript);
     } catch (err) {
       console.error("Transcription error:", err);
       // Show error in conversation but DON'T submit as an answer - let user retry
-      const errorItem = createMessageItem("Sorry, I couldn't understand that. Please try speaking again.");
+      const errorMsg = t('sorryNotUnderstood', lang);
+      const errorItem = createMessageItem(errorMsg);
       addConversationItem(setConversationItems, errorItem, conversationEndRef);
-      addToSpeechQueue("Sorry, I couldn't understand that. Please try speaking again.");
+      addToSpeechQueue(errorMsg);
     } finally {
       setIsProcessing(false);
     }
@@ -463,7 +469,7 @@ export default function VoiceSurveyPage() {
   const handleSympathyResponse = async (questionText, userResponse, onComplete) => {
     try {
       setIsGettingSympathize(true);
-      const sympatheticResponse = await getSympathizeResponse(questionText, userResponse);
+      const sympatheticResponse = await getSympathizeResponse(questionText, userResponse, lang);
       
       const sympathyItem = createSympathyResponseItem(sympatheticResponse);
       addConversationItem(setConversationItems, sympathyItem, conversationEndRef);
@@ -569,7 +575,7 @@ export default function VoiceSurveyPage() {
   };
 
   const handleSurveyCompletion = async () => {
-    const completionMessage = "Thank you for completing the survey! Your responses have been saved.";
+    const completionMessage = t('thankYou', lang) + " " + t('yourResponsesSaved', lang);
     const completionItem = createCompletionMessageItem(completionMessage);
     addConversationItem(setConversationItems, completionItem, conversationEndRef);
     
@@ -589,7 +595,7 @@ export default function VoiceSurveyPage() {
           addToSpeechQueue(errorMessage, () => {
             setTimeout(() => {
               const duration = calcSessionDuration(sessionStartTime || new Date());
-              router.push(`/survey/${surveyId}/complete?duration=${duration}`);
+              router.push(`/survey/${surveyId}/complete?duration=${duration}&lang=${lang}`);
             }, 1000);
           });
         }
@@ -617,7 +623,7 @@ export default function VoiceSurveyPage() {
         console.error("Error updating survey duration (non-critical):", durationError);
       }
 
-      const successMessage = "Survey completed successfully! Redirecting...";
+      const successMessage = t('surveyComplete', lang);
       const successItem = createCompletionMessageItem(successMessage);
       addConversationItem(setConversationItems, successItem, conversationEndRef);
 
@@ -625,7 +631,7 @@ export default function VoiceSurveyPage() {
       addToSpeechQueue(successMessage, () => {
         // Wait a bit more after speech completes, then redirect
         setTimeout(() => {
-          router.push(`/survey/${surveyId}/complete?duration=${duration}`);
+          router.push(`/survey/${surveyId}/complete?duration=${duration}&lang=${lang}`);
         }, 1000);
       });
       
@@ -634,7 +640,7 @@ export default function VoiceSurveyPage() {
       // If there's an error, still redirect after a delay
       setTimeout(() => {
         const duration = calcSessionDuration(sessionStartTime || new Date());
-        router.push(`/survey/${surveyId}/complete?duration=${duration}`);
+        router.push(`/survey/${surveyId}/complete?duration=${duration}&lang=${lang}`);
       }, 3000);
     }
   };
@@ -664,6 +670,7 @@ export default function VoiceSurveyPage() {
           totalQuestions={getTotalQuestions({ Questions: allQuestions })}
           showProgress={true}
           showSubmitButton={false}
+          lang={lang}
         />
       </Box>
 
@@ -694,7 +701,7 @@ export default function VoiceSurveyPage() {
             }}
           />
           <span style={{ fontSize: "14px", color: "#4CAF50" }}>
-            {isSpeaking ? "Speaking..." : "Processing speech..."}
+            {isSpeaking ? t('speaking', lang) : t('processingSpeech', lang)}
           </span>
         </Box>
       )}
@@ -717,7 +724,7 @@ export default function VoiceSurveyPage() {
           }}
         >
           <CircularProgress size={16} />
-          <span style={{ fontSize: "14px", color: "#1958F7" }}>Saving...</span>
+          <span style={{ fontSize: "14px", color: "#1958F7" }}>{t('saving', lang)}</span>
         </Box>
       )}
 
@@ -750,7 +757,9 @@ export default function VoiceSurveyPage() {
           </Typography>
           {window.location.protocol === "http:" && window.location.hostname !== "localhost" && (
             <Typography sx={{ fontSize: "12px", color: "#888", fontFamily: "Poppins, sans-serif", mt: 1 }}>
-              Try the <a href={`/survey/${surveyId}/text`} style={{ color: "#1958F7" }}>Text Survey</a> instead.
+              {lang === 'es'
+              ? <>Pruebe la <a href={`/survey/${surveyId}/text?lang=${lang}`} style={{ color: "#1958F7" }}>Encuesta de Texto</a> en su lugar.</>
+              : <>Try the <a href={`/survey/${surveyId}/text?lang=${lang}`} style={{ color: "#1958F7" }}>Text Survey</a> instead.</>}
             </Typography>
           )}
         </Box>
@@ -767,6 +776,7 @@ export default function VoiceSurveyPage() {
         onStartRecording={handleStartRecording}
         onStopRecording={handleStopRecording}
         isSpeaking={isSpeaking || isProcessingSpeech}
+        lang={lang}
       />
 
       {/* Wave Animation */}

@@ -27,8 +27,9 @@ class QuestionsAgent(Agent):
     Receives a ~900-token prompt with the full questions block.
     """
 
-    def __init__(self, instructions: str, **kwargs):
+    def __init__(self, instructions: str, language: str = "en", **kwargs):
         super().__init__(instructions=instructions, **kwargs)
+        self._language = language
 
     @function_tool
     async def set_language(
@@ -110,14 +111,19 @@ class QuestionsAgent(Agent):
                     await self.session.generate_reply()
                 return
 
-        # Fallback: let LLM ask the first question if no questions are pre-loaded
-        chat_ctx.add_message(
-            role="system",
-            content=(
+        if self._language == "es":
+            fallback_msg = (
+                "La identidad y disponibilidad han sido confirmadas por el saludo inicial. "
+                "NO te vuelvas a presentar ni preguntes por disponibilidad. "
+                "Comienza la encuesta inmediatamente con la primera pregunta. "
+                "DEBES responder SIEMPRE en español."
+            )
+        else:
+            fallback_msg = (
                 "Identity and availability have been confirmed by the greeter. "
                 "Do NOT re-introduce yourself or ask for availability again. "
                 "Start the survey immediately with Q1."
-            ),
-        )
+            )
+        chat_ctx.add_message(role="system", content=fallback_msg)
         await self.update_chat_ctx(chat_ctx)
         await self.session.generate_reply()

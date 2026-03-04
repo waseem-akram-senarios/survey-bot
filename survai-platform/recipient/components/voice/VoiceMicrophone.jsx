@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Typography, CircularProgress, IconButton } from "@mui/material";
 import Image from "next/image";
+import { t } from "../../src/lib/i18n";
 
 const VoiceMicrophone = ({
   isRecording,
@@ -12,6 +13,7 @@ const VoiceMicrophone = ({
   onStartRecording,
   onStopRecording,
   isSpeaking,
+  lang = "en",
 }) => {
   const isDisabled = isProcessing || isLoading || !surveyData || isGettingSympathize || surveyCompleted || isSpeaking;
   const showSpinner = isProcessing || isGettingSympathize;
@@ -118,11 +120,11 @@ const VoiceMicrophone = ({
           },
         }}
       >
-        {isRecording && "Listening... Tap to stop"}
-        {isProcessing && "Processing your response..."}
-        {isGettingSympathize && "Thinking..."}
-        {isSpeaking && !isRecording && !isProcessing && !isGettingSympathize && "Please wait..."}
-        {!isRecording && !isProcessing && !isGettingSympathize && !isSpeaking && "Tap microphone to speak"}
+        {isRecording && t('listening', lang)}
+        {isProcessing && t('processing', lang)}
+        {isGettingSympathize && t('thinking', lang)}
+        {isSpeaking && !isRecording && !isProcessing && !isGettingSympathize && t('pleaseWait', lang)}
+        {!isRecording && !isProcessing && !isGettingSympathize && !isSpeaking && t('tapToSpeak', lang)}
       </Typography>
     </Box>
   );

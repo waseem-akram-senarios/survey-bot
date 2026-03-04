@@ -8,8 +8,9 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import { t } from "../src/lib/i18n";
 
-const SubmitSurveyModal = ({ open, onClose, onConfirm, disabled = false }) => {
+const SubmitSurveyModal = ({ open, onClose, onConfirm, disabled = false, lang = "en" }) => {
   const isMobile = useMediaQuery("(max-width: 600px)");
 
   return (
@@ -28,7 +29,6 @@ const SubmitSurveyModal = ({ open, onClose, onConfirm, disabled = false }) => {
       }}
     >
       <DialogContent sx={{ p: isMobile ? 3 : 4, position: "relative" }}>
-        {/* Close Button */}
         <IconButton
           onClick={onClose}
           disabled={disabled}
@@ -37,17 +37,13 @@ const SubmitSurveyModal = ({ open, onClose, onConfirm, disabled = false }) => {
             right: 16,
             top: 16,
             color: "#7D7D7D",
-            "&:hover": {
-              backgroundColor: "#F5F5F5",
-            },
+            "&:hover": { backgroundColor: "#F5F5F5" },
           }}
         >
           <CloseIcon />
         </IconButton>
 
-        {/* Modal Content */}
         <Box sx={{ pt: 2 }}>
-          {/* Title */}
           <Typography
             sx={{
               fontFamily: "Poppins, sans-serif",
@@ -58,10 +54,9 @@ const SubmitSurveyModal = ({ open, onClose, onConfirm, disabled = false }) => {
               mb: 2,
             }}
           >
-            Submit Survey
+            {t("submitModalTitle", lang)}
           </Typography>
 
-          {/* Description */}
           <Typography
             sx={{
               fontFamily: "Poppins, sans-serif",
@@ -72,8 +67,7 @@ const SubmitSurveyModal = ({ open, onClose, onConfirm, disabled = false }) => {
               mb: 1,
             }}
           >
-            You haven't answered all the questions. Only your responses so far
-            will be saved, and you won't be able to return to this survey later.
+            {t("submitModalDesc", lang)}
           </Typography>
 
           <Typography
@@ -86,10 +80,9 @@ const SubmitSurveyModal = ({ open, onClose, onConfirm, disabled = false }) => {
               mb: 4,
             }}
           >
-            Do you want to continue?
+            {t("submitModalContinue", lang)}
           </Typography>
 
-          {/* Buttons */}
           <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
             <Button
               variant="outlined"
@@ -105,13 +98,10 @@ const SubmitSurveyModal = ({ open, onClose, onConfirm, disabled = false }) => {
                 fontFamily: "Poppins, sans-serif",
                 fontWeight: 400,
                 fontSize: "14px",
-                "&:hover": {
-                  borderColor: "#E0E0E0",
-                  backgroundColor: "#F5F5F5",
-                },
+                "&:hover": { borderColor: "#E0E0E0", backgroundColor: "#F5F5F5" },
               }}
             >
-              Cancel
+              {t("cancel", lang)}
             </Button>
             <Button
               variant="contained"
@@ -127,15 +117,11 @@ const SubmitSurveyModal = ({ open, onClose, onConfirm, disabled = false }) => {
                 fontFamily: "Poppins, sans-serif",
                 fontWeight: 400,
                 fontSize: "14px",
-                "&:hover": {
-                  backgroundColor: disabled ? "#ccc" : "#1443D1",
-                },
-                "&:disabled": {
-                  backgroundColor: "#ccc",
-                },
+                "&:hover": { backgroundColor: disabled ? "#ccc" : "#1443D1" },
+                "&:disabled": { backgroundColor: "#ccc" },
               }}
             >
-              Submit
+              {t("submit", lang)}
             </Button>
           </Box>
         </Box>

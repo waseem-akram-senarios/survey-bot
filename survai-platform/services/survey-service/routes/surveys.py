@@ -109,6 +109,10 @@ async def get_survey_questions(survey_id: str) -> dict:
     return {"SurveyId": survey_id, "TemplateName": template_name, "Questions": rows}
 
 
+TENANT_DISPLAY_NAMES: dict = {
+    "itcurves": "IT Curves",
+}
+
 async def get_survey_recipient(survey_id: str) -> dict:
     """Get recipient info for a survey."""
     rows = sql_execute(
@@ -119,12 +123,15 @@ async def get_survey_recipient(survey_id: str) -> dict:
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
     
     r = rows[0]
+    tenant_id = r.get("tenant_id") or ""
+    company_name = TENANT_DISPLAY_NAMES.get(tenant_id.lower(), tenant_id or os.getenv("ORGANIZATION_NAME", "SurvAI"))
     return {
         "SurveyId": survey_id,
         "Recipient": r["recipient"],
         "Name": r["name"],
         "RideID": r["ride_id"],
-        "TenantID": r["tenant_id"],
+        "TenantID": tenant_id,
+        "CompanyName": company_name,
         "Biodata": r.get("biodata", ""),
         "RiderName": r["rider_name"],
     }
@@ -225,6 +232,7 @@ def _row_to_survey(r: dict) -> SurveyP:
         Status=r["status"],
         LaunchDate=str(r["launch_date"])[:19] if r.get("launch_date") else "",
         CompletionDate=str(r.get("completion_date") or "")[:19],
+        EndReason=r.get("end_reason") or "",
     )
 
 
@@ -662,6 +670,34 @@ async def update_survey_duration(survey_id: str, duration_update: SurveyDuration
     return {"message": f"Duration updated for SurveyId {survey_id}"}
 
 
+@router.patch("/surveys/{survey_id}/details")
+async def update_survey_details(survey_id: str, recipient: str = None, rider_name: str = None, phone: str = None):
+    """Update editable survey fields (recipient, rider_name, phone)."""
+    rows = sql_execute("SELECT * FROM surveys WHERE id = :survey_id", {"survey_id": survey_id})
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
+    if rows[0]["status"] == "Completed":
+        raise HTTPException(status_code=400, detail="Cannot edit a completed survey")
+
+    updates = []
+    params = {"survey_id": survey_id}
+    if recipient is not None:
+        updates.append("recipient = :recipient")
+        params["recipient"] = recipient
+    if rider_name is not None:
+        updates.append("rider_name = :rider_name")
+        params["rider_name"] = rider_name
+    if phone is not None:
+        updates.append("phone = :phone")
+        params["phone"] = phone
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    sql_execute(f"UPDATE surveys SET {', '.join(updates)} WHERE id = :survey_id", params)
+    return {"message": f"Survey {survey_id} updated"}
+
+
 @router.post("/surveys/getquestions")
 async def get_survey_questions_with_answers(body: SurveyQuestionsP):
     """Get survey questions with answers."""
@@ -747,6 +783,9 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str):
     msg["Subject"] = subject
     msg["From"] = f"{smtp_from_name} <{smtp_from}>"
     msg["To"] = to_email
+    msg["Reply-To"] = smtp_from
+    msg["X-Mailer"] = "SurvAI Platform"
+    msg["MIME-Version"] = "1.0"
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 

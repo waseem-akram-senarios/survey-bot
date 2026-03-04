@@ -112,3 +112,6 @@ CREATE INDEX IF NOT EXISTS idx_surveys_channel ON surveys(channel);
 
 -- AI Augmented toggle support
 ALTER TABLE surveys ADD COLUMN IF NOT EXISTS ai_augmented boolean DEFAULT true;
+
+-- End reason tracking (link_sent, callback_scheduled, declined, wrong_person, etc.)
+ALTER TABLE surveys ADD COLUMN IF NOT EXISTS end_reason TEXT;

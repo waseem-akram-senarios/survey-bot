@@ -182,6 +182,7 @@ async def entrypoint(ctx: JobContext):
     )
     questions_agent = QuestionsAgent(
         instructions=questions_prompt,
+        language=call_language,
         tools=question_tools,
     )
     call_data.agents["greeter"] = greeter_agent

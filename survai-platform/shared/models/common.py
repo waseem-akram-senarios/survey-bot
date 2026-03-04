@@ -118,6 +118,7 @@ class SurveyP(SurveyBaseP):
     Status: Literal["In-Progress", "Completed"] = "In-Progress"
     LaunchDate: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
     CompletionDate: str = ""
+    EndReason: str = ""
 
 
 class SurveyStatusUpdateP(BaseModel):

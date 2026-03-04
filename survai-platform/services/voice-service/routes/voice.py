@@ -285,7 +285,15 @@ async def api_complete_survey(survey_id: str, reason: str = "completed"):
     ok = update_survey_status(survey_id, status)
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to update survey status")
-    return {"status": status, "survey_id": survey_id}
+    try:
+        from db import async_execute
+        await async_execute(
+            "UPDATE surveys SET end_reason = :reason WHERE id = :sid",
+            {"reason": reason, "sid": survey_id},
+        )
+    except Exception:
+        pass
+    return {"status": status, "survey_id": survey_id, "end_reason": reason}
 
 
 # ─── Direct call endpoint (dashboard calls this via gateway, skipping survey-service hop)

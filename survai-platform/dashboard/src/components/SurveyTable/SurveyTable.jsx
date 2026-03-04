@@ -20,7 +20,7 @@ import { useSurvey } from "../../hooks/Surveys/useSurvey";
 import SurveyService from "../../services/Surveys/surveyService";
 import SendSurveyDialog from "../Survey/components/SendSurveyDialog";
 
-const DashboardTable = ({ tableData = [], onRowClick, onDataChange }) => {  
+const DashboardTable = ({ tableData = [], onRowClick, onDataChange, onEditSurvey, onCloneSurvey }) => {  
   const [search, setSearch] = useState("");
   const [orderBy, setOrderBy] = useState("LaunchDate");
   const [order, setOrder] = useState("desc");
@@ -193,6 +193,8 @@ const DashboardTable = ({ tableData = [], onRowClick, onDataChange }) => {
           onSendEmail={handleSendEmail}
           onSendPhone={handleSendPhone}
           onDeleteSurvey={handleDeleteSurvey}
+          onEditSurvey={onEditSurvey}
+          onCloneSurvey={onCloneSurvey}
         />
       )}
 
