@@ -932,7 +932,7 @@ async def get_questions_translated(survey_id: str, lang: str = "es"):
         client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
         prompt = (
             "Translate each survey question below from English to Spanish. "
-            "Return ONLY a JSON array of translated strings in the same order. "
+            "Return a JSON object with key \"translations\" containing an array of translated strings in the same order. "
             "Keep them natural and conversational.\n\n"
             + json.dumps(texts, ensure_ascii=False)
         )
@@ -940,8 +940,12 @@ async def get_questions_translated(survey_id: str, lang: str = "es"):
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
+            response_format={"type": "json_object"},
         )
-        translated = json.loads(resp.choices[0].message.content.strip())
+        raw = resp.choices[0].message.content.strip()
+        raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        parsed = json.loads(raw)
+        translated = parsed if isinstance(parsed, list) else parsed.get("translations", parsed.get("questions", list(parsed.values())[0] if parsed else []))
         if isinstance(translated, list) and len(translated) == len(questions):
             for i, q in enumerate(questions):
                 q["text_es"] = translated[i]
