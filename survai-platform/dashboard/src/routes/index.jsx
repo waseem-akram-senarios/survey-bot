@@ -17,6 +17,7 @@ import GeneratedSurveyView from '../pages/main/Surveys/GeneratedSurveyView';
 import SurveyProgressPage from '../pages/main/Surveys/SurveyProgressPage';
 import SurveyQuestionAnalytics from '../pages/main/Templates/TemplateAnalytics';
 import ImportData from '../pages/main/Surveys/ImportData';
+import EditSurvey from '../pages/main/Surveys/EditSurvey';
 
 const routes = [
     {
@@ -107,6 +108,12 @@ const routes = [
           path: '/surveys/import',
           element: (
               <ImportData />
+          )
+        },
+        {
+          path: '/surveys/edit/:surveyId',
+          element: (
+              <EditSurvey />
           )
         },
       ]
