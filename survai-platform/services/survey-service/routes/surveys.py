@@ -757,7 +757,11 @@ async def makecall(request: MakeCallRequest):
                 },
             )
             if resp.status_code != 200:
-                raise HTTPException(status_code=resp.status_code, detail=resp.text)
+                try:
+                    err = resp.json().get("detail", resp.text)
+                except Exception:
+                    err = resp.text
+                raise HTTPException(status_code=resp.status_code, detail=err)
             return resp.json()
     except httpx.RequestError as e:
         logger.error(f"Voice service call failed: {e}")

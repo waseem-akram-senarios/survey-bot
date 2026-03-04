@@ -92,7 +92,9 @@ const DashboardTable = ({ tableData = [], onRowClick, onDataChange, onEditSurvey
       setShowSuccess(true);
     } catch (error) {
       console.error('Error sending email:', error);
-      // You might want to show an error toast/notification here
+      const detail = error?.response?.data?.detail || error?.message || "Failed to send email";
+      setSuccessMessage(`Error: ${detail}`);
+      setShowSuccess(true);
     } finally {
       setSendDialogOpen(false);
       setSelectedSurvey(null);
@@ -107,14 +109,15 @@ const DashboardTable = ({ tableData = [], onRowClick, onDataChange, onEditSurvey
         provider
       );
       
-      console.log('SMS send result:', result); // Debug log
+      console.log('SMS send result:', result);
       
-      // Show success message if no error was thrown
-      setSuccessMessage(`Survey "${selectedSurvey.Name}" sent successfully to ${phone}`);
+      setSuccessMessage(`Call initiated for "${selectedSurvey.Name}" to ${phone}`);
       setShowSuccess(true);
     } catch (error) {
-      console.error('Error sending SMS:', error);
-      // You might want to show an error toast/notification here
+      console.error('Error sending call:', error);
+      const detail = error?.response?.data?.detail || error?.message || "Failed to initiate call";
+      setSuccessMessage(`Error: ${detail}`);
+      setShowSuccess(true);
     } finally {
       setSendDialogOpen(false);
       setSelectedSurvey(null);
@@ -265,9 +268,13 @@ const DashboardTable = ({ tableData = [], onRowClick, onDataChange, onEditSurvey
       >
         <Alert
           onClose={handleSuccessClose}
-          severity="success"
+          severity={successMessage.startsWith("Error:") ? "error" : "success"}
           variant="filled"
-          sx={{ width: '100%', background: "#EFEFFD", color: "#1958F7" }}
+          sx={{
+            width: '100%',
+            background: successMessage.startsWith("Error:") ? "#FDEDED" : "#EFEFFD",
+            color: successMessage.startsWith("Error:") ? "#D32F2F" : "#1958F7",
+          }}
         >
           {successMessage}
         </Alert>
