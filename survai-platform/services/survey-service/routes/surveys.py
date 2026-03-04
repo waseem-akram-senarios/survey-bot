@@ -921,7 +921,7 @@ async def get_questions_translated(survey_id: str, lang: str = "es"):
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
 
     result = await get_survey_questions(survey_id)
-    questions = result.get("Questions", [])
+    questions = [dict(q) for q in result.get("Questions", [])]
 
     if lang == "en" or not questions:
         return result
