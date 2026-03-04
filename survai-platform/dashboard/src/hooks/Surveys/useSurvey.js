@@ -66,10 +66,10 @@ export const useSurvey = () => {
     }
   };
 
-  const sendSurveyByEmail = async (surveyId, email) => {
+  const sendSurveyByEmail = async (surveyId, email, language = "en") => {
     setIsSendingEmail(true);
     try {
-      const result = await SurveyService.sendSurveyByEmail(surveyId, email);
+      const result = await SurveyService.sendSurveyByEmail(surveyId, email, language);
       return result;
     } catch (error) {
       console.error('Error sending survey via email:', error);

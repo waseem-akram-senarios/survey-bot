@@ -13,7 +13,7 @@ import {
   FormControl,
   Divider,
 } from "@mui/material";
-import { UploadFile } from "@mui/icons-material";
+import { UploadFile, Translate } from "@mui/icons-material";
 
 import { useAlert } from "../../hooks/useAlert";
 import { useSurvey, useTemplates } from "../../hooks/Surveys/useSurvey";
@@ -38,6 +38,7 @@ const CreateSurveyForm = () => {
   const [phone, setPhone] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [recipientBiodata, setRecipientBiodata] = useState("");
+  const [bilingual, setBilingual] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Load templates on component mount and handle pre-selected template
@@ -82,7 +83,8 @@ const CreateSurveyForm = () => {
         rideId: rideId.trim(),
         tenantId: user?.tenantId || "",
         phone: phone.trim(),
-        biodata: recipientBiodata.trim()
+        biodata: recipientBiodata.trim(),
+        bilingual: bilingual,
       };
       
       const generatedSurveyData = await generateSurvey(surveyData);
@@ -100,7 +102,7 @@ const CreateSurveyForm = () => {
       const email = recipientEmail.trim();
       if (email) {
         try {
-          await sendSurveyByEmail(surveyId, email);
+          await sendSurveyByEmail(surveyId, email, bilingual ? "bilingual" : "en");
         } catch {
           showError("Survey launched but email delivery failed. You can resend from Manage Surveys.");
         }
@@ -429,6 +431,63 @@ const CreateSurveyForm = () => {
                       },
                     },
                   },
+                }}
+              />
+            </Box>
+          </Box>
+
+          {/* Bilingual Toggle */}
+          <Box
+            sx={{
+              mb: 4,
+              p: 2.5,
+              backgroundColor: bilingual ? "#EEF3FF" : "#F8F9FA",
+              borderRadius: "15px",
+              border: bilingual ? "1px solid #C5D5FF" : "1px solid #E9ECEF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              "&:hover": { backgroundColor: bilingual ? "#E3EDFF" : "#F0F1F3" },
+            }}
+            onClick={() => setBilingual(!bilingual)}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Translate sx={{ color: bilingual ? "#1958F7" : "#999", fontSize: 22 }} />
+              <Box>
+                <Typography sx={{ fontFamily: "Poppins, sans-serif", fontWeight: 500, fontSize: "14px", color: bilingual ? "#1958F7" : "#4B4B4B" }}>
+                  Bilingual Survey (EN / ES)
+                </Typography>
+                <Typography sx={{ fontFamily: "Poppins, sans-serif", fontWeight: 400, fontSize: "12px", color: "#7D7D7D" }}>
+                  {bilingual
+                    ? "AI will ask recipients their preferred language (English or Spanish)"
+                    : "Survey will be conducted in English only"}
+                </Typography>
+              </Box>
+            </Box>
+            <Box
+              sx={{
+                width: 44,
+                height: 24,
+                borderRadius: "12px",
+                backgroundColor: bilingual ? "#1958F7" : "#ccc",
+                position: "relative",
+                transition: "background-color 0.2s ease",
+                flexShrink: 0,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  backgroundColor: "#fff",
+                  position: "absolute",
+                  top: 3,
+                  left: bilingual ? 23 : 3,
+                  transition: "left 0.2s ease",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
                 }}
               />
             </Box>

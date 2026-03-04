@@ -113,10 +113,11 @@ const SurveyInProgress = () => {
 
   const handleSendEmailConfirm = async (email) => {
     try {
+      const emailLang = selectedSurvey.Bilingual ? "bilingual" : "en";
       const result = await sendSurveyByEmail(
         selectedSurvey.SurveyId, 
         email, 
-        selectedSurvey.Name
+        emailLang
       );
       
       showSuccess(`Survey "${selectedSurvey.Name}" sent successfully to ${email}`);

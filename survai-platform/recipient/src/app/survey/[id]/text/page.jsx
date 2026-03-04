@@ -17,6 +17,7 @@ import SubmitButton from "../../../../../components/text/SubmitButton.jsx";
 import { QuestionRenderer } from "../../../../../components/text/QuestionComponent.jsx";
 import {
   getSurveyQuestions,
+  getSurveyQuestionsTranslated,
   submitSurveyAnswers,
   updateSurveyStatus,
   updateSurveyDuration,
@@ -130,7 +131,10 @@ export default function TextSurveyPage() {
     const loadSurvey = async () => {
       try {
         setIsLoading(true);
-        const data = await getSurveyQuestions(surveyId);
+        const effectiveLang = urlLang || lang;
+        const data = effectiveLang === "es"
+          ? await getSurveyQuestionsTranslated(surveyId, "es")
+          : await getSurveyQuestions(surveyId);
         console.log("Loaded survey data:", data);
         setSurveyData(data);
 

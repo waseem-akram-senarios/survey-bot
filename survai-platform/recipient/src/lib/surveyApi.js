@@ -35,6 +35,36 @@ export async function getSurveyQuestions(surveyId) {
   }
 }
 
+export async function getSurveyQuestionsTranslated(surveyId, lang = "es") {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/surveys/${surveyId}/questions_translated?lang=${lang}`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch translated questions: ${response.status}`);
+    }
+    const data = await response.json();
+    const questionsWithAnswers = data.Questions.map((question) => ({
+      ...question,
+      answer: question.answer || "",
+      raw_answer: question.raw_answer || "",
+    })).sort((a, b) => parseInt(a.order) - parseInt(b.order));
+    return {
+      SurveyId: data.SurveyId,
+      TemplateName: data.TemplateName,
+      Questions: questionsWithAnswers,
+      Language: data.Language || lang,
+    };
+  } catch (error) {
+    console.error("Error fetching translated questions:", error);
+    throw error;
+  }
+}
+
 export async function submitSurveyAnswers(surveyId, questions) {
   try {
     const questionsWithAnswers = questions.map((question) => ({

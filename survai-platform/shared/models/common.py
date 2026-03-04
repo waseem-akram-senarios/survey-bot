@@ -111,6 +111,7 @@ class SurveyBaseP(BaseModel):
 
 class SurveyCreateP(SurveyBaseP):
     URL: str
+    Bilingual: bool = True
 
 
 class SurveyP(SurveyBaseP):
@@ -119,6 +120,7 @@ class SurveyP(SurveyBaseP):
     LaunchDate: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
     CompletionDate: str = ""
     EndReason: str = ""
+    Bilingual: bool = True
 
 
 class SurveyStatusUpdateP(BaseModel):
@@ -279,6 +281,7 @@ class SympathizeP(BaseModel):
 class Email(BaseModel):
     SurveyURL: str
     EmailTo: str
+    Language: str = "en"
 
 
 class QuestionIdRequestP(BaseModel):

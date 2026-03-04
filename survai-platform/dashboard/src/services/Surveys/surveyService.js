@@ -14,7 +14,8 @@ class SurveyService {
         RideId: surveyData.rideId,
         TenantId: surveyData.tenantId,
         Phone: (surveyData.phone || "").replace(/\s+/g, ""),
-        URL: `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyData.surveyId}`
+        URL: `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyData.surveyId}`,
+        Bilingual: surveyData.bilingual ?? true,
       });
 
       console.log("Generated survey response:", response);
@@ -99,11 +100,12 @@ class SurveyService {
     }
   }
 
-  static async sendSurveyByEmail(surveyId, email) {
+  static async sendSurveyByEmail(surveyId, email, language = "en") {
     try {
       const response = await ApiBaseHelper.post(ApiLinks.SURVEY_SEND_EMAIL, {
         SurveyURL: `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyId}`,
         EmailTo: email,
+        Language: language,
       });
 
       return {

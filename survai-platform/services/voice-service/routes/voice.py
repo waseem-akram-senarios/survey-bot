@@ -65,7 +65,7 @@ async def make_call(
     else:
         template_config = {}
 
-    bilingual = True  # hardcoded for now — will come from template config later
+    bilingual = survey.get("bilingual", True)
     language = "en"  # calls always start in English
 
     company_name = template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves")

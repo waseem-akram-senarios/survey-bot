@@ -86,7 +86,7 @@ async def get_survey_with_questions(survey_id: str) -> Optional[Dict[str, Any]]:
     survey = await async_execute(
         """SELECT s.id, s.template_name, s.biodata, s.name, s.recipient,
                   s.phone, s.rider_name, s.ride_id, s.tenant_id, s.url,
-                  s.status, s.email
+                  s.status, s.email, s.bilingual
            FROM surveys s WHERE s.id = :survey_id""",
         {"survey_id": survey_id},
     )

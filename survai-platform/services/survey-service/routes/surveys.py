@@ -116,7 +116,7 @@ TENANT_DISPLAY_NAMES: dict = {
 async def get_survey_recipient(survey_id: str) -> dict:
     """Get recipient info for a survey."""
     rows = sql_execute(
-        "SELECT recipient, name, ride_id, tenant_id, rider_name, biodata FROM surveys WHERE id = :survey_id",
+        "SELECT recipient, name, ride_id, tenant_id, rider_name, biodata, bilingual FROM surveys WHERE id = :survey_id",
         {"survey_id": survey_id},
     )
     if not rows:
@@ -134,6 +134,7 @@ async def get_survey_recipient(survey_id: str) -> dict:
         "CompanyName": company_name,
         "Biodata": r.get("biodata", ""),
         "RiderName": r["rider_name"],
+        "Bilingual": r.get("bilingual", True),
     }
 
 
@@ -233,6 +234,7 @@ def _row_to_survey(r: dict) -> SurveyP:
         LaunchDate=str(r["launch_date"])[:19] if r.get("launch_date") else "",
         CompletionDate=str(r.get("completion_date") or "")[:19],
         EndReason=r.get("end_reason") or "",
+        Bilingual=r.get("bilingual", True),
     )
 
 
@@ -467,8 +469,8 @@ async def generate_survey(survey_data: SurveyCreateP):
 
     try:
         sql_execute(
-            """INSERT INTO surveys (id, template_name, url, biodata, status, name, recipient, launch_date, rider_name, ride_id, tenant_id, phone)
-            VALUES (:id, :template_name, :url, :biodata, :status, :name, :recipient, :launch_date, :rider_name, :ride_id, :tenant_id, :phone)""",
+            """INSERT INTO surveys (id, template_name, url, biodata, status, name, recipient, launch_date, rider_name, ride_id, tenant_id, phone, bilingual)
+            VALUES (:id, :template_name, :url, :biodata, :status, :name, :recipient, :launch_date, :rider_name, :ride_id, :tenant_id, :phone, :bilingual)""",
             {
                 "id": survey_data.SurveyId,
                 "template_name": survey_data.Name,
@@ -482,6 +484,7 @@ async def generate_survey(survey_data: SurveyCreateP):
                 "ride_id": survey_data.RideId,
                 "tenant_id": survey_data.TenantId,
                 "phone": survey_data.Phone,
+                "bilingual": getattr(survey_data, "Bilingual", True),
             },
         )
 
@@ -831,9 +834,15 @@ def _send_via_resend(to_email: str, subject: str, html_body: str):
 async def sendemail(email: Email):
     """Send email survey. Tries MailerSend (verified domain) first, then Resend, then SMTP."""
     url = email.SurveyURL
-    html_body = build_html_email(url)
-    text_body = build_text_email(url)
-    subject = "Your Survey is Ready!"
+    lang = getattr(email, "Language", "en") or "en"
+    html_body = build_html_email(url, language=lang)
+    text_body = build_text_email(url, language=lang)
+    if lang == "es":
+        subject = "¡Su Encuesta Está Lista!"
+    elif lang == "bilingual":
+        subject = "Your Survey is Ready! / ¡Su Encuesta Está Lista!"
+    else:
+        subject = "Your Survey is Ready!"
     errors = []
 
     # 1. Try MailerSend with verified domain first (best deliverability)
@@ -900,6 +909,48 @@ async def schedule_callback(request: CallbackRequest):
     except Exception as e:
         logger.error(f"Failed to schedule callback via scheduler-service: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Translation endpoint (for text survey in Spanish) ───────────────────────
+
+@router.get("/surveys/{survey_id}/questions_translated")
+async def get_questions_translated(survey_id: str, lang: str = "es"):
+    """Return survey questions with text translated to the target language."""
+    rows = sql_execute("SELECT id FROM surveys WHERE id = :survey_id", {"survey_id": survey_id})
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
+
+    result = await get_survey_questions(survey_id)
+    questions = result.get("Questions", [])
+
+    if lang == "en" or not questions:
+        return result
+
+    texts = [q.get("text", "") for q in questions]
+    try:
+        import openai
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
+        prompt = (
+            "Translate each survey question below from English to Spanish. "
+            "Return ONLY a JSON array of translated strings in the same order. "
+            "Keep them natural and conversational.\n\n"
+            + json.dumps(texts, ensure_ascii=False)
+        )
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+        )
+        translated = json.loads(resp.choices[0].message.content.strip())
+        if isinstance(translated, list) and len(translated) == len(questions):
+            for i, q in enumerate(questions):
+                q["text_es"] = translated[i]
+                q["text_original"] = q["text"]
+                q["text"] = translated[i]
+    except Exception as e:
+        logger.warning(f"Translation failed for survey {survey_id}: {e}")
+
+    return {**result, "Questions": questions, "Language": lang}
 
 
 # ─── Aliases for frontend backward compatibility ─────────────────────────────

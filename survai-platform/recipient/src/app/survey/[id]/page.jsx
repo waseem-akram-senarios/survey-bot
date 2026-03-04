@@ -20,6 +20,7 @@ export default function Survey() {
   const [surveyName, setSurveyName] = useState("");
   const [biodata, setBiodata] = useState("");
   const [lang, setLang] = useState("en");
+  const [isBilingual, setIsBilingual] = useState(true);
   const [visibleLines, setVisibleLines] = useState(0);
   const [personalizedGreeting, setPersonalizedGreeting] = useState("");
 
@@ -42,7 +43,12 @@ export default function Survey() {
       setRiderName(result.RiderName || "");
       setSurveyName(result.Name || "");
       setBiodata(result.Biodata || "");
-      if (result.Name) setLang(detectLanguage(result.Name));
+      const bilingual = result.Bilingual !== false;
+      setIsBilingual(bilingual);
+      if (result.Name) {
+        const detected = detectLanguage(result.Name);
+        setLang(detected);
+      }
 
       try {
         const greeting = await generatePersonalizedGreeting(
@@ -153,8 +159,8 @@ export default function Survey() {
         padding: "24px",
       }}
     >
-      {/* Language Selector */}
-      <Box sx={{ position: "absolute", top: 20, right: 20, zIndex: 10 }}>
+      {/* Language Selector - only shown for bilingual surveys */}
+      {isBilingual && <Box sx={{ position: "absolute", top: 20, right: 20, zIndex: 10 }}>
         <ToggleButtonGroup
           value={lang}
           exclusive
@@ -185,7 +191,7 @@ export default function Survey() {
           <ToggleButton value="en">EN</ToggleButton>
           <ToggleButton value="es">ES</ToggleButton>
         </ToggleButtonGroup>
-      </Box>
+      </Box>}
 
       {/* Branding */}
       <Box textAlign="center" mb={4}>

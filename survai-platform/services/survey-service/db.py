@@ -181,9 +181,10 @@ def process_survey_question(question: dict) -> dict:
     return question
 
 
-def build_html_email(url: str) -> str:
-    """Build HTML email body for survey link."""
-    return f"""\
+def build_html_email(url: str, language: str = "en") -> str:
+    """Build HTML email body for survey link with bilingual support."""
+    if language == "bilingual":
+        return f"""\
 <!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -193,26 +194,81 @@ def build_html_email(url: str) -> str:
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
         <tr><td style="background-color:#1958F7;padding:30px 40px;text-align:center;">
           <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">We'd Love Your Feedback</h1>
+          <h2 style="margin:8px 0 0;color:#ffffffcc;font-size:18px;font-weight:500;">Nos Encantaría Conocer Su Opinión</h2>
         </td></tr>
         <tr><td style="padding:32px 40px;">
-          <p style="margin:0 0 16px;font-size:16px;color:#333333;line-height:1.6;">
+          <p style="margin:0 0 12px;font-size:16px;color:#333333;line-height:1.6;">
             We value your opinion and would appreciate a few minutes of your time to complete a short survey.
           </p>
-          <p style="margin:0 0 24px;font-size:16px;color:#333333;line-height:1.6;">
-            Your responses help us improve our products and services.
+          <p style="margin:0 0 20px;font-size:16px;color:#666666;line-height:1.6;font-style:italic;">
+            Valoramos su opinión y le agradeceríamos unos minutos de su tiempo para completar una breve encuesta.
           </p>
           <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
             <tr><td style="background-color:#1958F7;border-radius:8px;text-align:center;">
-              <a href="{url}" style="display:inline-block;padding:14px 36px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;">Take the Survey</a>
+              <a href="{url}" style="display:inline-block;padding:14px 36px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;">Take the Survey / Realizar la Encuesta</a>
             </td></tr>
           </table>
           <p style="margin:24px 0 0;font-size:14px;color:#666666;line-height:1.5;">
             If the button above doesn't work, copy and paste this link into your browser:
+            <br><span style="color:#999;font-style:italic;">Si el botón no funciona, copie y pegue este enlace:</span>
             <br><a href="{url}" style="color:#1958F7;word-break:break-all;">{url}</a>
           </p>
         </td></tr>
         <tr><td style="padding:20px 40px;background-color:#f9f9f9;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#999999;">Thank you for your time and insights.</p>
+          <p style="margin:0;font-size:12px;color:#999999;">Thank you for your time. / Gracias por su tiempo.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    if language == "es":
+        heading = "Nos Encantaría Conocer Su Opinión"
+        intro = "Valoramos su opinión y le agradeceríamos unos minutos de su tiempo para completar una breve encuesta."
+        body2 = "Sus respuestas nos ayudan a mejorar nuestros productos y servicios."
+        cta = "Realizar la Encuesta"
+        fallback = "Si el botón de arriba no funciona, copie y pegue este enlace en su navegador:"
+        footer = "Gracias por su tiempo y sus comentarios."
+    else:
+        heading = "We'd Love Your Feedback"
+        intro = "We value your opinion and would appreciate a few minutes of your time to complete a short survey."
+        body2 = "Your responses help us improve our products and services."
+        cta = "Take the Survey"
+        fallback = "If the button above doesn't work, copy and paste this link into your browser:"
+        footer = "Thank you for your time and insights."
+
+    html_lang = "es" if language == "es" else "en"
+    return f"""\
+<!DOCTYPE html>
+<html lang="{html_lang}">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background-color:#1958F7;padding:30px 40px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">{heading}</h1>
+        </td></tr>
+        <tr><td style="padding:32px 40px;">
+          <p style="margin:0 0 16px;font-size:16px;color:#333333;line-height:1.6;">
+            {intro}
+          </p>
+          <p style="margin:0 0 24px;font-size:16px;color:#333333;line-height:1.6;">
+            {body2}
+          </p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+            <tr><td style="background-color:#1958F7;border-radius:8px;text-align:center;">
+              <a href="{url}" style="display:inline-block;padding:14px 36px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;">{cta}</a>
+            </td></tr>
+          </table>
+          <p style="margin:24px 0 0;font-size:14px;color:#666666;line-height:1.5;">
+            {fallback}
+            <br><a href="{url}" style="color:#1958F7;word-break:break-all;">{url}</a>
+          </p>
+        </td></tr>
+        <tr><td style="padding:20px 40px;background-color:#f9f9f9;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#999999;">{footer}</p>
         </td></tr>
       </table>
     </td></tr>
@@ -221,8 +277,27 @@ def build_html_email(url: str) -> str:
 </html>"""
 
 
-def build_text_email(url: str) -> str:
-    """Build plain text email body for survey link."""
+def build_text_email(url: str, language: str = "en") -> str:
+    """Build plain text email body for survey link with bilingual support."""
+    if language == "bilingual":
+        return (
+            "We'd Love Your Feedback / Nos Encantaría Conocer Su Opinión\n\n"
+            "We value your opinion and would appreciate a few minutes of your time "
+            "to complete a short survey.\n"
+            "Valoramos su opinión y le agradeceríamos unos minutos de su "
+            "tiempo para completar una breve encuesta.\n\n"
+            f"Take the survey / Realizar la encuesta: {url}\n\n"
+            "Thank you / Gracias"
+        )
+    if language == "es":
+        return (
+            "Nos Encantaría Conocer Su Opinión\n\n"
+            "Valoramos su opinión y le agradeceríamos unos minutos de su "
+            "tiempo para completar una breve encuesta.\n\n"
+            "Sus respuestas nos ayudan a mejorar nuestros productos y servicios.\n\n"
+            f"Realizar la encuesta: {url}\n\n"
+            "Gracias por su tiempo y sus comentarios."
+        )
     return (
         "We'd Love Your Feedback\n\n"
         "We value your opinion and would appreciate a few minutes of your time "
