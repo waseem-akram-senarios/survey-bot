@@ -141,7 +141,7 @@ const SurveyInProgress = () => {
       showSuccess(`Survey "${selectedSurvey.Name}" sent successfully to ${phone}`);
     } catch (error) {
       console.error('Error sending SMS:', error);
-      showError('Failed to send survey via SMS. Please try again.');
+      showError(error.message || 'Failed to send survey via phone. Please try again.');
     } finally {
       setSendDialogOpen(false);
       setSelectedSurvey(null);

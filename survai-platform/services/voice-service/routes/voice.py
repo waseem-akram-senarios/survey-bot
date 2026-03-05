@@ -7,8 +7,10 @@ Handles LiveKit call lifecycle:
 - Email fallback
 """
 
+import asyncio
 import logging
 import os
+import time
 
 from fastapi import APIRouter, HTTPException
 
@@ -25,6 +27,10 @@ from prompt_builder import build_greeter_prompt, build_questions_prompt
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/voice", tags=["voice"])
+
+_active_calls: dict[str, float] = {}
+_active_calls_lock = asyncio.Lock()
+CALL_COOLDOWN_SECONDS = 30
 
 
 def _extract_rider_first_name(rider_name: str) -> str:
@@ -45,6 +51,21 @@ async def make_call(
     provider: str = "livekit",
 ):
     """Initiate an AI-powered survey call via LiveKit SIP."""
+    normalized_phone = phone.strip().replace(" ", "")
+    async with _active_calls_lock:
+        now = time.monotonic()
+        expired = [p for p, t in _active_calls.items() if now - t > CALL_COOLDOWN_SECONDS]
+        for p in expired:
+            del _active_calls[p]
+        last_call_time = _active_calls.get(normalized_phone)
+        if last_call_time and now - last_call_time < CALL_COOLDOWN_SECONDS:
+            remaining = int(CALL_COOLDOWN_SECONDS - (now - last_call_time))
+            raise HTTPException(
+                status_code=429,
+                detail=f"A call to {normalized_phone} is already in progress. Please wait {remaining}s before retrying.",
+            )
+        _active_calls[normalized_phone] = now
+
     survey = await get_survey_with_questions(survey_id)
     if not survey:
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
