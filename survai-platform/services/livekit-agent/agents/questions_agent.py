@@ -36,12 +36,20 @@ class QuestionsAgent(Agent):
         self,
         language: Annotated[str, "Language code: 'en' for English, 'es' for Spanish"],
     ) -> str:
-        """Switch the survey language mid-call if the recipient requests it."""
+        """Switch the survey language ONLY if the recipient explicitly asks to change. Do NOT call this proactively."""
         self.session.userdata.detected_language = language
         logger.info(f"[LANGUAGE] Recipient switched language to: {language}")
         if language == "es":
-            return "Language switched to Spanish. Re-ask the current question in Spanish and continue entirely in Spanish."
-        return "Language switched to English. Re-ask the current question in English and continue entirely in English."
+            return (
+                "Language LOCKED to Spanish. From now on you MUST speak ONLY in Spanish. "
+                "Use ONLY the ES version of each question. NEVER use English again. "
+                "Re-ask the current question using the ES version now."
+            )
+        return (
+            "Language LOCKED to English. From now on you MUST speak ONLY in English. "
+            "Use ONLY the EN version of each question. NEVER use Spanish again. "
+            "Re-ask the current question using the EN version now."
+        )
 
     async def on_enter(self) -> None:
         """
@@ -63,33 +71,34 @@ class QuestionsAgent(Agent):
             new_items = [item for item in truncated.items if item.id not in existing_ids]
             chat_ctx.items.extend(new_items)
 
+        lang = getattr(userdata, "detected_language", "en")
+
         if userdata.question_ids:
             first_q_id = userdata.question_ids[0]
             first_q_text = userdata.questions_map.get(first_q_id, "")
             if first_q_text:
-                lang = getattr(userdata, "detected_language", "en")
                 if lang == "es":
-                    # For Spanish, let the LLM speak Q1 in Spanish from the prompt
-                    # rather than TTS-speaking the English question text
                     intro = "¡Perfecto, comencemos!"
-                    spoken_q1 = intro
-                else:
-                    intro = f"Great, let's get started! {first_q_text}"
-                    spoken_q1 = first_q_text
-
-                # Tell the LLM Q1 status — for Spanish, instruct it to ask Q1 in Spanish
-                if lang == "es":
                     system_note = (
                         "Identity and availability have been confirmed by the greeter. "
-                        "Do NOT re-introduce yourself or ask for availability again. "
+                        "Do NOT re-introduce yourself or ask for availability again.\n\n"
+                        "*** LANGUAGE LOCKED: SPANISH ***\n"
+                        "The recipient chose SPANISH. You MUST speak ONLY in Spanish for the ENTIRE survey.\n"
+                        "For each question, use ONLY the ES version. NEVER read or say the EN version.\n"
+                        "NEVER switch to English. NEVER mix languages. ALL acknowledgments, transitions, "
+                        "and responses must be in Spanish only.\n\n"
                         "The intro '¡Perfecto, comencemos!' was spoken. "
-                        "Now ask Q1 in Spanish (use the [ES] version from the QUESTIONS section). "
-                        "Do NOT use the English version."
+                        "Now ask Q1 in Spanish (use ONLY the ES version). Do NOT use English."
                     )
                 else:
+                    intro = f"Great, let's get started! {first_q_text}"
                     system_note = (
                         "Identity and availability have been confirmed by the greeter. "
-                        "Do NOT re-introduce yourself or ask for availability again. "
+                        "Do NOT re-introduce yourself or ask for availability again.\n\n"
+                        "*** LANGUAGE LOCKED: ENGLISH ***\n"
+                        "The recipient chose ENGLISH. You MUST speak ONLY in English for the ENTIRE survey.\n"
+                        "For each question, use ONLY the EN version. NEVER read or say the ES version.\n"
+                        "NEVER switch to Spanish. NEVER mix languages.\n\n"
                         f"Q1 is already being spoken to the caller verbatim: \"{first_q_text}\". "
                         "Do NOT repeat Q1. Wait silently for the caller's answer."
                     )
@@ -97,31 +106,30 @@ class QuestionsAgent(Agent):
                 chat_ctx.add_message(role="system", content=system_note)
                 await self.update_chat_ctx(chat_ctx)
 
-                # Speak the intro and wait for full audio playout before returning
                 await self.session.say(intro).wait_for_playout()
 
-                # For English: inject Q1 as assistant message so LLM won't repeat it.
-                # For Spanish: inject only the intro — LLM will generate Q1 in Spanish.
                 chat_ctx2 = self.chat_ctx.copy()
                 chat_ctx2.add_message(role="assistant", content=intro)
                 await self.update_chat_ctx(chat_ctx2)
 
-                # For Spanish, generate the LLM reply so it asks Q1 in Spanish
                 if lang == "es":
                     await self.session.generate_reply()
                 return
 
-        if self._language == "es":
+        if lang == "es":
             fallback_msg = (
                 "La identidad y disponibilidad han sido confirmadas por el saludo inicial. "
-                "NO te vuelvas a presentar ni preguntes por disponibilidad. "
-                "Comienza la encuesta inmediatamente con la primera pregunta. "
-                "DEBES responder SIEMPRE en español."
+                "NO te vuelvas a presentar ni preguntes por disponibilidad.\n\n"
+                "*** IDIOMA BLOQUEADO: ESPAÑOL ***\n"
+                "DEBES responder SIEMPRE y ÚNICAMENTE en español. NUNCA uses inglés.\n"
+                "Comienza la encuesta inmediatamente con la primera pregunta en español."
             )
         else:
             fallback_msg = (
                 "Identity and availability have been confirmed by the greeter. "
-                "Do NOT re-introduce yourself or ask for availability again. "
+                "Do NOT re-introduce yourself or ask for availability again.\n\n"
+                "*** LANGUAGE LOCKED: ENGLISH ***\n"
+                "You MUST speak ONLY in English. NEVER use Spanish.\n"
                 "Start the survey immediately with Q1."
             )
         chat_ctx.add_message(role="system", content=fallback_msg)

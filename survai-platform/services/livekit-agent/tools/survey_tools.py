@@ -104,6 +104,9 @@ def create_survey_tools(
             question_id: The question identifier from the survey
             answer: The caller's response in their own words
         """
+        lang = getattr(context.userdata, "detected_language", "en")
+        lang_reminder = " Respond ONLY in Spanish." if lang == "es" else ""
+
         if question_id in survey_responses["answers"]:
             done = list(survey_responses["answers"].keys())
             if question_ids:
@@ -111,10 +114,10 @@ def create_survey_tools(
                 if remaining:
                     next_id = remaining[0]
                     next_text = qmap.get(next_id, "")
-                    return f"Already recorded. Ask: \"{next_text}\" (id:{next_id})"
+                    return f"Already recorded. Ask: \"{next_text}\" (id:{next_id}).{lang_reminder}"
                 else:
-                    return "All questions answered. Call end_survey(\"completed\") now."
-            return "Already recorded. Continue."
+                    return f"All questions answered. Call end_survey(\"completed\") now.{lang_reminder}"
+            return f"Already recorded. Continue.{lang_reminder}"
 
         survey_responses["answers"][question_id] = answer
         done = list(survey_responses["answers"].keys())
@@ -132,11 +135,11 @@ def create_survey_tools(
             if remaining:
                 next_id = remaining[0]
                 next_text = qmap.get(next_id, "")
-                return f"Recorded. Ask: \"{next_text}\" (id:{next_id})"
+                return f"Recorded. Ask: \"{next_text}\" (id:{next_id}).{lang_reminder}"
             else:
                 logger.info(f"ALL {total_questions} questions answered")
-                return "All questions answered. Call end_survey(\"completed\") now."
-        return "Recorded."
+                return f"All questions answered. Call end_survey(\"completed\") now.{lang_reminder}"
+        return f"Recorded.{lang_reminder}"
 
     @function_tool()
     async def end_survey(context: RunContext, reason: str = "completed"):
@@ -165,20 +168,36 @@ def create_survey_tools(
 
         rider = survey_responses.get("rider_name", "").strip()
         name_part = f", {rider}" if rider else ""
+        lang = getattr(context.userdata, "detected_language", "en")
 
-        if reason == "completed":
-            farewell = (
-                f"Thanks so much for sharing your thoughts{name_part}! "
-                "I really appreciate your time, and I hope you have a great rest of your day! Goodbye!"
-            )
-        elif reason in ("not_available", "callback_scheduled"):
-            farewell = "Fantastic! We'll be in touch. Thank you for your time, and have a wonderful day! Goodbye!"
-        elif reason == "wrong_person":
-            farewell = "I apologize for the mix-up! Have a great day! Goodbye!"
-        elif reason == "link_sent":
-            farewell = "Great! We'll send that over. Thank you for your time, and have a wonderful day! Goodbye!"
+        if lang == "es":
+            if reason == "completed":
+                farewell = (
+                    f"¡Muchas gracias por compartir sus opiniones{name_part}! "
+                    "Realmente aprecio su tiempo. ¡Que tenga un excelente día! ¡Adiós!"
+                )
+            elif reason in ("not_available", "callback_scheduled"):
+                farewell = "¡Perfecto! Estaremos en contacto. ¡Gracias por su tiempo y que tenga un excelente día! ¡Adiós!"
+            elif reason == "wrong_person":
+                farewell = "¡Le pido disculpas por la confusión! ¡Que tenga un buen día! ¡Adiós!"
+            elif reason == "link_sent":
+                farewell = "¡Perfecto! Le enviaremos el enlace. ¡Gracias por su tiempo y que tenga un excelente día! ¡Adiós!"
+            else:
+                farewell = "¡Por supuesto, no hay problema! ¡Gracias por su tiempo y que tenga un buen día! ¡Adiós!"
         else:
-            farewell = "Of course, no problem at all! Thanks for your time — have a great day! Goodbye!"
+            if reason == "completed":
+                farewell = (
+                    f"Thanks so much for sharing your thoughts{name_part}! "
+                    "I really appreciate your time, and I hope you have a great rest of your day! Goodbye!"
+                )
+            elif reason in ("not_available", "callback_scheduled"):
+                farewell = "Fantastic! We'll be in touch. Thank you for your time, and have a wonderful day! Goodbye!"
+            elif reason == "wrong_person":
+                farewell = "I apologize for the mix-up! Have a great day! Goodbye!"
+            elif reason == "link_sent":
+                farewell = "Great! We'll send that over. Thank you for your time, and have a wonderful day! Goodbye!"
+            else:
+                farewell = "Of course, no problem at all! Thanks for your time — have a great day! Goodbye!"
 
         logger.info(f"[FAREWELL] {farewell}")
         speech_handle = context.session.say(farewell)

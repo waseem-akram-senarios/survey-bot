@@ -85,7 +85,11 @@ async def _translate_questions_to_es(questions: List[Dict[str, Any]]) -> Dict[st
 
 
 def _format_question(order: int, q: Dict[str, Any], es_text: Optional[str] = None) -> str:
-    """Format a single question block for the agent prompt."""
+    """Format a single question block for the agent prompt.
+    
+    When es_text is provided, both versions are included with clear labels
+    so the agent can pick the correct one based on the locked language.
+    """
     qid = q.get("id", f"q{order}")
     text = q.get("text", "")
     criteria = q.get("criteria", "open")
@@ -95,22 +99,17 @@ def _format_question(order: int, q: Dict[str, Any], es_text: Optional[str] = Non
     parent_order = q.get("_parent_order", "")
     trigger_cats = q.get("parent_category_texts", [])
 
-    # Build the question text line(s) — bilingual if es_text is provided
     if es_text:
-        question_text = f'[EN] "{text}" / [ES] "{es_text}"'
-        ask_instruction = "Ask in the recipient's chosen language (set via set_language). If they switch language, call set_language() then re-ask this question in the new language."
+        question_text = f'EN: "{text}" | ES: "{es_text}"'
     else:
         question_text = f'"{text}"'
-        ask_instruction = ""
-
-    ask_suffix = f"\n  {ask_instruction}" if ask_instruction else ""
 
     if parent_id:
         trigger_str = ", ".join(trigger_cats) if trigger_cats else "any answer"
         return (
             f"Q{order} [{qid}] CONDITIONAL (ask ONLY IF the answer to Q{parent_order} "
             f"includes: {trigger_str}): {question_text}\n"
-            f"  Skip entirely if the condition is not met.{ask_suffix}"
+            f"  Skip entirely if the condition is not met."
         )
     elif criteria == "scale":
         return (
@@ -118,7 +117,7 @@ def _format_question(order: int, q: Dict[str, Any], es_text: Optional[str] = Non
             f"  Ask it word-for-word. Always tell the caller: '1 is very poor, {scale_max} is excellent.'\n"
             f"  If they give a word instead of a number, ask once: \"If you had to put a number on it, 1 to {scale_max}?\"\n"
             f"  After recording their answer: give ONE brief acknowledgment sentence, then move to the next question.\n"
-            f"  Do NOT ask a follow-up or probe in the same response as the acknowledgment.{ask_suffix}"
+            f"  Do NOT ask a follow-up or probe in the same response as the acknowledgment."
         )
     elif criteria == "categorical":
         cats_str = ", ".join(categories) if categories else "open"
@@ -126,14 +125,14 @@ def _format_question(order: int, q: Dict[str, Any], es_text: Optional[str] = Non
             f"Q{order} [{qid}] CHOICE [{cats_str}]: {question_text}\n"
             f"  Let them answer freely. Only list the options if they seem stuck.\n"
             f"  Negative choice: empathize and ask ONE follow-up.\n"
-            f"  Positive choice: celebrate briefly and move on.{ask_suffix}"
+            f"  Positive choice: celebrate briefly and move on."
         )
     else:
         return (
             f"Q{order} [{qid}] OPEN: {question_text}\n"
             f"  If vague (\"fine\", \"okay\", \"good\") — probe gently with ONE clarifying question.\n"
             f"  If detailed — acknowledge warmly and move on.\n"
-            f"  If emotional — validate first, then continue.{ask_suffix}"
+            f"  If emotional — validate first, then continue."
         )
 
 
@@ -176,7 +175,8 @@ Stop and wait for their reply.
 - They say "English" / "inglés" / respond in English → call set_language("en") → then call to_questions()
 - They say "Spanish" / "español" / respond in Spanish → call set_language("es") → then call to_questions()
 - Unclear → ask once: "English or Spanish? / ¿Inglés o español?" then follow the same rules.
-IMPORTANT: NEVER call to_questions() before set_language() is called."""
+IMPORTANT: NEVER call to_questions() before set_language() is called.
+IMPORTANT: Once set_language() is called, the language is LOCKED. From that moment, speak ONLY in the selected language. Do NOT mix languages."""
         tools_extra = "\n- set_language(language) — record the recipient's language preference. Call BEFORE to_questions() on bilingual calls."
         steps_count = "THREE"
     else:
@@ -272,14 +272,18 @@ async def build_questions_prompt(
     bilingual_rule = ""
     if bilingual:
         bilingual_header = (
-            "\n## LANGUAGE\n"
-            "The recipient selected their preferred language during the greeting (English or Spanish). "
-            "Ask EVERY question in their chosen language. "
-            "If the recipient switches language mid-call, call set_language('en' or 'es') immediately, "
-            "then re-ask the current question in the new language.\n"
+            "\n## LANGUAGE — CRITICAL\n"
+            "The recipient chose their preferred language during the greeting.\n"
+            "Each question below shows both EN and ES versions. Use ONLY the version matching the chosen language.\n"
+            "**RULES:**\n"
+            "- If language is English: use ONLY the EN version. Speak ONLY English. NEVER say anything in Spanish.\n"
+            "- If language is Spanish: use ONLY the ES version. Speak ONLY Spanish. NEVER say anything in English.\n"
+            "- Do NOT show, read, or mention the other language version.\n"
+            "- Do NOT switch languages unless the recipient explicitly asks to change language.\n"
+            "- NEVER mix languages in the same sentence or turn.\n"
         )
-        bilingual_tools = "\n- set_language(language) — switch the survey language mid-call if the recipient requests it. Re-ask the current question in the new language after calling it."
-        bilingual_rule = "\n10. If the recipient speaks in a different language than their selection, call set_language() and re-ask the current question in that language."
+        bilingual_tools = "\n- set_language(language) — ONLY if the recipient explicitly requests to change language. Do NOT call this proactively."
+        bilingual_rule = "\n10. NEVER mix languages. Stick to the chosen language for the ENTIRE call. If the recipient explicitly asks to switch, call set_language() ONCE then continue in the new language only."
 
     return f"""You are Cameron, a warm and professional survey caller for {organization_name}. Identity and availability are already confirmed — do NOT re-introduce yourself.
 {bilingual_header}

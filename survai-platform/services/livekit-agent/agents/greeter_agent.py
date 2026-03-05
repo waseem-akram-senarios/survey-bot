@@ -70,12 +70,20 @@ class GreeterAgent(Agent):
         self,
         language: Annotated[str, "Language code: 'en' for English, 'es' for Spanish"],
     ) -> str:
-        """Record the recipient's language preference for the rest of the call."""
+        """Record the recipient's language preference. This LOCKS the language for the entire call."""
         self.session.userdata.detected_language = language
         logger.info(f"[LANGUAGE] Recipient selected: {language}")
         if language == "es":
-            return "Language preference set to Spanish. Respond entirely in Spanish from now on."
-        return "Language preference set to English. Respond entirely in English from now on."
+            return (
+                "Language LOCKED to Spanish. From this moment you MUST speak ONLY in Spanish. "
+                "NEVER use English again for the rest of this call. "
+                "Now call to_questions() to begin the survey."
+            )
+        return (
+            "Language LOCKED to English. From this moment you MUST speak ONLY in English. "
+            "NEVER use Spanish again for the rest of this call. "
+            "Now call to_questions() to begin the survey."
+        )
 
     async def on_enter(self) -> None:
         """Speak the opening greeting and wait for full playout before LLM takes over."""
