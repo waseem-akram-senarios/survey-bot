@@ -2,6 +2,20 @@ import ApiBaseHelper from '../../network/apiBaseHelper';
 import ApiLinks from '../../network/apiLinks';
 import { transformApiQuestionsToComponentFormat, transformComponentQuestionsToApiFormat } from '../../utils/Surveys/surveyHelpers';
 
+function getApiErrorMessage(error, fallback) {
+  if (error.response?.data?.detail) {
+    const d = error.response.data.detail;
+    if (typeof d === 'string') return d;
+    if (Array.isArray(d)) return d.map((x) => x?.msg ?? x?.loc?.join('.') ?? JSON.stringify(x)).filter(Boolean).join('; ') || fallback;
+  }
+  if (error.response?.data?.message) return error.response.data.message;
+  if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') return 'Network error. Check that the server is running and the dashboard URL is correct.';
+  if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) return 'Request timed out. Try again.';
+  if (error.response?.status === 404) return 'Not found. Check template name and try again.';
+  if (error.response?.status === 400) return error.response?.data?.detail || 'Invalid request.';
+  return error.message || fallback;
+}
+
 class SurveyService {
   static async generateSurvey(surveyData) {
     try {
@@ -30,7 +44,8 @@ class SurveyService {
       };
     } catch (error) {
       console.error('Error generating survey:', error);
-      throw new Error('Failed to generate survey. Please try again.');
+      const msg = getApiErrorMessage(error, 'Failed to generate survey. Please try again.');
+      throw new Error(msg);
     }
   }
 
@@ -52,7 +67,8 @@ class SurveyService {
       };
     } catch (error) {
       console.error('Error launching survey:', error);
-      throw new Error('Failed to launch survey. Please try again.');
+      const msg = getApiErrorMessage(error, 'Failed to launch survey. Please try again.');
+      throw new Error(msg);
     }
   }
 
@@ -171,11 +187,12 @@ class SurveyService {
 
       return {
         success: true,
-        message: response.message || 'Survey sent successfully via SMS',
+        message: response.message || 'Call initiated successfully',
       };
     } catch (error) {
-      console.error('Error sending survey via SMS:', error);
-      throw new Error('Failed to send survey via SMS. Please try again.');
+      console.error('Error sending survey via phone:', error);
+      const msg = getApiErrorMessage(error, 'Failed to send survey via phone. Please try again.');
+      throw new Error(msg);
     }
   }
 }

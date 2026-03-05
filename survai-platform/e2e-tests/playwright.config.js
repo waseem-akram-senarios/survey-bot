@@ -16,7 +16,7 @@ module.exports = defineConfig({
     timeout: 15_000,
   },
   use: {
-    baseURL: 'http://localhost:8080',
+    baseURL: process.env.BASE_URL || 'http://localhost:8080',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

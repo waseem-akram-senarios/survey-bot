@@ -1,7 +1,8 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const { loginToDashboard } = require('./auth.setup');
 
-const BASE = 'http://localhost:8080';
+const BASE = process.env.BASE_URL || 'http://localhost:8080';
 
 // ─── Survey API Tests ────────────────────────────────────────────────────────
 
@@ -47,13 +48,11 @@ test.describe('Survey Lifecycle via API', () => {
   let questionId = '';
 
   test('setup: create template with question', async ({ request }) => {
-    // Create template
     const tResp = await request.post(`${BASE}/pg/api/templates/create`, {
       data: { TemplateName: TEMPLATE_NAME },
     });
     expect(tResp.ok()).toBeTruthy();
 
-    // Create question
     const qResp = await request.post(`${BASE}/pg/api/questions`, {
       data: {
         QueText: 'E2E Lifecycle: Rate our service?',
@@ -66,13 +65,11 @@ test.describe('Survey Lifecycle via API', () => {
     const idMatch = qBody.match(/ID\s+([0-9a-f-]+)/i);
     questionId = idMatch ? idMatch[1] : '';
 
-    // Add question to template
     const addResp = await request.post(`${BASE}/pg/api/templates/addquestions`, {
       data: { TemplateName: TEMPLATE_NAME, QueId: questionId, Order: 1 },
     });
     expect(addResp.ok()).toBeTruthy();
 
-    // Publish template
     await request.patch(`${BASE}/pg/api/templates/status`, {
       data: { TemplateName: TEMPLATE_NAME, Status: 'Published' },
     });
@@ -109,7 +106,6 @@ test.describe('Survey Lifecycle via API', () => {
     const response = await request.get(`${BASE}/pg/api/surveys/${surveyId}/questions`);
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
-    // Should have at least 1 question
     const questions = body.Questions || body;
     expect(Array.isArray(questions) ? questions.length : 0).toBeGreaterThan(0);
   });
@@ -132,7 +128,6 @@ test.describe('Survey Lifecycle via API', () => {
 
   test('cleanup: delete survey and template', async ({ request }) => {
     if (surveyId) {
-      // Set back to In-Progress so we can delete it
       await request.patch(`${BASE}/pg/api/surveys/${surveyId}/status`, {
         data: { Status: 'In-Progress' },
       });
@@ -151,15 +146,15 @@ test.describe('Survey Lifecycle via API', () => {
 
 test.describe('Surveys UI', () => {
   test('dashboard page loads with stats and table', async ({ page }) => {
-    await page.goto(`${BASE}/dashboard`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(3000);
+    await loginToDashboard(page);
+    await page.waitForTimeout(2000);
 
     const bodyText = await page.textContent('body');
     expect(bodyText && bodyText.length > 10).toBeTruthy();
   });
 
   test('manage surveys page loads with stats', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/surveys/manage`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
@@ -170,17 +165,18 @@ test.describe('Surveys UI', () => {
   });
 
   test('manage surveys has Send Survey icon buttons for in-progress surveys', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/surveys/manage`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
-    // Action buttons use <img alt="Send Survey"> inside MUI IconButton
     const sendBtns = page.locator('img[alt="Send Survey"]');
     const count = await sendBtns.count();
     expect(count).toBeGreaterThan(0);
   });
 
   test('manage surveys has Delete Survey buttons', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/surveys/manage`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
@@ -191,6 +187,7 @@ test.describe('Surveys UI', () => {
   });
 
   test('manage surveys table has action icons', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/surveys/manage`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
@@ -201,6 +198,7 @@ test.describe('Surveys UI', () => {
   });
 
   test('completed surveys page loads', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/surveys/completed`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
@@ -210,6 +208,7 @@ test.describe('Surveys UI', () => {
   });
 
   test('completed surveys page shows only completed status', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/surveys/completed`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
@@ -219,6 +218,7 @@ test.describe('Surveys UI', () => {
   });
 
   test('launch survey page loads', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/surveys/launch`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
@@ -228,6 +228,7 @@ test.describe('Surveys UI', () => {
   });
 
   test('launch survey page has template selector and form fields', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/surveys/launch`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);

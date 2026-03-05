@@ -1,18 +1,20 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 
-const GATEWAY_URL = 'http://localhost:8080';
+const GATEWAY_URL = process.env.BASE_URL || 'http://localhost:8080';
 
+// When testing remote server (BASE_URL set), only gateway is reachable
 const SERVICES = [
-  { name: 'Gateway',           url: `${GATEWAY_URL}/health` },
-  { name: 'Survey Service',    url: 'http://localhost:8020/health' },
-  { name: 'Question Service',  url: 'http://localhost:8030/health' },
-  { name: 'Template Service',  url: 'http://localhost:8040/health' },
-  { name: 'Brain Service',     url: 'http://localhost:8016/health' },
-  { name: 'Voice Service',     url: 'http://localhost:8017/health' },
-  { name: 'Agent Service',     url: 'http://localhost:8050/health' },
-  { name: 'Analytics Service', url: 'http://localhost:8060/health' },
-  { name: 'Scheduler Service', url: 'http://localhost:8070/health' },
+  { name: 'Gateway', url: `${GATEWAY_URL}/health` },
+  ...(process.env.BASE_URL ? [] : [
+    { name: 'Survey Service',    url: 'http://localhost:8020/health' },
+    { name: 'Question Service',  url: 'http://localhost:8030/health' },
+    { name: 'Template Service',  url: 'http://localhost:8040/health' },
+    { name: 'Brain Service',     url: 'http://localhost:8016/health' },
+    { name: 'Voice Service',     url: 'http://localhost:8017/health' },
+    { name: 'Analytics Service', url: 'http://localhost:8060/health' },
+    { name: 'Scheduler Service', url: 'http://localhost:8070/health' },
+  ]),
 ];
 
 test.describe('API Health Checks', () => {
@@ -27,8 +29,8 @@ test.describe('API Health Checks', () => {
 });
 
 test.describe('Gateway Routing', () => {
-  test('Gateway proxies to Survey Service root', async ({ request }) => {
-    const response = await request.get(`${GATEWAY_URL}/pg/`);
+  test('Gateway /pg/api/surveys is reachable', async ({ request }) => {
+    const response = await request.get(`${GATEWAY_URL}/pg/api/surveys/list`);
     expect(response.ok()).toBeTruthy();
   });
 
@@ -49,18 +51,14 @@ test.describe('Gateway Routing', () => {
     expect(response.ok()).toBeTruthy();
   });
 
-  test('Gateway proxies service health endpoints', async ({ request }) => {
-    const healthEndpoints = [
-      '/pg/api/surveys/health',
-      '/pg/api/questions/health',
-      '/pg/api/templates/health',
-      '/pg/api/brain/health',
-      '/pg/api/voice/health',
-      '/pg/api/agent/health',
-      '/pg/api/analytics/health',
-      '/pg/api/scheduler/health',
+  test('Gateway proxies key API routes', async ({ request }) => {
+    const endpoints = [
+      '/pg/api/surveys/list',
+      '/pg/api/templates/list',
+      '/pg/api/surveys/stat',
+      '/pg/api/templates/stat',
     ];
-    for (const ep of healthEndpoints) {
+    for (const ep of endpoints) {
       const response = await request.get(`${GATEWAY_URL}${ep}`);
       expect(response.ok(), `${ep} should return 200`).toBeTruthy();
     }

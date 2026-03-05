@@ -145,7 +145,7 @@ export const transformComponentQuestionsToApiFormat = (
         ParentId: null,
         ParentCategoryTexts: [],
         Order: currentOrder,
-        AutoFill: question.autofill || "No",
+        Autofill: question.autofill || "No",
       };
       questionsWithAns.push(parentQuestion);
       currentOrder++;

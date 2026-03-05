@@ -1,26 +1,18 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const { loginToDashboard } = require('./auth.setup');
 
-const BASE = 'http://localhost:8080';
-
-// NOTE: Login.jsx exists but is never wired into the routes.
-// The dashboard has no auth guards — all pages are publicly accessible.
-// Tests below verify the dashboard renders correctly without requiring login.
-
-// ─── Dashboard Page ───────────────────────────────────────────────────────────
+const BASE = process.env.BASE_URL || 'http://localhost:8080';
 
 test.describe('Dashboard Home', () => {
-  test('root redirects to /dashboard', async ({ page }) => {
-    await page.goto(BASE);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+  test('root redirects to /dashboard after login', async ({ page }) => {
+    await loginToDashboard(page);
     expect(page.url()).toContain('/dashboard');
   });
 
   test('renders dashboard with stats cards', async ({ page }) => {
-    await page.goto(`${BASE}/dashboard`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(3000);
+    await loginToDashboard(page);
+    await page.waitForTimeout(2000);
 
     const bodyText = await page.textContent('body');
     expect(bodyText).toBeTruthy();
@@ -30,11 +22,8 @@ test.describe('Dashboard Home', () => {
   });
 
   test('dashboard has sidebar with navigation links', async ({ page }) => {
-    await page.goto(`${BASE}/dashboard`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    await loginToDashboard(page);
 
-    // Should have sidebar with Templates and Surveys sections
     const bodyText = await page.textContent('body');
     expect(bodyText).toContain('Templates');
     expect(bodyText).toContain('Surveys');
@@ -44,11 +33,9 @@ test.describe('Dashboard Home', () => {
     const errors = [];
     page.on('pageerror', (err) => errors.push(err.message));
 
-    await page.goto(`${BASE}/dashboard`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(3000);
+    await loginToDashboard(page);
+    await page.waitForTimeout(2000);
 
-    // Filter out non-critical errors
     const criticalErrors = errors.filter(
       (e) => !e.includes('ResizeObserver') && !e.includes('Loading chunk')
     );
@@ -56,18 +43,16 @@ test.describe('Dashboard Home', () => {
   });
 
   test('dashboard shows Active Surveys table', async ({ page }) => {
-    await page.goto(`${BASE}/dashboard`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(3000);
+    await loginToDashboard(page);
+    await page.waitForTimeout(2000);
 
     const bodyText = await page.textContent('body');
     expect(bodyText).toContain('Active Surveys');
   });
 
   test('dashboard table has expected columns', async ({ page }) => {
-    await page.goto(`${BASE}/dashboard`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(3000);
+    await loginToDashboard(page);
+    await page.waitForTimeout(2000);
 
     const headers = await page.locator('table thead th').allInnerTexts();
     expect(headers.length).toBeGreaterThanOrEqual(5);
@@ -76,9 +61,8 @@ test.describe('Dashboard Home', () => {
   });
 
   test('dashboard search filters table rows', async ({ page }) => {
-    await page.goto(`${BASE}/dashboard`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(3000);
+    await loginToDashboard(page);
+    await page.waitForTimeout(2000);
 
     const searchInput = page.locator('input[placeholder*="earch" i]');
     if (await searchInput.count() > 0) {
@@ -91,13 +75,9 @@ test.describe('Dashboard Home', () => {
   });
 });
 
-// ─── Sidebar Navigation ──────────────────────────────────────────────────────
-
 test.describe('Sidebar Navigation', () => {
   test('can navigate to Templates Manage page', async ({ page }) => {
-    await page.goto(`${BASE}/dashboard`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    await loginToDashboard(page);
 
     const templatesLink = page.locator('a[href*="templates"]').first();
     if (await templatesLink.count() > 0) {
@@ -105,7 +85,6 @@ test.describe('Sidebar Navigation', () => {
       await page.waitForLoadState('networkidle');
       expect(page.url()).toContain('/templates');
     } else {
-      // Navigate directly
       await page.goto(`${BASE}/templates/manage`);
       await page.waitForLoadState('networkidle');
       const bodyText = await page.textContent('body');
@@ -114,9 +93,7 @@ test.describe('Sidebar Navigation', () => {
   });
 
   test('can navigate to Surveys Manage page', async ({ page }) => {
-    await page.goto(`${BASE}/dashboard`);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    await loginToDashboard(page);
 
     const surveysLink = page.locator('a[href*="surveys/manage"]').first();
     if (await surveysLink.count() > 0) {
@@ -124,7 +101,6 @@ test.describe('Sidebar Navigation', () => {
       await page.waitForLoadState('networkidle');
       expect(page.url()).toContain('/surveys');
     } else {
-      // Navigate directly
       await page.goto(`${BASE}/surveys/manage`);
       await page.waitForLoadState('networkidle');
       const bodyText = await page.textContent('body');

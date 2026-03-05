@@ -1,7 +1,7 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 
-const BASE = 'http://localhost:8080';
+const BASE = process.env.BASE_URL || 'http://localhost:8080';
 
 // ─── Recipient App Accessibility ─────────────────────────────────────────────
 

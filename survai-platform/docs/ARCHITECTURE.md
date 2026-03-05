@@ -387,9 +387,9 @@ SurvAI is an AI-powered voice survey platform for transit agencies. It conducts 
 
 | Service | URL |
 |---------|-----|
-| Dashboard | `http://54.226.248.105:8080/dashboard` |
-| Recipient App | `http://54.226.248.105:3000` |
-| API | `http://54.226.248.105:8080/api/` |
+| Dashboard | `http://54.86.65.150:8080/dashboard` |
+| Recipient App | `http://54.86.65.150:3000` |
+| API | `http://54.86.65.150:8080/api/` |
 
 ---
 

@@ -482,12 +482,15 @@ async def generate_survey(survey_data: SurveyCreateP):
         raise HTTPException(status_code=500, detail=str(e))
 
     try:
-        # Resolve company name: from request > template > tenant > env
+        # Resolve company name: from request > template (if column exists) > env
         req_company = getattr(survey_data, "CompanyName", None) or ""
         if not req_company:
-            tpl_rows = sql_execute("SELECT company_name FROM templates WHERE name = :tn", {"tn": survey_data.Name})
-            if tpl_rows and tpl_rows[0].get("company_name"):
-                req_company = tpl_rows[0]["company_name"]
+            try:
+                tpl_rows = sql_execute("SELECT company_name FROM templates WHERE name = :tn", {"tn": survey_data.Name})
+                if tpl_rows and tpl_rows[0].get("company_name"):
+                    req_company = tpl_rows[0]["company_name"]
+            except Exception:
+                pass  # templates.company_name may not exist on older DBs
 
         sql_execute(
             """INSERT INTO surveys (id, template_name, url, biodata, status, name, recipient, launch_date, rider_name, ride_id, tenant_id, phone, bilingual, company_name)
@@ -590,7 +593,15 @@ async def generate_survey(survey_data: SurveyCreateP):
 async def create_survey(survey_data: SurveyQuestionsP):
     """Create survey questions and autofill where needed (dashboard uses this after generate)."""
     try:
-        autofill_questions = [q for q in survey_data.QuestionswithAns if q.Autofill == "Yes"]
+        # Ensure survey exists (from generate step)
+        rows = sql_execute("SELECT id FROM surveys WHERE id = :survey_id", {"survey_id": survey_data.SurveyId})
+        if not rows:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Survey {survey_data.SurveyId} not found. Generate the survey first, then launch.",
+            )
+
+        autofill_questions = [q for q in survey_data.QuestionswithAns if getattr(q, "Autofill", "No") == "Yes"]
 
         biodata = ""
         try:
@@ -612,12 +623,13 @@ async def create_survey(survey_data: SurveyQuestionsP):
         insert_params = []
         for item in survey_data.QuestionswithAns:
             autofill = autofill_lookup.get(item.QueId)
+            autofill_val = getattr(item, "Autofill", None) or getattr(item, "AutoFill", "No")
             insert_params.append({
                 "survey_id": survey_data.SurveyId,
                 "question_id": item.QueId,
                 "answer": autofill.Ans if autofill else None,
                 "ord": item.Order,
-                "autofill": item.Autofill,
+                "autofill": autofill_val if autofill_val in ("Yes", "No") else "No",
             })
 
         if insert_params:
@@ -638,7 +650,10 @@ async def create_survey(survey_data: SurveyQuestionsP):
             pass
 
         return {"message": f"Questions added to SurveyId {survey_data.SurveyId}"}
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

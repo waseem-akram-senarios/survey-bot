@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "npx playwright test",
+    "test:server": "BASE_URL=http://54.86.65.150:8080 npx playwright test",
     "test:api": "npx playwright test --project=api-health",
     "test:dashboard": "npx playwright test --project=dashboard",
     "test:templates": "npx playwright test --project=templates",

@@ -1,7 +1,8 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const { loginToDashboard } = require('./auth.setup');
 
-const BASE = 'http://localhost:8080';
+const BASE = process.env.BASE_URL || 'http://localhost:8080';
 
 // ─── Template API Tests ──────────────────────────────────────────────────────
 
@@ -48,20 +49,17 @@ test.describe('Template CRUD via API', () => {
     });
     expect(response.ok()).toBeTruthy();
 
-    // Verify clone exists
     const listResp = await request.get(`${BASE}/pg/api/templates/list`);
     const templates = await listResp.json();
     const found = templates.find((t) => t.TemplateName === cloneName);
     expect(found).toBeTruthy();
 
-    // Clean up clone
     await request.delete(`${BASE}/pg/api/templates/delete`, {
       data: { TemplateName: cloneName },
     });
   });
 
   test('delete the template', async ({ request }) => {
-    // Must unpublish before deleting
     await request.patch(`${BASE}/pg/api/templates/status`, {
       data: { TemplateName: TEMPLATE_NAME, Status: 'Draft' },
     });
@@ -70,7 +68,6 @@ test.describe('Template CRUD via API', () => {
     });
     expect(response.ok()).toBeTruthy();
 
-    // Verify deletion
     const listResp = await request.get(`${BASE}/pg/api/templates/list`);
     const templates = await listResp.json();
     const found = templates.find((t) => t.TemplateName === TEMPLATE_NAME);
@@ -85,13 +82,11 @@ test.describe('Question & Template-Question Flow via API', () => {
   let questionId = '';
 
   test('create template, question, and link them', async ({ request }) => {
-    // 1. Create template
     const tResp = await request.post(`${BASE}/pg/api/templates/create`, {
       data: { TemplateName: TEMPLATE_NAME },
     });
     expect(tResp.ok()).toBeTruthy();
 
-    // 2. Create a categorical question
     const qResp = await request.post(`${BASE}/pg/api/questions`, {
       data: {
         QueText: 'E2E: How would you rate the service?',
@@ -101,12 +96,10 @@ test.describe('Question & Template-Question Flow via API', () => {
     });
     expect(qResp.ok()).toBeTruthy();
     const qBody = await qResp.json();
-    // Response is "Question with ID <uuid> added successfully"
     const idMatch = qBody.match(/ID\s+([0-9a-f-]+)/i);
     questionId = idMatch ? idMatch[1] : '';
     expect(questionId).toBeTruthy();
 
-    // 3. Add question to template
     const addResp = await request.post(`${BASE}/pg/api/templates/addquestions`, {
       data: { TemplateName: TEMPLATE_NAME, QueId: questionId, Order: 1 },
     });
@@ -136,6 +129,7 @@ test.describe('Question & Template-Question Flow via API', () => {
 
 test.describe('Templates UI', () => {
   test('templates manage page loads', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/templates/manage`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
@@ -150,6 +144,7 @@ test.describe('Templates UI', () => {
   });
 
   test('templates page shows stats cards', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/templates/manage`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
@@ -159,17 +154,18 @@ test.describe('Templates UI', () => {
   });
 
   test('templates table has Launch Survey icon buttons', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/templates/manage`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
 
-    // Action buttons use <img alt="Launch Survey"> inside MUI IconButton
     const launchBtns = page.locator('img[alt="Launch Survey"]');
     const count = await launchBtns.count();
     expect(count).toBeGreaterThan(0);
   });
 
   test('templates table has Clone icon buttons', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/templates/manage`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
@@ -180,6 +176,7 @@ test.describe('Templates UI', () => {
   });
 
   test('Launch Survey button navigates to create survey form', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/templates/manage`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
@@ -199,6 +196,7 @@ test.describe('Templates UI', () => {
   });
 
   test('create template page loads', async ({ page }) => {
+    await loginToDashboard(page);
     await page.goto(`${BASE}/templates/create`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(3000);
