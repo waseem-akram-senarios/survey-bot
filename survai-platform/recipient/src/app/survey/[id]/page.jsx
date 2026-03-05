@@ -1,6 +1,6 @@
 "use client";
 import { Box, Typography, Button, CircularProgress, Card, Avatar, Chip, ToggleButton, ToggleButtonGroup } from "@mui/material";
-import { AutoAwesome, RecordVoiceOver, TextFields, Language } from "@mui/icons-material";
+import { AutoAwesome, TextFields, Language } from "@mui/icons-material";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Background from '../../../../public/StartBackground.svg'
@@ -104,8 +104,8 @@ export default function Survey() {
     return () => timers.forEach(clearTimeout);
   }, [isLoading, error, lang]);
 
-  const handleStart = () => {
-    if (id) router.push(`/survey/${id}/start?lang=${lang}`);
+  const handleStartText = () => {
+    if (id) router.push(`/survey/${id}/text?lang=${lang}`);
   };
 
   if (isLoading) {
@@ -305,46 +305,27 @@ export default function Survey() {
           </Box>
         )}
 
-        {/* Mode selection */}
+        {/* Start Survey */}
         {visibleLines >= greetingLines.length && (
-          <Box sx={{ display: "flex", gap: 1.5, mb: 3, animation: "fadeSlideIn 0.4s ease" }}>
+          <Box sx={{ mb: 3, animation: "fadeSlideIn 0.4s ease" }}>
             <Button
               variant="contained"
+              fullWidth
               startIcon={<TextFields />}
-              onClick={() => router.push(`/survey/${id}/text?lang=${lang}`)}
+              onClick={handleStartText}
               sx={{
-                flex: 1,
                 textTransform: "none",
                 borderRadius: "14px",
-                height: "48px",
+                height: "52px",
                 backgroundColor: "#1958F7",
                 fontFamily: "Poppins, sans-serif",
-                fontSize: "13px",
-                fontWeight: 500,
+                fontSize: "15px",
+                fontWeight: 600,
                 boxShadow: "0 4px 12px rgba(25, 88, 247, 0.25)",
                 "&:hover": { backgroundColor: "#1443D1" },
               }}
             >
-              {t('textSurvey', lang)}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<RecordVoiceOver />}
-              onClick={handleStart}
-              sx={{
-                flex: 1,
-                textTransform: "none",
-                borderRadius: "14px",
-                height: "48px",
-                borderColor: "#1958F7",
-                color: "#1958F7",
-                fontFamily: "Poppins, sans-serif",
-                fontSize: "13px",
-                fontWeight: 500,
-                "&:hover": { backgroundColor: "#EEF3FF", borderColor: "#1443D1" },
-              }}
-            >
-              {t('voiceSurvey', lang)}
+              {t('startTextSurvey', lang)}
             </Button>
           </Box>
         )}
