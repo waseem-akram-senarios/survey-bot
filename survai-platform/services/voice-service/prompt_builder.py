@@ -16,9 +16,11 @@ logger = logging.getLogger(__name__)
 
 _LANGUAGE_PREFERENCE_QUESTION = (
     "What language would you like to complete the survey in? "
-    "To continue in English, please say English. "
+    "To continue in English, please continue speaking English. "
+    "To continue in Spanish, please speak Spanish to indicate your preference. "
     "¿En qué idioma le gustaría completar la encuesta? "
-    "Para continuar en español, por favor diga español."
+    "Para continuar en inglés, por favor continúe hablando en inglés. "
+    "Para continuar en español, por favor hable en español para indicar su preferencia."
 )
 
 

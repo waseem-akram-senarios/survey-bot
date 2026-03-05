@@ -113,24 +113,38 @@ TENANT_DISPLAY_NAMES: dict = {
     "itcurves": "IT Curves",
 }
 
+
+def _resolve_company_name(row: dict) -> str:
+    """Resolve company name: DB field > tenant lookup > env var."""
+    # 1. Explicit company_name on the survey
+    if row.get("company_name"):
+        return row["company_name"]
+    # 2. Lookup from tenant_id
+    tenant_id = row.get("tenant_id") or ""
+    if tenant_id:
+        name = TENANT_DISPLAY_NAMES.get(tenant_id.lower())
+        if name:
+            return name
+    # 3. Env fallback
+    return os.getenv("ORGANIZATION_NAME", "SurvAI")
+
 async def get_survey_recipient(survey_id: str) -> dict:
     """Get recipient info for a survey."""
     rows = sql_execute(
-        "SELECT recipient, name, ride_id, tenant_id, rider_name, biodata, bilingual FROM surveys WHERE id = :survey_id",
+        "SELECT recipient, name, ride_id, tenant_id, rider_name, biodata, bilingual, company_name FROM surveys WHERE id = :survey_id",
         {"survey_id": survey_id},
     )
     if not rows:
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
     
     r = rows[0]
-    tenant_id = r.get("tenant_id") or ""
-    company_name = TENANT_DISPLAY_NAMES.get(tenant_id.lower(), tenant_id or os.getenv("ORGANIZATION_NAME", "SurvAI"))
+    company_name = _resolve_company_name(r)
     return {
         "SurveyId": survey_id,
         "Recipient": r["recipient"],
         "Name": r["name"],
         "RideID": r["ride_id"],
-        "TenantID": tenant_id,
+        "TenantID": r.get("tenant_id") or "",
         "CompanyName": company_name,
         "Biodata": r.get("biodata", ""),
         "RiderName": r["rider_name"],
@@ -468,9 +482,16 @@ async def generate_survey(survey_data: SurveyCreateP):
         raise HTTPException(status_code=500, detail=str(e))
 
     try:
+        # Resolve company name: from request > template > tenant > env
+        req_company = getattr(survey_data, "CompanyName", None) or ""
+        if not req_company:
+            tpl_rows = sql_execute("SELECT company_name FROM templates WHERE name = :tn", {"tn": survey_data.Name})
+            if tpl_rows and tpl_rows[0].get("company_name"):
+                req_company = tpl_rows[0]["company_name"]
+
         sql_execute(
-            """INSERT INTO surveys (id, template_name, url, biodata, status, name, recipient, launch_date, rider_name, ride_id, tenant_id, phone, bilingual)
-            VALUES (:id, :template_name, :url, :biodata, :status, :name, :recipient, :launch_date, :rider_name, :ride_id, :tenant_id, :phone, :bilingual)""",
+            """INSERT INTO surveys (id, template_name, url, biodata, status, name, recipient, launch_date, rider_name, ride_id, tenant_id, phone, bilingual, company_name)
+            VALUES (:id, :template_name, :url, :biodata, :status, :name, :recipient, :launch_date, :rider_name, :ride_id, :tenant_id, :phone, :bilingual, :company_name)""",
             {
                 "id": survey_data.SurveyId,
                 "template_name": survey_data.Name,
@@ -485,6 +506,7 @@ async def generate_survey(survey_data: SurveyCreateP):
                 "tenant_id": survey_data.TenantId,
                 "phone": survey_data.Phone,
                 "bilingual": getattr(survey_data, "Bilingual", True),
+                "company_name": req_company or None,
             },
         )
 
@@ -793,6 +815,17 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str):
     msg["Reply-To"] = smtp_from
     msg["X-Mailer"] = "SurvAI Platform"
     msg["MIME-Version"] = "1.0"
+
+    # Deliverability headers — help land in inbox instead of spam
+    import email.utils
+    msg["Message-ID"] = email.utils.make_msgid(domain=smtp_from.split("@")[-1] if "@" in smtp_from else "aidevlab.com")
+    msg["Date"] = email.utils.formatdate(localtime=True)
+    msg["X-Priority"] = "3"  # Normal priority
+    msg["X-PM-Message-Stream"] = "outbound"  # Postmark compatibility
+    msg["Precedence"] = "bulk"  # Transactional/bulk
+    # List-Unsubscribe header (improves deliverability with Gmail/Outlook)
+    msg["List-Unsubscribe"] = f"<mailto:{smtp_from}?subject=unsubscribe>"
+
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 

@@ -243,6 +243,15 @@ async def send_email_fallback(
             msg["Subject"] = subject
             msg["From"] = f"{smtp_from_name} <{smtp_from}>"
             msg["To"] = email
+            msg["Reply-To"] = smtp_from
+
+            # Deliverability headers
+            import email.utils as _eu
+            msg["Message-ID"] = _eu.make_msgid(domain=smtp_from.split("@")[-1] if "@" in smtp_from else "aidevlab.com")
+            msg["Date"] = _eu.formatdate(localtime=True)
+            msg["X-Priority"] = "3"
+            msg["List-Unsubscribe"] = f"<mailto:{smtp_from}?subject=unsubscribe>"
+
             msg.attach(MIMEText(text_body, "plain"))
             msg.attach(MIMEText(html_body, "html"))
 

@@ -240,18 +240,44 @@ def create_survey_tools(
         After this returns, call end_survey(reason='link_sent') to end the call.
         """
         logger.info(f"Sending survey link for survey={survey_id} to {rider_email or caller_number}")
+        SURVEY_SERVICE_URL = os.getenv("SURVEY_SERVICE_URL", "http://survey-service:8020")
 
         sent = False
+        # 1. Try email if we have an email address
         if survey_id and survey_url and rider_email:
             sent = await _call_service(
                 f"{VOICE_SERVICE_URL}/api/voice/send-email-fallback",
                 {"survey_id": survey_id, "email": rider_email, "survey_url": survey_url},
             )
 
+        # 2. Fallback to SMS if email failed or no email
+        if not sent and survey_id and caller_number:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        f"{SURVEY_SERVICE_URL}/api/surveys/sendsms",
+                        json={
+                            "phone": caller_number,
+                            "survey_id": survey_id,
+                            "survey_url": survey_url or "",
+                            "rider_name": person_name,
+                            "language": "en",
+                        },
+                        timeout=aiohttp.ClientTimeout(total=10),
+                    ) as resp:
+                        if resp.status == 200:
+                            sent = True
+                            logger.info(f"Survey link sent via SMS to {caller_number}")
+                        else:
+                            body = await resp.text()
+                            logger.warning(f"SMS send failed ({resp.status}): {body}")
+            except Exception as e:
+                logger.warning(f"SMS fallback failed: {e}")
+
         if sent:
             return "Survey link sent. Now call end_survey(reason='link_sent') to end the call."
         else:
-            return "Could not send link (no email on file). Apologize, then call end_survey(reason='link_sent') to end the call."
+            return "Could not send link (no email or phone on file). Apologize, then call end_survey(reason='link_sent') to end the call."
 
     @function_tool()
     async def to_questions(context: RunContext):

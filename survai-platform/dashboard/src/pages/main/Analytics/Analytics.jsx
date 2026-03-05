@@ -250,6 +250,7 @@ const Analytics = () => {
   const totalResponses = Object.values(responseTypes).reduce((a, b) => a + b, 0);
 
   const responseColors = { open: '#1958F7', scale: '#FF9800', categorical: '#4CAF50', text: '#9C27B0', unknown: '#999' };
+  const responseLabels = { open: 'Open', scale: 'Scale', categorical: 'Multiple Choice', text: 'Text', unknown: 'Unknown' };
 
   return (
     <Box
@@ -409,7 +410,7 @@ const Analytics = () => {
                 .map(([type, count]) => (
                   <ResponseTypeBar
                     key={type}
-                    label={type}
+                    label={responseLabels[type] || type}
                     count={count}
                     total={totalResponses}
                     color={responseColors[type] || '#999'}
