@@ -1030,6 +1030,7 @@ async def delete_survey(survey_id: str):
     sql_execute("DELETE FROM survey_analytics WHERE survey_id = :survey_id", {"survey_id": survey_id})
     sql_execute("DELETE FROM call_transcripts WHERE survey_id = :survey_id", {"survey_id": survey_id})
     sql_execute("DELETE FROM survey_response_items WHERE survey_id = :survey_id", {"survey_id": survey_id})
+    sql_execute("DELETE FROM incentive_tracking WHERE survey_id = :survey_id", {"survey_id": survey_id})
     
     # Finally delete the survey record
     sql_execute("DELETE FROM surveys WHERE id = :survey_id", {"survey_id": survey_id})
