@@ -49,6 +49,7 @@ async def make_call(
     survey_id: str,
     phone: str,
     provider: str = "livekit",
+    greetings: str = "",
 ):
     """Initiate an AI-powered survey call via LiveKit SIP."""
     normalized_phone = phone.strip().replace(" ", "")
@@ -86,8 +87,8 @@ async def make_call(
     else:
         template_config = {}
 
-    bilingual = survey.get("bilingual", True)
-    language = "en"  # calls always start in English
+    # Language is always a single, fixed language per call — no bilingual mode
+    language = survey.get("language") or "en"
 
     company_name = template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves")
     callback_url = os.getenv("SURVEY_SUBMIT_URL", "http://survey-service:8020/api/answers/qna_phone")
@@ -102,7 +103,6 @@ async def make_call(
         "template_name": template_name,
         "organization_name": company_name,
         "language": language,
-        "bilingual": bilingual,
         "questions": questions,
         "callback_url": callback_url,
         "survey_url": survey_url,
@@ -114,17 +114,18 @@ async def make_call(
         greeter_prompt = build_greeter_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
-            bilingual=bilingual,
+            language=language,
         )
-        questions_prompt = await build_questions_prompt(
+        questions_prompt, translated_questions_map = await build_questions_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
             survey_name=template_name or f"Survey {survey_id}",
             questions=questions,
-            bilingual=bilingual,
+            language=language,
         )
         survey_context["greeter_prompt"] = greeter_prompt
         survey_context["questions_prompt"] = questions_prompt
+        survey_context["translated_questions"] = translated_questions_map
         survey_context["system_prompt"] = greeter_prompt  # backward compat
         logger.info(
             f"Built prompts for LiveKit call — greeter: {len(greeter_prompt)} chars, "
@@ -139,6 +140,7 @@ async def make_call(
             phone_number=phone,
             survey_id=survey_id,
             survey_context=survey_context,
+            greetings=greetings,
         )
 
         call_id = result.get("call_id", "")
@@ -324,9 +326,9 @@ async def api_complete_survey(survey_id: str, reason: str = "completed"):
 # ─── Direct call endpoint (dashboard calls this via gateway, skipping survey-service hop)
 
 @router.post("/direct-call")
-async def direct_call(to: str, survey_id: str, provider: str = "livekit"):
+async def direct_call(to: str, survey_id: str, provider: str = "livekit", greetings: str = ""):
     """Dashboard-compatible endpoint: accepts 'to' param instead of 'phone'."""
-    return await make_call(survey_id=survey_id, phone=to, provider=provider)
+    return await make_call(survey_id=survey_id, phone=to, provider=provider, greetings=greetings)
 
 
 # ─── Backward Compatibility Aliases ──────────────────────────────────────────
@@ -335,8 +337,8 @@ agent_router = APIRouter(prefix="/api/agent", tags=["agent-compat"])
 
 
 @agent_router.post("/make-call")
-async def agent_make_call(survey_id: str, phone: str, provider: str = "livekit"):
-    return await make_call(survey_id=survey_id, phone=phone, provider=provider)
+async def agent_make_call(survey_id: str, phone: str, provider: str = "livekit", greetings: str = ""):
+    return await make_call(survey_id=survey_id, phone=phone, provider=provider, greetings=greetings)
 
 
 @agent_router.get("/transcript/{survey_id}")

@@ -2,8 +2,11 @@
 Survey System Prompt Builder for Voice Service.
 
 Two focused prompts are built here:
-  - build_greeter_prompt()   — ~300 tokens, identity + availability only
+  - build_greeter_prompt()   — ~300 tokens, language-specific greeter instructions
   - build_questions_prompt() — ~900 tokens, questions + recording intelligence
+
+Language is always a single, fixed value per call: "en" or "es".
+No bilingual mode.
 
 build_survey_prompt() is kept as a backward-compatible alias (returns joined text).
 """
@@ -13,15 +16,6 @@ import os
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
-
-_LANGUAGE_PREFERENCE_QUESTION = (
-    "What language would you like to complete the survey in? "
-    "To continue in English, please continue speaking English. "
-    "To continue in Spanish, please speak Spanish to indicate your preference. "
-    "¿En qué idioma le gustaría completar la encuesta? "
-    "Para continuar en inglés, por favor continúe hablando en inglés. "
-    "Para continuar en español, por favor hable en español para indicar su preferencia."
-)
 
 
 async def _translate_questions_to_es(questions: List[Dict[str, Any]]) -> Dict[str, str]:
@@ -35,7 +29,7 @@ async def _translate_questions_to_es(questions: List[Dict[str, Any]]) -> Dict[st
 
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key:
-        logger.warning("OPENAI_API_KEY not set — bilingual questions will use English only")
+        logger.warning("OPENAI_API_KEY not set — Spanish questions will use English text")
         return {}
 
     try:
@@ -67,7 +61,6 @@ async def _translate_questions_to_es(questions: List[Dict[str, Any]]) -> Dict[st
         result: Dict[str, str] = {}
         for i, (q, line) in enumerate(zip(questions, translated_lines)):
             qid = q.get("id", f"q{i+1}")
-            # Strip leading "1. [id] " prefix from the translation
             text = line.strip()
             bracket_end = text.find("] ")
             if bracket_end != -1:
@@ -80,16 +73,12 @@ async def _translate_questions_to_es(questions: List[Dict[str, Any]]) -> Dict[st
         return result
 
     except Exception as e:
-        logger.warning(f"Question translation to Spanish failed: {e} — using English only")
+        logger.warning(f"Question translation to Spanish failed: {e} — using English text")
         return {}
 
 
-def _format_question(order: int, q: Dict[str, Any], es_text: Optional[str] = None) -> str:
-    """Format a single question block for the agent prompt.
-    
-    When es_text is provided, both versions are included with clear labels
-    so the agent can pick the correct one based on the locked language.
-    """
+def _format_question_en(order: int, q: Dict[str, Any]) -> str:
+    """Format a single question block for the English-only agent prompt."""
     qid = q.get("id", f"q{order}")
     text = q.get("text", "")
     criteria = q.get("criteria", "open")
@@ -99,10 +88,7 @@ def _format_question(order: int, q: Dict[str, Any], es_text: Optional[str] = Non
     parent_order = q.get("_parent_order", "")
     trigger_cats = q.get("parent_category_texts", [])
 
-    if es_text:
-        question_text = f'EN: "{text}" | ES: "{es_text}"'
-    else:
-        question_text = f'"{text}"'
+    question_text = f'"{text}"'
 
     if parent_id:
         trigger_str = ", ".join(trigger_cats) if trigger_cats else "any answer"
@@ -136,92 +122,179 @@ def _format_question(order: int, q: Dict[str, Any], es_text: Optional[str] = Non
         )
 
 
+def _format_question_es(order: int, q: Dict[str, Any], es_text: str) -> str:
+    """Format a single question block for the Spanish-only agent prompt."""
+    qid = q.get("id", f"q{order}")
+    criteria = q.get("criteria", "open")
+    categories = q.get("categories", [])
+    scale_max = q.get("scales") or 5
+    parent_id = q.get("parent_id")
+    parent_order = q.get("_parent_order", "")
+    trigger_cats = q.get("parent_category_texts", [])
+
+    question_text = f'"{es_text}"'
+
+    if parent_id:
+        trigger_str = ", ".join(trigger_cats) if trigger_cats else "cualquier respuesta"
+        return (
+            f"P{order} [{qid}] CONDICIONAL (preguntar SOLO SI la respuesta a P{parent_order} "
+            f"incluye: {trigger_str}): {question_text}\n"
+            f"  Omitir completamente si no se cumple la condición."
+        )
+    elif criteria == "scale":
+        return (
+            f"P{order} [{qid}] ESCALA 1-{scale_max} (1=muy malo, {scale_max}=excelente): {question_text}\n"
+            f"  Pregunta tal cual. Siempre indica: '1 es muy malo, {scale_max} es excelente.'\n"
+            f"  Si dan una palabra en vez de número, pregunta una vez: \"¿Si tuviera que darle un número del 1 al {scale_max}?\"\n"
+            f"  Después de registrar su respuesta: una breve frase de reconocimiento y pasa a la siguiente pregunta.\n"
+            f"  NO hagas una pregunta de seguimiento en la misma respuesta que el reconocimiento."
+        )
+    elif criteria == "categorical":
+        cats_str = ", ".join(categories) if categories else "abierto"
+        return (
+            f"P{order} [{qid}] OPCIÓN [{cats_str}]: {question_text}\n"
+            f"  Deja que respondan libremente. Solo menciona las opciones si parecen perdidos.\n"
+            f"  Respuesta negativa: empatiza y haz UNA pregunta de seguimiento.\n"
+            f"  Respuesta positiva: celebra brevemente y avanza."
+        )
+    else:
+        return (
+            f"P{order} [{qid}] ABIERTA: {question_text}\n"
+            f"  Si es vaga (\"bien\", \"regular\") — indaga gentilmente con UNA pregunta aclaratoria.\n"
+            f"  Si es detallada — agradece y avanza.\n"
+            f"  Si es emocional — valida primero, luego continúa."
+        )
+
+
 def build_greeter_prompt(
     organization_name: str,
     rider_first_name: str,
-    bilingual: bool = False,
+    language: str = "en",
 ) -> str:
     """
-    Build the GreeterAgent system prompt (~300 tokens).
+    Build the greeter agent system prompt (~300 tokens).
 
-    Covers only identity confirmation and availability check.
-    When bilingual=True, adds STEP 3 for language preference detection.
-    No questions block — keeps first-turn LLM TTFT fast.
+    language="en": English greeter with lang-pref detection step.
+    language="es": Spanish greeter — identity + availability only, no lang-pref.
     """
     name_is_known = bool(rider_first_name and rider_first_name.strip())
 
+    if language == "es":
+        # ── Spanish Greeter ────────────────────────────────────────────────────
+        if name_is_known:
+            identity_line = (
+                f'El saludo ya te presentó como Cameron llamando de parte de {organization_name}, '
+                f'y confirmó "¿Estoy hablando con {rider_first_name}?" — espera su respuesta. '
+                f'NO repitas la presentación ni vuelvas a preguntar su nombre.'
+            )
+        else:
+            identity_line = (
+                f'El saludo ya te presentó como Cameron llamando de parte de {organization_name}, '
+                f'y preguntó "¿Con quién tengo el gusto de hablar?" — espera a que den su nombre. '
+                f'NO repitas la presentación.'
+            )
+
+        return f"""Eres Cameron, un encuestador cálido y profesional de {organization_name}.
+
+## TU FUNCIÓN
+Manejar la presentación y verificar disponibilidad. Hay exactamente DOS pasos que debes completar EN ORDEN antes de transferir.
+
+## FLUJO DE LA LLAMADA
+
+**PASO 1 — IDENTIDAD ÚNICAMENTE**
+{identity_line}
+- Confirmado → ve al PASO 2. No hagas nada más — solo pasa al PASO 2.
+- Persona equivocada → llama end_survey("wrong_person").
+- Confundido → "Soy Cameron llamando de parte de {organization_name}." Pregunta una vez más.
+
+CRÍTICO: Lo que la persona diga en el PASO 1 es SOLO sobre su identidad. NO es sobre disponibilidad.
+
+**PASO 2 — DISPONIBILIDAD (OBLIGATORIO — no omitir)**
+DEBES hacer esta pregunta exactamente así: "¡Perfecto! ¿Tiene unos minutos para responder una breve encuesta?"
+- SÍ → llama to_questions() inmediatamente. No digas nada más antes de llamarlo.
+- NO → "¡Claro! ¿Podemos llamarle en otro momento?"
+  - SÍ: "¿Qué hora le vendría bien?" → llama schedule_callback(preferred_time) → llama end_survey("callback_scheduled").
+  - NO: "¡No hay problema! ¿Le enviamos la encuesta por correo para que la complete cuando pueda?" → SÍ: llama send_survey_link() → llama end_survey("link_sent"). NO: "¡Sin problema! Que tenga un buen día." → llama end_survey("not_available").
+
+**EN CUALQUIER MOMENTO — si piden parar o declinan**
+Llama end_survey("declined") inmediatamente.
+
+## HERRAMIENTAS
+- to_questions() — SOLO después de completar AMBOS pasos.
+- end_survey(reason) — guarda datos, dice despedida, cuelga. Motivos: wrong_person, declined, not_available, callback_scheduled, link_sent.
+- schedule_callback(preferred_time) — luego llama end_survey("callback_scheduled").
+- send_survey_link() — luego llama end_survey("link_sent").
+
+## REGLAS
+1. NUNCA llames to_questions() sin completar AMBOS pasos (identidad Y disponibilidad).
+2. NO digas adiós tú mismo — end_survey() lo hace.
+3. NO empieces a hacer preguntas de la encuesta — eso es trabajo del agente de preguntas.
+4. Toda llamada termina con UNA llamada a end_survey() O una transferencia via to_questions().
+5. HABLA SIEMPRE Y ÚNICAMENTE EN ESPAÑOL. NUNCA uses inglés."""
+
+    # ── English Greeter ────────────────────────────────────────────────────────
     if name_is_known:
-        identity_line = (
-            f'The greeting already introduced you as Cameron calling on behalf of {organization_name}, '
-            f'and confirmed "Am I speaking with {rider_first_name}?" — wait for their reply. '
-            f'Do NOT repeat the introduction or re-ask their name.'
+        identity_after_langpref = (
+            f'After language is detected, ask for identity in the chosen language. '
+            f'In English: "Am I speaking with {rider_first_name}?" '
+            f'In Spanish: "¿Estoy hablando con {rider_first_name}?"'
         )
     else:
-        identity_line = (
-            f'The greeting already introduced you as Cameron calling on behalf of {organization_name}, '
-            f'and asked "May I know who I\'m speaking with?" — wait for them to give their name. '
-            f'Do NOT repeat the introduction.'
+        identity_after_langpref = (
+            f'After language is detected, ask for identity in the chosen language. '
+            f'In English: "May I know who I\'m speaking with?" '
+            f'In Spanish: "¿Con quién tengo el gusto de hablar?"'
         )
-
-    # STEP 2 outcome — if bilingual, availability YES leads to STEP 3, not directly to_questions()
-    if bilingual:
-        availability_yes = "- YES or similar → proceed to STEP 3 immediately. Do NOT call to_questions() yet."
-        handoff_rule = "NEVER call to_questions() without completing ALL THREE steps (identity, availability, AND language preference)."
-        step3_block = f"""
-**STEP 3 — LANGUAGE PREFERENCE (REQUIRED — never skip, never call to_questions() before this)**
-Ask WORD FOR WORD: "{_LANGUAGE_PREFERENCE_QUESTION}"
-
-Stop and wait for their reply.
-- They say "English" / "inglés" / respond in English → call set_language("en") → then call to_questions()
-- They say "Spanish" / "español" / respond in Spanish → call set_language("es") → then call to_questions()
-- Unclear → ask once: "English or Spanish? / ¿Inglés o español?" then follow the same rules.
-IMPORTANT: NEVER call to_questions() before set_language() is called.
-IMPORTANT: Once set_language() is called, the language is LOCKED. From that moment, speak ONLY in the selected language. Do NOT mix languages."""
-        tools_extra = "\n- set_language(language) — record the recipient's language preference. Call BEFORE to_questions() on bilingual calls."
-        steps_count = "THREE"
-    else:
-        availability_yes = "- YES or similar → call to_questions() immediately. Do not say anything else before calling it."
-        handoff_rule = "NEVER call to_questions() without completing BOTH Step 1 AND Step 2."
-        step3_block = ""
-        tools_extra = ""
-        steps_count = "TWO"
 
     return f"""You are Cameron, a warm and professional survey caller for {organization_name}.
 
 ## YOUR ROLE
-Handle the introduction and availability check. There are exactly {steps_count} steps you must complete IN ORDER before handing off.
+Handle language detection, identity, and availability. There are exactly THREE steps you must complete IN ORDER before handing off.
+
+NOTE: The opening line ALREADY asked for both language preference AND availability ("I'd like to conduct a brief survey... Do you have a few moments? To continue in English, say English...").
 
 ## CALL FLOW
 
-**STEP 1 — IDENTITY ONLY**
-{identity_line}
-- Confirmed → go to STEP 2. Do nothing else — just move to STEP 2.
+**STEP 1 — LANGUAGE PREFERENCE & INITIAL AVAILABILITY**
+Wait for the recipient's reply to the opening line.
+- They say "English" / "Yes" / respond in English → call set_language("en"). 
+  - If they clearly said "Yes" (e.g. "Yes, English"), mark availability as confirmed and proceed to STEP 2.
+  - If they only gave the language (e.g. "English"), proceed to STEP 2 (Identity), then verify availability in STEP 3.
+- They say "Spanish" / "español" / "SÍ" / respond in Spanish → call set_language("es").
+  - Handle availability confirmation same as above.
+- They decline immediately → call end_survey("declined").
+- Unclear → ask once: "English or Spanish? / ¿Inglés o español?" then follow the same rules.
+IMPORTANT: Call set_language() as soon as the language is clear.
+
+**STEP 2 — IDENTITY (in the chosen language)**
+{identity_after_langpref}
+- Confirmed → go to STEP 3.
 - Wrong person → call end_survey("wrong_person").
-- Confused → "I'm Cameron calling on behalf of {organization_name}." Re-ask once.
 
-CRITICAL: Whatever the person says in STEP 1 is ONLY about their identity. It is NOT about availability. Even if they say "yes, it's all set" or "yes, go ahead" — you MUST still ask the availability question in STEP 2 before doing anything else.
+**STEP 3 — VERIFY AVAILABILITY (If not already confirmed)**
+- If they already confirmed they have time in Step 1 (e.g. "Yes, I can do English"), call to_questions() immediately after Step 2 is done.
+- If they only confirmed language but haven't explicitly said they have time:
+  In English: "Great! Do you have some time to walk through a brief survey?"
+  In Spanish: "¡Perfecto! ¿Tiene unos minutos para responder una breve encuesta?"
+  - YES → call to_questions() immediately.
+  - NO → offer callback or link, then end accordingly.
 
-**STEP 2 — AVAILABILITY (REQUIRED — never skip this step)**
-You MUST ask this question every single time, word for word: "Great! Do you have some time to walk through a brief survey?"
-{availability_yes}
-- NO → "Of course! Can we give you a call back at a better time?"
-  - YES: "What time works best for you?" → call schedule_callback(preferred_time) → call end_survey("callback_scheduled").
-  - NO: "No problem! Can we email or text you the survey to fill out at your convenience?" → YES: "Great! We'll send you the link. Thank you for your time, and have a great day!" → call send_survey_link() → call end_survey("link_sent"). NO: "No problem! Have a great day." → call end_survey("not_available").
-{step3_block}
 **AT ANY TIME — if they ask to stop or decline**
 Call end_survey("declined") immediately.
 
 ## TOOLS
-- to_questions() — ONLY after ALL required steps are complete.
+- set_language(language) — call as soon as language preference is detected. MUST be called before to_questions().
+- to_questions() — ONLY after ALL THREE steps are complete.
 - end_survey(reason) — saves data, speaks farewell, hangs up. Reasons: wrong_person, declined, not_available, callback_scheduled, link_sent.
 - schedule_callback(preferred_time) — then call end_survey("callback_scheduled").
-- send_survey_link() — then call end_survey("link_sent").{tools_extra}
+- send_survey_link() — then call end_survey("link_sent").
 
 ## RULES
-1. {handoff_rule}
+1. NEVER call to_questions() without completing ALL THREE steps.
 2. Do NOT say goodbye yourself — end_survey() handles it.
 3. Do NOT start asking survey questions — that is the questions agent's job.
-4. Every call ends with ONE call to end_survey() OR a handoff via to_questions()."""
+4. Every call ends with ONE call to end_survey() OR a handoff via to_questions().
+5. After set_language() is called, speak ONLY in that language. NEVER mix languages."""
 
 
 async def build_questions_prompt(
@@ -230,22 +303,21 @@ async def build_questions_prompt(
     survey_name: str,
     questions: List[Dict[str, Any]],
     restricted_topics: Optional[List[str]] = None,
-    bilingual: bool = False,
-) -> str:
+    language: str = "en",
+) -> Any:  # Returns (prompt_text, translated_map)
     """
     Build the QuestionsAgent system prompt (~900 tokens).
 
-    Identity and availability are already confirmed. Focus entirely on
-    conducting the survey questions with conversational intelligence.
-    When bilingual=True, each question includes both [EN] and [ES] text.
+    Returns:
+        tuple: (prompt_text: str, questions_map: dict)
     """
     order_map: Dict[str, int] = {}
     for i, q in enumerate(questions, start=1):
         order_map[q.get("id", f"q{i}")] = i
 
-    # Translate questions to Spanish if bilingual
+    # Translate questions to Spanish if needed
     es_map: Dict[str, str] = {}
-    if bilingual:
+    if language == "es":
         es_map = await _translate_questions_to_es(questions)
 
     question_blocks = []
@@ -254,52 +326,96 @@ async def build_questions_prompt(
             q = dict(q)
             q["_parent_order"] = order_map[q["parent_id"]]
         qid = q.get("id", f"q{i}")
-        es_text = es_map.get(qid) if bilingual else None
-        question_blocks.append(_format_question(i, q, es_text=es_text))
+        if language == "es":
+            es_text = es_map.get(qid) or q.get("text", "")
+            question_blocks.append(_format_question_es(i, q, es_text))
+        else:
+            question_blocks.append(_format_question_en(i, q))
 
     questions_block = "\n\n".join(question_blocks)
     total_questions = len(questions)
-
-    name_is_known = bool(rider_first_name and rider_first_name.strip())
 
     restricted_block = ""
     if restricted_topics:
         lines = "\n".join(f"  - NEVER discuss {t}" for t in restricted_topics)
         restricted_block = f"\n## RESTRICTED TOPICS\n{lines}\n"
 
-    bilingual_header = ""
-    bilingual_tools = ""
-    bilingual_rule = ""
-    if bilingual:
-        bilingual_header = (
-            "\n## LANGUAGE — CRITICAL\n"
-            "The recipient chose their preferred language during the greeting.\n"
-            "Each question below shows both EN and ES versions. Use ONLY the version matching the chosen language.\n"
-            "**RULES:**\n"
-            "- If language is English: use ONLY the EN version. Speak ONLY English. NEVER say anything in Spanish.\n"
-            "- If language is Spanish: use ONLY the ES version. Speak ONLY Spanish. NEVER say anything in English.\n"
-            "- Do NOT show, read, or mention the other language version.\n"
-            "- Do NOT switch languages unless the recipient explicitly asks to change language.\n"
-            "- NEVER mix languages in the same sentence or turn.\n"
-        )
-        bilingual_tools = "\n- set_language(language) — ONLY if the recipient explicitly requests to change language. Do NOT call this proactively."
-        bilingual_rule = "\n10. NEVER mix languages. Stick to the chosen language for the ENTIRE call. If the recipient explicitly asks to switch, call set_language() ONCE then continue in the new language only."
+    if language == "es":
+        prompt = f"""Eres Cameron, un encuestador cálido y profesional de {organization_name}. La identidad y disponibilidad ya fueron confirmadas — NO te vuelvas a presentar.
 
-    return f"""You are Cameron, a warm and professional survey caller for {organization_name}. Identity and availability are already confirmed — do NOT re-introduce yourself.
-{bilingual_header}
+## IDIOMA — CRÍTICO
+DEBES hablar SIEMPRE y ÚNICAMENTE en español. NUNCA uses inglés en ningún momento de la encuesta.
+
+## PERSONALIDAD
+Cálido, empático, curioso. Adapt tu estilo: breve con personas concisas, conversacional con las más charlatanas.
+
+## LECTURA DE RESPUESTAS
+- Vaga ("bien", "más o menos") → indaga: "¿Qué te hizo sentir así?"
+- Negativa/frustrada → valida primero ("Lamento escuchar eso"), luego continúa
+- Monosilábica → UNA pregunta de seguimiento antes de avanzar
+- "No sé" → "Está perfectamente bien." Registra y avanza
+## RECONOCIMIENTOS
+Después de cada respuesta: Una respuesta MUY breve y genuina (máximo 5-7 palabras). No repitas sus palabras. Transición inmediata.
+
+## SALTO DE PREGUNTAS — SILENCIOSO
+Si una respuesta anterior ya cubrió una pregunta futura: SÁLTALA en silencio. NUNCA menciones que estás saltando una pregunta ni expliques por qué lo haces. Simplemente pasa a la siguiente pregunta disponible.
+
+## FLUJO DE LA ENCUESTA ({total_questions} preguntas)
+
+**PASO 1 — INICIO**
+Comienza con P1 inmediatamente. NO te vuelvas a presentar ni confirmes disponibilidad de nuevo.
+
+**PASO 2 — CADA PREGUNTA**
+Haz la pregunta textualmente → espera su respuesta completa → llama record_answer(question_id, answer) → UNA frase de reconocimiento → haz la siguiente pregunta textualmente. Nunca hagas dos preguntas en un turno.
+
+**PASO 3 — SALIDA A MITAD DE LLAMADA**
+Si quieren terminar: reconócelo sin presionar, llama end_survey("declined").
+
+**PASO 4 — CIERRE**
+Después de la última pregunta: llama end_survey("completed"). La herramienta maneja la despedida y la llamada — no digas nada más.
+
+## PREGUNTAS
+{questions_block}
+
+## HERRAMIENTAS
+- record_answer(question_id, answer) — llama INMEDIATAMENTE después de cada respuesta; sigue la instrucción de retorno para el texto de la siguiente pregunta.
+- end_survey(reason) — guarda datos, dice despedida, cuelga. No digas NADA después de llamarlo. Motivos: completed, declined.
+
+## REGLAS
+1. Toda llamada termina con UNA llamada a end_survey(). Sin excepciones.
+2. NO digas adiós tú mismo — end_survey() lo hace.
+3. Llama record_answer() inmediatamente después de cada respuesta. Sin acumulación.
+4. Haz EXACTAMENTE UNA pregunta por respuesta. Nunca combines dos preguntas.
+5. Nunca repitas una pregunta ya registrada.
+6. Solo habla de la encuesta.
+7. Si preguntan si eres IA: "¡Sí! Tu opinión va directamente al equipo de {organization_name}." Luego continúa.
+9. Después de hacer una pregunta, detente de hablar inmediatamente. No añadas relleno ni otra pregunta. Espera la respuesta.
+10. NUNCA expliques tu razonamiento interno ni menciones que la herramienta te dijo algo. Habla solo como Cameron.
+11. NUNCA digas cosas como "ya que respondiste X, saltaremos Y".{restricted_block}"""
+        return prompt, es_map
+
+    # ── English prompt ─────────────────────────────────────────────────────────
+    else:
+        name_is_known = bool(rider_first_name and rider_first_name.strip())
+
+        prompt = f"""You are Cameron, a warm and professional survey caller for {organization_name}. Identity and availability are already confirmed — do NOT re-introduce yourself.
+
+## LANGUAGE — CRITICAL
+You MUST speak ONLY in English for the ENTIRE survey. NEVER use Spanish.
+
 ## PERSONALITY
 Warm, empathetic, curious. Mirror their style: brief with brief people, conversational with chatty ones. Respect their time.
 
 ## READING ANSWERS
-- Vague ("fine", "okay") → probe gently: "What made you feel that way?"
-- Negative/frustrated → validate first ("I'm sorry to hear that"), then continue; shorten remaining questions if they seem rushed
-- One-word → ONE targeted follow-up before moving on
-- "I don't know" → "That's perfectly fine." Record and move on
-- If a previous answer covers the next question → acknowledge it and skip/abbreviate
-- Build on earlier answers: "You mentioned X earlier — does that relate here?"
-
+- If a previous answer covers the next question → SKIP IT silently. NEVER mention that you are skipping a question or explain why. Simply move to the next available question.
+- Vague ("fine", "okay") → probe only if the question is critical.
+- Negative/frustrated → Brief validation, then continue.
+- Do NOT explain your internal reasoning or why you are skipping questions.
 ## ACKNOWLEDGMENTS
-After every answer: ONE genuine sentence matching their tone. Vary the phrasing. No repeating their words. No promises. Transition smoothly.
+After every answer: One VERY brief, genuine sentence (max 5-7 words). Do not repeat their words. Transition immediately.
+
+## SKIPPING QUESTIONS — SILENTLY
+If a previous answer covers the next question: SKIP IT silently. NEVER mention that you are skipping a question or explain why. Simply move to the next available question.
 
 ## SURVEY FLOW ({total_questions} questions)
 
@@ -320,18 +436,22 @@ After last question: call end_survey("completed"). Tool handles farewell and han
 
 ## TOOLS
 - record_answer(question_id, answer) — call IMMEDIATELY after each answer; follow its return instruction for the next question text.
-- end_survey(reason) — saves data, speaks farewell, hangs up. You say NOTHING after calling it. Reasons: completed, declined.{bilingual_tools}
+- end_survey(reason) — saves data, speaks farewell, hangs up. You say NOTHING after calling it. Reasons: completed, declined.
 
 ## RULES
 1. Every call ends with ONE call to end_survey(). No exceptions.
 2. Do NOT say goodbye yourself — end_survey() does it.
 3. Call record_answer() immediately after each answer. No batching.
-4. Ask EXACTLY ONE question per response. Never combine two questions — not even a follow-up together with the next main question. One question, then stop.
+4. Ask EXACTLY ONE question per response. Never combine two questions.
 5. Never re-ask a recorded question.
 6. Only discuss the survey.
 7. If asked if AI: "Yes — your feedback goes to the {organization_name} team!" Then continue.
 8. Ask each question VERBATIM as written in the QUESTIONS section above. Do NOT rephrase, expand, shorten, or add context to the question text.
-9. After asking a question, stop speaking immediately. Do not add filler, explanation, or another question. Wait for the caller's answer.{bilingual_rule}{restricted_block}"""
+9. After asking a question, stop speaking immediately. Do not add filler, explanation, or another question. Wait for the caller's answer.
+10. NEVER explain your internal reasoning or mention that you are skipping a question based on a previous answer.
+11. NEVER say things like "since you already answered X, I'll move to Y". Just ask Y.{restricted_block}"""
+
+    return prompt, es_map if language == "es" else {}
 
 
 async def build_survey_prompt(
@@ -340,14 +460,14 @@ async def build_survey_prompt(
     survey_name: str,
     questions: List[Dict[str, Any]],
     restricted_topics: Optional[List[str]] = None,
-    bilingual: bool = False,
+    language: str = "en",
 ) -> str:
     """
     Backward-compatible single prompt (greeter + questions joined).
     Use build_greeter_prompt() and build_questions_prompt() for the multi-agent setup.
     """
-    greeter = build_greeter_prompt(organization_name, rider_first_name, bilingual=bilingual)
-    questions_p = await build_questions_prompt(
-        organization_name, rider_first_name, survey_name, questions, restricted_topics, bilingual=bilingual
+    greeter = build_greeter_prompt(organization_name, rider_first_name, language=language)
+    questions_p, _ = await build_questions_prompt(
+        organization_name, rider_first_name, survey_name, questions, restricted_topics, language=language
     )
     return greeter + "\n\n---\n\n" + questions_p

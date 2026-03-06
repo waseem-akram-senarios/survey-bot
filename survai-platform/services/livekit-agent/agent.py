@@ -1,9 +1,13 @@
 """
 Survey Voice Bot — Main Entry Point (Multi-Agent)
 
-Two agents handle the call:
-  GreeterAgent  — identity confirmation + availability check (~300-token prompt)
-  QuestionsAgent — survey questions + answer recording (~900-token prompt)
+Two agents handle each call. The pair depends on the call language:
+  language=="en" (default):
+    EnglishGreeterAgent — lang-pref detection + identity + availability (~300-token prompt)
+    EnglishQuestionsAgent or SpanishQuestionsAgent — chosen after lang-pref
+  language=="es":
+    SpanishGreeterAgent — identity + availability in Spanish (~300-token prompt)
+    SpanishQuestionsAgent — Spanish-only survey questions
 
 Prompts come from voice-service via dispatch metadata (greeter_prompt / questions_prompt).
 """
@@ -44,7 +48,15 @@ from config.settings import (
     VAD_MIN_SPEECH_DURATION,
     VAD_ACTIVATION_THRESHOLD,
 )
-from agents import SurveyCallData, GreeterAgent, QuestionsAgent
+from agents import (
+    SurveyCallData,
+    GreeterAgent,
+    QuestionsAgent,
+    EnglishGreeterAgent,
+    SpanishGreeterAgent,
+    EnglishQuestionsAgent,
+    SpanishQuestionsAgent,
+)
 from tools.survey_tools import create_survey_tools
 from utils.logging import get_logger, setup_survey_logging, cleanup_survey_logging
 from utils.metrics_logger import log_pipeline_metrics
@@ -105,7 +117,10 @@ async def entrypoint(ctx: JobContext):
     rider_first_name = platform_recipient.split()[0] if platform_recipient else ""
     org_name = platform_org or ORGANIZATION_NAME
     call_language = metadata.get("language", "en")
-    bilingual = metadata.get("bilingual", False)
+    greetings = metadata.get("greetings", "")
+
+    # Ensure detected_language is pre-set to the call language
+    # (for Spanish calls it is always "es"; for English calls it may change after lang-pref)
 
     greeter_prompt = metadata.get("greeter_prompt") or metadata.get("system_prompt") or MINIMAL_GREETER_PROMPT
     questions_prompt = metadata.get("questions_prompt") or MINIMAL_QUESTIONS_PROMPT
@@ -118,10 +133,18 @@ async def entrypoint(ctx: JobContext):
             qid = q.get("id", f"q{i+1}")
             questions_map[qid] = q.get("text") or q.get("question_text") or f"Question {i+1}"
 
+    # Overwrite English texts with translations if they were provided in metadata
+    translated_map = metadata.get("translated_questions")
+    if isinstance(translated_map, dict):
+        logger.info(f"Applying {len(translated_map)} translated question texts")
+        questions_map.update(translated_map)
+
     logger.info(
         f"Recipient: '{rider_first_name}' | Org: '{org_name}' | Phone: {caller_number} | "
-        f"Questions: {len(question_ids)} | Greeter prompt: {len(greeter_prompt)} chars | "
-        f"Questions prompt: {len(questions_prompt)} chars"
+        f"Language: {call_language} | Questions: {len(question_ids)} | "
+        f"Greeter prompt: {len(greeter_prompt)} chars | "
+        f"Questions prompt: {len(questions_prompt)} chars | "
+        f"Greetings override: {'yes' if greetings else 'no'}"
     )
 
     survey_responses = create_empty_response_dict(rider_first_name, caller_number)
@@ -171,37 +194,58 @@ async def entrypoint(ctx: JobContext):
         rider_name=rider_first_name,
     )
 
-    # Build both agents and register them in call_data
-    greeter_agent = GreeterAgent(
-        instructions=greeter_prompt,
-        rider_first_name=rider_first_name,
-        organization_name=org_name,
-        language=call_language,
-        bilingual=bilingual,
-        tools=greeter_tools,
-    )
-    questions_agent = QuestionsAgent(
-        instructions=questions_prompt,
-        language=call_language,
-        tools=question_tools,
-    )
-    call_data.agents["greeter"] = greeter_agent
-    call_data.agents["questions"] = questions_agent
+    # Build agents based on call language
+    if call_language == "es":
+        # Spanish pipeline: SpanishGreeterAgent → SpanishQuestionsAgent (fixed)
+        call_data.detected_language = "es"  # pre-set so tools use Spanish from the first tool call
+        greeter_agent = SpanishGreeterAgent(
+            instructions=greeter_prompt,
+            rider_first_name=rider_first_name,
+            organization_name=org_name,
+            greetings=greetings,
+            tools=greeter_tools,
+        )
+        questions_agent = SpanishQuestionsAgent(
+            instructions=questions_prompt,
+            tools=question_tools,
+        )
+        call_data.agents["questions"] = questions_agent
+        call_data.agents["greeter"] = greeter_agent
+    else:
+        # English pipeline: EnglishGreeterAgent → EnglishQuestionsAgent or SpanishQuestionsAgent
+        # Both questions agents are registered; to_questions() picks by detected_language
+        greeter_agent = EnglishGreeterAgent(
+            instructions=greeter_prompt,
+            rider_first_name=rider_first_name,
+            organization_name=org_name,
+            greetings=greetings,
+            tools=greeter_tools,
+        )
+        questions_agent_en = EnglishQuestionsAgent(
+            instructions=questions_prompt,
+            tools=question_tools,
+        )
+        questions_agent_es = SpanishQuestionsAgent(
+            instructions=questions_prompt,
+            tools=question_tools,
+        )
+        call_data.agents["greeter"] = greeter_agent
+        call_data.agents["questions_en"] = questions_agent_en
+        call_data.agents["questions_es"] = questions_agent_es
+        questions_agent = questions_agent_en  # default; actual selection done in to_questions()
 
     session = AgentSession[SurveyCallData](
         userdata=call_data,
         stt=deepgram.STT(
             model=STT_MODEL,
-            language="multi" if bilingual else (
-                "es" if call_language == "es" else STT_LANGUAGE
-            ),
+            language="es" if call_language == "es" else STT_LANGUAGE,
         ),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
         tts=(
             elevenlabs.TTS(
                 voice_id=TTS_VOICE_ID,
-                model="eleven_multilingual_v2" if bilingual else TTS_MODEL,
-                apply_text_normalization="on",
+                model=TTS_MODEL,
+                streaming_latency=3,
             )
             if os.getenv("ELEVEN_API_KEY")
             else openai.TTS(voice="nova")
@@ -261,7 +305,7 @@ if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
-            agent_name="survey-agent",
+            agent_name="survey-agent-local",
             initialize_process_timeout=WORKER_INITIALIZE_TIMEOUT,
             job_memory_warn_mb=JOB_MEMORY_WARN_MB,
             job_memory_limit_mb=JOB_MEMORY_LIMIT_MB,
