@@ -26,6 +26,7 @@ async def dispatch_livekit_call(
     phone_number: str,
     survey_id: str,
     survey_context: dict = None,
+    greetings: str = "",
 ) -> dict:
     """
     Dispatch the LiveKit survey-caller agent to make an outbound call.
@@ -36,6 +37,8 @@ async def dispatch_livekit_call(
         survey_context: Optional enriched context from the platform
             (system_prompt, questions, recipient_name, callback_url, etc.).
             When provided, the agent uses real survey data instead of defaults.
+        greetings: Optional custom opening text spoken verbatim by the greeter agent.
+            When empty, the agent uses its auto-generated opening.
 
     Returns dict with room_name (used as call identifier).
     """
@@ -47,6 +50,8 @@ async def dispatch_livekit_call(
     }
     if survey_context:
         meta.update(survey_context)
+    if greetings:
+        meta["greetings"] = greetings
 
     metadata = json.dumps(meta)
 
@@ -54,7 +59,7 @@ async def dispatch_livekit_call(
     try:
         dispatch = await lk_api.agent_dispatch.create_dispatch(
             api.CreateAgentDispatchRequest(
-                agent_name="survey-agent",
+                agent_name="survey-agent-local",
                 room=room_name,
                 metadata=metadata,
             )

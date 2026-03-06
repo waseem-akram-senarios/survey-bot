@@ -307,6 +307,16 @@ def create_survey_tools(
         """
         call_data = context.userdata
         call_data.prev_agent = context.session.current_agent
+
+        # English path: both language variants are registered — pick by detected language
+        if "questions_en" in call_data.agents:
+            lang = getattr(call_data, "detected_language", "en")
+            key = "questions_es" if lang == "es" else "questions_en"
+            logger.info(f"[HANDOFF] to_questions → {key} (detected_language={lang})")
+            return call_data.agents[key]
+
+        # Spanish path (or legacy): single "questions" key
+        logger.info("[HANDOFF] to_questions → questions")
         return call_data.agents["questions"]
 
     greeter_tools = [end_survey, schedule_callback, send_survey_link, to_questions]
