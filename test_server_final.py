@@ -2,9 +2,9 @@
 import time
 from playwright.sync_api import sync_playwright
 
-SERVER = "http://54.86.65.150:8080"
-SURVEY_IN_PROGRESS = "demo_robert_1771418512"
-SURVEY_COMPLETED = "1772046362166_816"
+SERVER = "http://localhost:8080"
+SURVEY_IN_PROGRESS = "demo_1771414344"
+SURVEY_COMPLETED = "demo_1708259000"
 results = []
 
 def log(ok, msg):
