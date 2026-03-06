@@ -263,10 +263,11 @@ def create_survey_tools(
 
         sent = False
         # 1. Try email if we have an email address
+        lang = getattr(context.userdata, "detected_language", "en")
         if survey_id and survey_url and rider_email:
             sent = await _call_service(
                 f"{VOICE_SERVICE_URL}/api/voice/send-email-fallback",
-                {"survey_id": survey_id, "email": rider_email, "survey_url": survey_url},
+                {"survey_id": survey_id, "email": rider_email, "survey_url": survey_url, "language": lang},
             )
 
         # 2. Fallback to SMS if email failed or no email
@@ -280,7 +281,7 @@ def create_survey_tools(
                             "survey_id": survey_id,
                             "survey_url": survey_url or "",
                             "rider_name": person_name,
-                            "language": "en",
+                            "language": lang,
                         },
                         timeout=aiohttp.ClientTimeout(total=10),
                     ) as resp:

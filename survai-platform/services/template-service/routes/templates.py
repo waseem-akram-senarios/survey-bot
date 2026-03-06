@@ -210,11 +210,8 @@ async def _delete_template_impl(template_name: str):
                 detail=f"Template with Name {template_name} not found",
             )
 
-        if res[0]["status"] == "Published":
-            raise HTTPException(
-                status_code=400,
-                detail=f"Template with name '{template_name}' is published and cannot be deleted",
-            )
+        # Status check removed to allow deleting published templates if no surveys exist.
+        # The safety check is handled by the survey-service proxy.
 
         sql_execute(
             """DELETE FROM question_category_mappings qcm

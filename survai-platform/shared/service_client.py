@@ -65,11 +65,20 @@ class ServiceClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def delete(self, service: str, path: str) -> Any:
+    async def patch(self, service: str, path: str, json: Optional[Dict] = None) -> Any:
+        client = await self._get_client()
+        url = f"{self._get_base_url(service)}{path}"
+        logger.debug(f"PATCH {url}")
+        resp = await client.patch(url, json=json)
+        resp.raise_for_status()
+        return resp.json()
+
+    async def delete(self, service: str, path: str, json: Optional[Dict] = None) -> Any:
         client = await self._get_client()
         url = f"{self._get_base_url(service)}{path}"
         logger.debug(f"DELETE {url}")
-        resp = await client.delete(url)
+        # Note: httpx supported json in delete since 0.16.0
+        resp = await client.request("DELETE", url, json=json)
         resp.raise_for_status()
         return resp.json()
 

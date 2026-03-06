@@ -284,6 +284,46 @@ export default function Survey() {
           )
         ))}
 
+        {/* Proactive Bilingual Prompt */}
+        {isBilingual && visibleLines >= greetingLines.length && (
+          <Box
+            sx={{
+              mb: 3,
+              p: "12px 16px",
+              backgroundColor: "#FFF8E7",
+              borderRadius: "4px 18px 18px 18px",
+              border: "1px solid #FFD700",
+              animation: "fadeSlideIn 0.4s ease",
+            }}
+          >
+            <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "14px", fontWeight: 600, color: "#7A5C00", mb: 1 }}>
+              {t('bilingualQuestion', 'en')} / {t('bilingualQuestion', 'es')}
+            </Typography>
+            <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "13px", color: "#333", mb: 2, lineHeight: 1.4 }}>
+              {t('bilingualPrompt', 'en')}
+              <br />
+              <span style={{ fontStyle: 'italic', color: '#666' }}>{t('languageIntro', 'es')}</span>
+            </Typography>
+            
+            <Box display="flex" gap={2}>
+              <Button 
+                variant={lang === 'en' ? "contained" : "outlined"}
+                onClick={() => setLang('en')}
+                sx={{ flex: 1, borderRadius: "10px", textTransform: "none", fontFamily: "Poppins, sans-serif" }}
+              >
+                English
+              </Button>
+              <Button 
+                variant={lang === 'es' ? "contained" : "outlined"}
+                onClick={() => setLang('es')}
+                sx={{ flex: 1, borderRadius: "10px", textTransform: "none", fontFamily: "Poppins, sans-serif" }}
+              >
+                Español
+              </Button>
+            </Box>
+          </Box>
+        )}
+
         {/* Survey name badge */}
         {visibleLines >= greetingLines.length && surveyName && (
           <Box

@@ -8,6 +8,10 @@ import {
   TextField,
   Typography,
   useMediaQuery,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import React, { useState } from "react";
 import AddIcon from '../../../assets/Add.svg';
@@ -28,10 +32,10 @@ const SendSurveyDialog = ({
   const isCompleted = surveyStatus?.toLowerCase() === "completed";
   const isMobile = useMediaQuery("(max-width: 600px)");
   const [currentState, setCurrentState] = useState("default"); // "default", "email", "phone"
-  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  const [emailLanguage, setEmailLanguage] = useState("bilingual");
   const [voiceProvider, setVoiceProvider] = useState("livekit");
 
   const surveyLink = `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyId}`;
@@ -101,7 +105,7 @@ const SendSurveyDialog = ({
     const error = validateEmail(email);
     setEmailError(error);
     if (error) return;
-    onConfirmEmail(email.trim());
+    onConfirmEmail(email.trim(), emailLanguage);
   };
 
   const handlePhoneSend = () => {
@@ -157,6 +161,7 @@ const SendSurveyDialog = ({
       setPhoneError("");
       setEmailTouched(false);
       setPhoneTouched(false);
+      setEmailLanguage("bilingual");
       setVoiceProvider("livekit");
       onClose();
     }
@@ -281,7 +286,36 @@ const SendSurveyDialog = ({
                   mb: 2,
                 }}
               >
-                Enter Email
+                Email Options
+              </Typography>
+              <FormControl fullWidth sx={{ mb: 3 }}>
+                <InputLabel id="email-language-label" sx={{ fontFamily: "Poppins, sans-serif" }}>Language</InputLabel>
+                <Select
+                  labelId="email-language-label"
+                  value={emailLanguage}
+                  label="Language"
+                  onChange={(e) => setEmailLanguage(e.target.value)}
+                  sx={{
+                    borderRadius: "12px",
+                    fontFamily: "Poppins, sans-serif",
+                    fontSize: "14px",
+                  }}
+                >
+                  <MenuItem value="bilingual" sx={{ fontFamily: "Poppins, sans-serif" }}>Bilingual (English & Spanish)</MenuItem>
+                  <MenuItem value="en" sx={{ fontFamily: "Poppins, sans-serif" }}>English Only</MenuItem>
+                  <MenuItem value="es" sx={{ fontFamily: "Poppins, sans-serif" }}>Spanish Only</MenuItem>
+                </Select>
+              </FormControl>
+              <Typography
+                sx={{
+                  fontFamily: "Poppins, sans-serif",
+                  fontWeight: 500,
+                  fontSize: "14px",
+                  color: "#1E1E1E",
+                  mb: 1,
+                }}
+              >
+                Recipient Email
               </Typography>
               <Box
                 sx={{

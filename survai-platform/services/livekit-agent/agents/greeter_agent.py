@@ -93,7 +93,17 @@ class GreeterAgent(Agent):
         org = self.organization_name
         is_spanish = self.language == "es"
 
-        if _is_real_name(name):
+        if self.bilingual:
+            greeting = (
+                f"Hi! Hola! This is Cameron calling from {org}. "
+                "What language would you like to complete the survey in? "
+                "To continue in English please continue speaking English, "
+                "to continue in Spanish please speak Spanish to indicate your preference. "
+                "¿En qué idioma le gustaría completar la encuesta? "
+                "Para continuar en inglés, por favor continúe hablando en inglés. "
+                "Para continuar en español, por favor hable en español."
+            )
+        elif _is_real_name(name):
             if is_spanish:
                 greeting = (
                     f"Hola, mi nombre es Cameron y estoy llamando de parte de {org}. "
@@ -117,5 +127,11 @@ class GreeterAgent(Agent):
                 )
 
         logger.info(f"[AGENT] {greeting}")
+        
+        # Inject the greeting into chat history so the LLM knows it has been spoken
+        chat_ctx = self.chat_ctx.copy()
+        chat_ctx.add_message(role="assistant", content=greeting)
+        await self.update_chat_ctx(chat_ctx)
+
         speech_handle = self.session.say(greeting)
         await speech_handle.wait_for_playout()
