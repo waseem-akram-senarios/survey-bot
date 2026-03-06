@@ -310,6 +310,11 @@ async def get_survey_stats(tenant_id: Optional[str] = None):
     )
 
 
+@router.get("/surveys/canary")
+async def survey_canary():
+    return {"version": "1.0.1", "status": "deployed", "feature": "incentive_tracking_fix"}
+
+
 @router.get("/surveys", response_model=List[SurveyP])
 async def list_surveys(tenant_id: Optional[str] = None):
     """List all surveys. Optionally filter by tenant_id."""
