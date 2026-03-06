@@ -202,20 +202,15 @@ async def send_email_fallback(
     survey_id: str,
     email: str,
     survey_url: str,
+    language: str = "en",
 ):
     """Send an email survey link as fallback when call fails or is declined."""
-    subject = "We'd love your feedback!"
-    html_body = f"""
-    <html>
-    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2 style="color: #4CAF50;">We'd love your input!</h2>
-        <p>We value your feedback and would appreciate it if you could take a few moments to complete a brief survey.</p>
-        <p><a href="{survey_url}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Take the Survey</a></p>
-        <p>Thank you for your time!</p>
-    </body>
-    </html>
-    """
-    text_body = f"We'd love your feedback! Take the survey here: {survey_url}"
+    from db import build_html_email, build_text_email
+    subject = "We'd love your feedback! / ¡Nos encantaría conocer su opinión!" if language == "bilingual" else (
+        "¡Su Encuesta Está Lista!" if language == "es" else "We'd love your feedback!"
+    )
+    html_body = build_html_email(survey_url, language=language)
+    text_body = build_text_email(survey_url, language=language)
 
     # 1) Try MailerSend
     try:

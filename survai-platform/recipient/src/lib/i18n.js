@@ -74,6 +74,10 @@ const translations = {
     selectLanguage: "Select Language",
     english: "English",
     spanish: "Espa\u00f1ol",
+    bilingualPrompt: "To continue in English, please continue speaking English. To continue in Spanish, please speak Spanish to indicate your preference.",
+    bilingualQuestion: "What language would you like to complete the survey in?",
+    languageIntro: "Para continuar en inglés, por favor continúe hablando en inglés. Para continuar en español, por favor hable en español.",
+    whatLanguage: "What language would you like to complete the survey in?",
   },
   es: {
     // Landing page
@@ -150,6 +154,10 @@ const translations = {
     selectLanguage: "Seleccionar Idioma",
     english: "English",
     spanish: "Espa\u00f1ol",
+    bilingualPrompt: "To continue in English, please continue speaking English. To continue in Spanish, please speak Spanish to indicate your preference.",
+    bilingualQuestion: "\u00bfEn qu\u00e9 idioma le gustar\u00eda completar la encuesta?",
+    languageIntro: "Para continuar en ingl\u00e9s, por favor contin\u00fae hablando en ingl\u00e9s. Para continuar en espa\u00f1ol, por favor hable en espa\u00f1ol.",
+    whatLanguage: "What language would you like to complete the survey in?",
   },
 };
 

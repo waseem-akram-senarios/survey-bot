@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Body
 from mailersend import EmailBuilder, MailerSendClient
 from pydantic import BaseModel
 
@@ -308,6 +308,11 @@ async def get_survey_stats(tenant_id: Optional[str] = None):
         Median_Completion_Duration_Today=int(r["durations_today_median"] or 0),
         AverageCSAT=float(r["csat_avg"] or 0),
     )
+
+
+@router.get("/surveys/canary")
+async def survey_canary():
+    return {"version": "1.0.1", "status": "deployed", "feature": "incentive_tracking_fix"}
 
 
 @router.get("/surveys", response_model=List[SurveyP])
@@ -1021,16 +1026,51 @@ async def update_survey_duration_post(survey_id: str, duration_update: SurveyDur
 
 @router.delete("/surveys/{survey_id}")
 async def delete_survey(survey_id: str):
-    """Delete a survey and all its responses."""
+    """Delete a survey and all its responses, transcripts, and analytics."""
     rows = sql_execute("SELECT * FROM surveys WHERE id = :survey_id", {"survey_id": survey_id})
     if not rows:
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
     
-    survey = rows[0]
-    
+    # Delete related records in other tables first to avoid FK constraints
+    sql_execute("DELETE FROM survey_analytics WHERE survey_id = :survey_id", {"survey_id": survey_id})
+    sql_execute("DELETE FROM call_transcripts WHERE survey_id = :survey_id", {"survey_id": survey_id})
     sql_execute("DELETE FROM survey_response_items WHERE survey_id = :survey_id", {"survey_id": survey_id})
+    sql_execute("DELETE FROM incentive_tracking WHERE survey_id = :survey_id", {"survey_id": survey_id})
+    
+    # Finally delete the survey record
     sql_execute("DELETE FROM surveys WHERE id = :survey_id", {"survey_id": survey_id})
-    return {"message": f"Survey deleted with SurveyId {survey_id}"}
+    return {"message": f"Survey {survey_id} and all related data deleted successfully"}
+
+
+@router.delete("/templates/delete")
+async def delete_template_proxy(request: dict = Body(...)):
+    """Proxy template deletion to template-service."""
+    template_name = request.get("TemplateName")
+    if not template_name:
+        raise HTTPException(status_code=400, detail="TemplateName is required")
+        
+    try:
+        # Check if there are any surveys using this template
+        surveys = sql_execute("SELECT id FROM surveys WHERE template_name = :name LIMIT 1", {"name": template_name})
+        if surveys:
+            # If there are surveys, we can either block or delete them.
+            # Usually better to block to prevent accidental massive data loss.
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot delete template '{template_name}' because it has existing surveys. Delete surveys first."
+            )
+
+        # Forward the delete request to template-service
+        return await service_client.delete(
+            "template-service",
+            "/api/templates/delete",
+            json={"TemplateName": template_name}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to proxy template deletion: {e}")
+        raise HTTPException(status_code=502, detail=f"Template service error: {str(e)}")
 
 
 @router.post("/surveys/email")
@@ -1098,6 +1138,74 @@ async def list_surveys_from_templates(template_name: dict):
     """Get survey stats from template (POST version)."""
     name = template_name.get("TemplateName", "")
     return await get_surveys_from_template(name)
+
+
+# ─── Template Service Proxy Routes ───────────────────────────────────────────
+
+@router.get("/templates/stat")
+async def get_template_stat_proxy():
+    """Proxy template stats to template-service."""
+    return await service_client.get("template-service", "/api/templates/stat")
+
+
+@router.get("/templates/list")
+async def list_templates_proxy():
+    """Proxy template list to template-service."""
+    return await service_client.get("template-service", "/api/templates/list")
+
+
+@router.get("/templates/list_drafts")
+async def list_draft_templates_proxy():
+    """Proxy draft template list to template-service."""
+    return await service_client.get("template-service", "/api/templates/list_drafts")
+
+
+@router.post("/templates/getquestions")
+async def get_template_questions_proxy(request: dict = Body(...)):
+    """Proxy get template questions to template-service."""
+    return await service_client.post("template-service", "/api/templates/getquestions", json=request)
+
+
+@router.post("/templates/clone")
+async def clone_template_proxy(request: dict = Body(...)):
+    """Proxy clone template to template-service."""
+    return await service_client.post("template-service", "/api/templates/clone", json=request)
+
+
+@router.post("/templates/create")
+async def create_template_proxy(request: dict = Body(...)):
+    """Proxy create template to template-service."""
+    return await service_client.post("template-service", "/api/templates/create", json=request)
+
+
+@router.patch("/templates/status")
+async def update_template_status_proxy(request: dict = Body(...)):
+    """Proxy update template status to template-service."""
+    return await service_client.patch("template-service", "/api/templates/status", json=request)
+
+
+@router.patch("/templates/update")
+async def update_template_config_proxy(request: dict = Body(...)):
+    """Proxy update template config to template-service."""
+    return await service_client.patch("template-service", "/api/templates/update", json=request)
+
+
+@router.post("/templates/addquestions")
+async def add_question_to_template_proxy(request: dict = Body(...)):
+    """Proxy add question to template-service."""
+    return await service_client.post("template-service", "/api/templates/addquestions", json=request)
+
+
+@router.delete("/templates/deletequestionbyidwithparentchild")
+async def delete_question_proxy(request: dict = Body(...)):
+    """Proxy delete question to template-service."""
+    return await service_client.delete("template-service", "/api/templates/deletequestionbyidwithparentchild", json=request)
+
+
+@router.post("/templates/translate")
+async def translate_template_proxy(request: dict = Body(...)):
+    """Proxy translate template to template-service."""
+    return await service_client.post("template-service", "/api/templates/translate", json=request)
 
 
 @router.post("/surveys/get-transcript")
