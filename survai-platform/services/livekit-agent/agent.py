@@ -16,6 +16,7 @@ import asyncio
 import os
 import json
 from datetime import datetime
+import aiohttp
 
 from livekit import api
 from livekit.agents import (
@@ -62,6 +63,7 @@ from utils.metrics_logger import log_pipeline_metrics
 from utils.storage import create_empty_response_dict
 
 logger = get_logger()
+VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
 
 MINIMAL_GREETER_PROMPT = (
     "You are Cameron, a friendly survey caller. "
@@ -82,6 +84,21 @@ async def entrypoint(ctx: JobContext):
     phone_number = metadata.get("phone_number")
     survey_id = metadata.get("survey_id")
 
+    async def release_call_lock() -> None:
+        if not survey_id and not phone_number:
+            return
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{VOICE_SERVICE_URL}/api/voice/release-call",
+                    params={"survey_id": survey_id or "", "phone": phone_number or ""},
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as resp:
+                    if resp.status != 200:
+                        logger.warning(f"release-call returned {resp.status}: {await resp.text()}")
+        except Exception as e:
+            logger.warning(f"Failed to release call lock for survey {survey_id}: {e}")
+
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     if phone_number:
@@ -99,6 +116,7 @@ async def entrypoint(ctx: JobContext):
             logger.info(f"Answered: {phone_number}")
         except Exception as e:
             logger.error(f"Call to {phone_number} failed: {e}")
+            await release_call_lock()
             return
         participant = await ctx.wait_for_participant()
         caller_number = phone_number
@@ -292,14 +310,17 @@ async def entrypoint(ctx: JobContext):
 
     asyncio.create_task(_time_limit_watchdog())
 
-    await session.start(
-        room=ctx.room,
-        agent=call_data.agents["greeter"],
-        room_options=RoomOptions(
-            audio_input=AudioInputOptions(noise_cancellation=noise_cancellation.BVC()),
-            close_on_disconnect=False,
-        ),
-    )
+    try:
+        await session.start(
+            room=ctx.room,
+            agent=call_data.agents["greeter"],
+            room_options=RoomOptions(
+                audio_input=AudioInputOptions(noise_cancellation=noise_cancellation.BVC()),
+                close_on_disconnect=False,
+            ),
+        )
+    finally:
+        await release_call_lock()
 
 
 if __name__ == "__main__":

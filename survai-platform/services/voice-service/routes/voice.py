@@ -54,6 +54,8 @@ async def _survey_lock_matches_phone(survey_id: str, phone: str) -> bool:
     status = str(row.get("status") or "")
     end_reason = str(row.get("end_reason") or "")
 
+    if not db_phone:
+        return False
     if db_phone and db_phone != _normalize_phone(phone):
         return False
     if status == "Completed" or end_reason:
@@ -179,6 +181,14 @@ async def make_call(
     public_url = os.getenv("NEXT_PUBLIC_API_BASE_URL", os.getenv("PUBLIC_URL", ""))
     survey_url = f"{public_url}/survey/{survey_id}" if public_url else ""
     rider_email = survey.get("email", "")
+
+    try:
+        await async_execute(
+            "UPDATE surveys SET phone = :phone WHERE id = :sid",
+            {"phone": normalized_phone, "sid": survey_id},
+        )
+    except Exception as e:
+        logger.warning(f"Failed to persist phone {normalized_phone} on survey {survey_id}: {e}")
 
     await _reserve_call(normalized_phone, survey_id)
 
@@ -465,6 +475,14 @@ async def api_complete_survey(survey_id: str, reason: str = "completed"):
         pass
     await _release_call(survey_id=survey_id)
     return {"status": status, "survey_id": survey_id, "end_reason": reason}
+
+
+@router.post("/release-call")
+async def api_release_call(survey_id: str | None = None, phone: str | None = None):
+    """Release an in-memory active call lock when an agent job exits."""
+    normalized_phone = _normalize_phone(phone or "")
+    await _release_call(survey_id=survey_id, phone=normalized_phone or None)
+    return {"status": "released", "survey_id": survey_id, "phone": normalized_phone}
 
 
 # ─── Direct call endpoint (dashboard calls this via gateway, skipping survey-service hop)
