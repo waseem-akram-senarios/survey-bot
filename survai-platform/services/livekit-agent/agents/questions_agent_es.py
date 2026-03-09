@@ -48,7 +48,10 @@ class SpanishQuestionsAgent(Agent):
 
         if userdata.question_ids:
             first_q_id = userdata.question_ids[0]
-            first_q_text = userdata.questions_map.get(first_q_id, "")
+            first_q_text = (
+                userdata.questions_map_es.get(first_q_id, "")
+                or userdata.questions_map.get(first_q_id, "")
+            )
             if first_q_text:
                 intro = f"¡Perfecto, comencemos! {first_q_text}"
                 system_note = (

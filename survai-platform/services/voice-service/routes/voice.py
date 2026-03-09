@@ -127,6 +127,17 @@ async def make_call(
         survey_context["questions_prompt"] = questions_prompt
         survey_context["translated_questions"] = translated_questions_map
         survey_context["system_prompt"] = greeter_prompt  # backward compat
+        # For English-initiated calls, also build Spanish prompt and map so user can get Spanish questions if they choose Spanish
+        if language == "en":
+            questions_prompt_es, questions_es_map = await build_questions_prompt(
+                organization_name=company_name,
+                rider_first_name=rider_first_name,
+                survey_name=template_name or f"Survey {survey_id}",
+                questions=questions,
+                language="es",
+            )
+            survey_context["questions_prompt_es"] = questions_prompt_es
+            survey_context["questions_es_map"] = questions_es_map
         logger.info(
             f"Built prompts for LiveKit call — greeter: {len(greeter_prompt)} chars, "
             f"questions: {len(questions_prompt)} chars"

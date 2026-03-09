@@ -43,7 +43,6 @@ from config.settings import (
     WORKER_INITIALIZE_TIMEOUT,
     JOB_MEMORY_WARN_MB,
     JOB_MEMORY_LIMIT_MB,
-    STT_LANGUAGE,
     VAD_MIN_SILENCE_DURATION,
     VAD_MIN_SPEECH_DURATION,
     VAD_ACTIVATION_THRESHOLD,
@@ -133,11 +132,15 @@ async def entrypoint(ctx: JobContext):
             qid = q.get("id", f"q{i+1}")
             questions_map[qid] = q.get("text") or q.get("question_text") or f"Question {i+1}"
 
-    # Overwrite English texts with translations if they were provided in metadata
+    # For Spanish-initiated calls, overwrite with Spanish question texts
     translated_map = metadata.get("translated_questions")
-    if isinstance(translated_map, dict):
+    if isinstance(translated_map, dict) and translated_map:
         logger.info(f"Applying {len(translated_map)} translated question texts")
         questions_map.update(translated_map)
+    # For English-initiated calls, keep Spanish map separate (used when user selects Spanish)
+    questions_map_es = metadata.get("questions_es_map") or {}
+    if questions_map_es:
+        logger.info(f"Spanish question map available for lang switch: {len(questions_map_es)} questions")
 
     logger.info(
         f"Recipient: '{rider_first_name}' | Org: '{org_name}' | Phone: {caller_number} | "
@@ -172,6 +175,7 @@ async def entrypoint(ctx: JobContext):
         disconnect_fn=hangup_call,
         question_ids=question_ids,
         questions_map=questions_map,
+        questions_map_es=questions_map_es,
         survey_id=survey_id,
         survey_url=survey_url,
         rider_email=rider_email,
@@ -188,6 +192,7 @@ async def entrypoint(ctx: JobContext):
         disconnect_fn=hangup_call,
         question_ids=question_ids,
         questions_map=questions_map,
+        questions_map_es=questions_map_es,
         survey_id=survey_id,
         survey_url=survey_url,
         rider_email=rider_email,
@@ -225,8 +230,9 @@ async def entrypoint(ctx: JobContext):
             instructions=questions_prompt,
             tools=question_tools,
         )
+        questions_prompt_es = metadata.get("questions_prompt_es") or questions_prompt
         questions_agent_es = SpanishQuestionsAgent(
-            instructions=questions_prompt,
+            instructions=questions_prompt_es,
             tools=question_tools,
         )
         call_data.agents["greeter"] = greeter_agent
@@ -238,18 +244,13 @@ async def entrypoint(ctx: JobContext):
         userdata=call_data,
         stt=deepgram.STT(
             model=STT_MODEL,
-            language="es" if call_language == "es" else STT_LANGUAGE,
+            language="es" if call_language == "es" else "multi"
         ),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
-        tts=(
-            elevenlabs.TTS(
+        tts=elevenlabs.TTS(
                 voice_id=TTS_VOICE_ID,
-                model=TTS_MODEL,
-                streaming_latency=3,
-            )
-            if os.getenv("ELEVEN_API_KEY")
-            else openai.TTS(voice="nova")
-        ),
+                model=TTS_MODEL
+            ),
         vad=silero.VAD.load(
             min_silence_duration=VAD_MIN_SILENCE_DURATION,
             min_speech_duration=VAD_MIN_SPEECH_DURATION,
