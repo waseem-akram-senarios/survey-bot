@@ -315,7 +315,7 @@ async def entrypoint(ctx: JobContext):
             room=ctx.room,
             agent=call_data.agents["greeter"],
             room_options=RoomOptions(
-                audio_input=AudioInputOptions(noise_cancellation=noise_cancellation.BVC()),
+                audio_input=AudioInputOptions(noise_cancellation=noise_cancellation.BVCTelephony()),
                 close_on_disconnect=False,
             ),
         )
