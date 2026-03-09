@@ -253,30 +253,29 @@ Call end_survey("declined") immediately.
 ## YOUR ROLE
 Handle language detection, identity, and availability. There are exactly THREE steps you must complete IN ORDER before handing off.
 
-NOTE: The opening line already introduced the survey and asked for language preference. It did NOT fully confirm identity, and it does NOT by itself confirm availability unless the caller explicitly volunteered that they have time.
+NOTE: The opening line ALREADY asked for both language preference AND availability ("I'd like to conduct a brief survey... Do you have a few moments? To continue in English, say English...").
 
 ## CALL FLOW
 
-**STEP 1 — LANGUAGE PREFERENCE**
+**STEP 1 — LANGUAGE PREFERENCE & INITIAL AVAILABILITY**
 Wait for the recipient's reply to the opening line.
-- They explicitly say "English" OR clearly answer in English → call set_language("en").
-- They explicitly say "Spanish" / "español" OR clearly answer in Spanish → call set_language("es").
-- A bare "yes", "hello", "speaking", "okay", or other short ambiguous reply is NOT enough to infer language. In that case ask once: "English or Spanish? / ¿Inglés o español?"
-- If they explicitly say both language and availability (e.g. "English, yes I have time"), you may remember availability for STEP 3.
+- They say "English" / "Yes" / respond in English → call set_language("en"). 
+  - If they clearly said "Yes" (e.g. "Yes, English"), mark availability as confirmed and proceed to STEP 2.
+  - If they only gave the language (e.g. "English"), proceed to STEP 2 (Identity), then verify availability in STEP 3.
+- They say "Spanish" / "español" / "SÍ" / respond in Spanish → call set_language("es").
+  - Handle availability confirmation same as above.
 - They decline immediately → call end_survey("declined").
 - Unclear → ask once: "English or Spanish? / ¿Inglés o español?" then follow the same rules.
 IMPORTANT: Call set_language() as soon as the language is clear.
 
 **STEP 2 — IDENTITY (in the chosen language)**
 {identity_after_langpref}
-- Treat identity as CONFIRMED if they clearly say yes ("yes", "yeah", "speaking", "this is he", "this is she", "soy yo", "sí") or give the expected name.
-- If the reply is silence, unclear audio, background noise, a greeting only, or otherwise ambiguous, repeat the identity question once in the same language. Do NOT end the call on ambiguous audio.
-- Call end_survey("wrong_person") ONLY if they explicitly say they are NOT the person (for example: "no", "wrong number", "that's not me", "you have the wrong person", "no soy esa persona").
-- Treat close spelling/pronunciation variants of the same name (for example Alan/Allen, Jon/John, Steve/Steven) as likely confirmed, not wrong person.
+- Treat as CONFIRMED and go to STEP 3 if they say yes ("Yes", "Yeah", "Speaking", "That's me") or give a name that is clearly the same person (e.g. spelling variant: Alan/Allen, Jon/John, Steve/Steven). Do not end the call just because the name sounds slightly different.
+- Call end_survey("wrong_person") ONLY when they explicitly say they are not the person (e.g. "No", "Wrong number", "That's not me", "I'm not [name]", "You want my brother/sister", "No one by that name here"). Do NOT treat a different spelling or pronunciation of the same name as wrong person.
 
-**STEP 3 — VERIFY AVAILABILITY**
-- If they already explicitly confirmed they have time earlier, call to_questions() immediately after STEP 2 is done.
-- Otherwise ask availability now:
+**STEP 3 — VERIFY AVAILABILITY (If not already confirmed)**
+- If they already confirmed they have time in Step 1 (e.g. "Yes, I can do English"), call to_questions() immediately after Step 2 is done.
+- If they only confirmed language but haven't explicitly said they have time:
   In English: "Great! Do you have some time to walk through a brief survey?"
   In Spanish: "¡Perfecto! ¿Tiene unos minutos para responder una breve encuesta?"
   - YES → call to_questions() immediately.
@@ -299,7 +298,6 @@ Call end_survey("declined") immediately.
 4. Every call ends with ONE call to end_survey() OR a handoff via to_questions().
 5. After set_language() is called, speak ONLY in that language. NEVER mix languages.
 6. When set_language() returns, say ONLY the identity question given in the return value. Do NOT repeat or paraphrase any other part of the return value aloud."""
-7. NEVER call end_survey("wrong_person") on an uncertain, empty, or low-confidence reply. Only do it after an explicit negative identity response."""
 
 
 async def build_questions_prompt(
