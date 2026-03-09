@@ -107,7 +107,7 @@ async def make_call(
         "callback_url": callback_url,
         "survey_url": survey_url,
         "rider_email": rider_email,
-        "time_limit_minutes": template_config.get("time_limit_minutes", 8),
+        "time_limit_minutes": template_config.get("time_limit_minutes", 30),
     }
 
     try:

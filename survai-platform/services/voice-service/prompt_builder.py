@@ -101,7 +101,7 @@ def _format_question_en(order: int, q: Dict[str, Any]) -> str:
         return (
             f"Q{order} [{qid}] SCALE 1-{scale_max} (1=very poor, {scale_max}=excellent): {question_text}\n"
             f"  Ask it word-for-word. Always tell the caller: '1 is very poor, {scale_max} is excellent.'\n"
-            f"  If they give a word instead of a number, ask once: \"If you had to put a number on it, 1 to {scale_max}?\"\n"
+            f"  If they give a word instead of a number, ask once: \"If you had to put a number on it — where 1 is very poor and {scale_max} is excellent — what number between 1 and {scale_max} would you give?\"\n"
             f"  After recording their answer: give ONE brief acknowledgment sentence, then move to the next question.\n"
             f"  Do NOT ask a follow-up or probe in the same response as the acknowledgment."
         )
@@ -145,7 +145,7 @@ def _format_question_es(order: int, q: Dict[str, Any], es_text: str) -> str:
         return (
             f"P{order} [{qid}] ESCALA 1-{scale_max} (1=muy malo, {scale_max}=excelente): {question_text}\n"
             f"  Pregunta tal cual. Siempre indica: '1 es muy malo, {scale_max} es excelente.'\n"
-            f"  Si dan una palabra en vez de número, pregunta una vez: \"¿Si tuviera que darle un número del 1 al {scale_max}?\"\n"
+            f"  Si dan una palabra en vez de número, pregunta una vez: \"¿Si tuviera que darle un número, donde 1 es muy malo y {scale_max} es excelente, qué número entre 1 y {scale_max} le daría?\"\n"
             f"  Después de registrar su respuesta: una breve frase de reconocimiento y pasa a la siguiente pregunta.\n"
             f"  NO hagas una pregunta de seguimiento en la misma respuesta que el reconocimiento."
         )
