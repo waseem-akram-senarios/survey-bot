@@ -35,6 +35,32 @@ _active_calls_lock = asyncio.Lock()
 ACTIVE_CALL_STALE_SECONDS = 15 * 60
 
 
+def _normalize_phone(phone: str) -> str:
+    """Normalize a phone number for lock comparisons."""
+    return (phone or "").strip().replace(" ", "")
+
+
+async def _survey_lock_matches_phone(survey_id: str, phone: str) -> bool:
+    """Return True only when the locked survey still belongs to this phone."""
+    rows = await async_execute(
+        "SELECT phone, status, end_reason FROM surveys WHERE id = :survey_id",
+        {"survey_id": survey_id},
+    )
+    if not rows:
+        return False
+
+    row = rows[0]
+    db_phone = _normalize_phone(str(row.get("phone") or ""))
+    status = str(row.get("status") or "")
+    end_reason = str(row.get("end_reason") or "")
+
+    if db_phone and db_phone != _normalize_phone(phone):
+        return False
+    if status == "Completed" or end_reason:
+        return False
+    return True
+
+
 async def _reserve_call(phone: str, survey_id: str) -> None:
     """Reserve a phone number while a live call is active."""
     async with _active_calls_lock:
@@ -52,7 +78,16 @@ async def _reserve_call(phone: str, survey_id: str) -> None:
 
         existing = _active_calls.get(phone)
         if existing:
-            elapsed = int(now - float(existing.get("started_at", now)))
+            active_survey_id = str(existing.get("survey_id", ""))
+            if active_survey_id and not await _survey_lock_matches_phone(active_survey_id, phone):
+                logger.warning(
+                    f"Releasing stale call lock for {phone}: survey {active_survey_id} no longer matches active DB state"
+                )
+                del _active_calls[phone]
+                _active_surveys.pop(active_survey_id, None)
+                existing = None
+
+        if existing:
             active_survey_id = str(existing.get("survey_id", ""))
             if active_survey_id == survey_id:
                 raise HTTPException(
