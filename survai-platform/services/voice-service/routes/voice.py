@@ -29,9 +29,59 @@ from prompt_builder import build_greeter_prompt, build_questions_prompt
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 
-_active_calls: dict[str, float] = {}
+_active_calls: dict[str, dict[str, float | str]] = {}
+_active_surveys: dict[str, str] = {}
 _active_calls_lock = asyncio.Lock()
-CALL_COOLDOWN_SECONDS = 30
+ACTIVE_CALL_STALE_SECONDS = 15 * 60
+
+
+async def _reserve_call(phone: str, survey_id: str) -> None:
+    """Reserve a phone number while a live call is active."""
+    async with _active_calls_lock:
+        now = time.monotonic()
+        expired = [
+            number
+            for number, meta in _active_calls.items()
+            if now - float(meta.get("started_at", 0)) > ACTIVE_CALL_STALE_SECONDS
+        ]
+        for number in expired:
+            stale_survey_id = str(_active_calls[number].get("survey_id", ""))
+            if stale_survey_id:
+                _active_surveys.pop(stale_survey_id, None)
+            del _active_calls[number]
+
+        existing = _active_calls.get(phone)
+        if existing:
+            elapsed = int(now - float(existing.get("started_at", now)))
+            active_survey_id = str(existing.get("survey_id", ""))
+            if active_survey_id == survey_id:
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"A call for survey {survey_id} to {phone} is already in progress.",
+                )
+            raise HTTPException(
+                status_code=429,
+                detail=f"A call to {phone} is already in progress for survey {active_survey_id or 'another active survey'}. Please wait until it finishes before retrying.",
+            )
+
+        _active_calls[phone] = {"survey_id": survey_id, "started_at": now}
+        _active_surveys[survey_id] = phone
+
+
+async def _release_call(*, survey_id: str | None = None, phone: str | None = None) -> None:
+    """Release an active call reservation after the call finishes or fails."""
+    async with _active_calls_lock:
+        resolved_phone = phone
+        if survey_id:
+            resolved_phone = resolved_phone or _active_surveys.pop(survey_id, None)
+        if resolved_phone:
+            meta = _active_calls.get(resolved_phone)
+            if meta:
+                meta_survey_id = str(meta.get("survey_id", ""))
+                if not survey_id or meta_survey_id == survey_id:
+                    del _active_calls[resolved_phone]
+                    if meta_survey_id:
+                        _active_surveys.pop(meta_survey_id, None)
 
 
 def _extract_rider_first_name(rider_name: str) -> str:
@@ -64,20 +114,6 @@ async def make_call(
 ):
     """Initiate an AI-powered survey call via LiveKit SIP."""
     normalized_phone = phone.strip().replace(" ", "")
-    async with _active_calls_lock:
-        now = time.monotonic()
-        expired = [p for p, t in _active_calls.items() if now - t > CALL_COOLDOWN_SECONDS]
-        for p in expired:
-            del _active_calls[p]
-        last_call_time = _active_calls.get(normalized_phone)
-        if last_call_time and now - last_call_time < CALL_COOLDOWN_SECONDS:
-            remaining = int(CALL_COOLDOWN_SECONDS - (now - last_call_time))
-            raise HTTPException(
-                status_code=429,
-                detail=f"A call to {normalized_phone} is already in progress. Please wait {remaining}s before retrying.",
-            )
-        _active_calls[normalized_phone] = now
-
     survey = await get_survey_with_questions(survey_id)
     if not survey:
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
@@ -108,6 +144,8 @@ async def make_call(
     public_url = os.getenv("NEXT_PUBLIC_API_BASE_URL", os.getenv("PUBLIC_URL", ""))
     survey_url = f"{public_url}/survey/{survey_id}" if public_url else ""
     rider_email = survey.get("email", "")
+
+    await _reserve_call(normalized_phone, survey_id)
 
     survey_context = {
         "recipient_name": rider_name or "",
@@ -182,6 +220,7 @@ async def make_call(
             "provider": "livekit",
         }
     except Exception as e:
+        await _release_call(survey_id=survey_id, phone=normalized_phone)
         logger.error(f"LiveKit call failed: {e}")
         raise HTTPException(status_code=500, detail=f"LiveKit call failed: {str(e)}")
 
@@ -389,6 +428,7 @@ async def api_complete_survey(survey_id: str, reason: str = "completed"):
         )
     except Exception:
         pass
+    await _release_call(survey_id=survey_id)
     return {"status": status, "survey_id": survey_id, "end_reason": reason}
 
 
