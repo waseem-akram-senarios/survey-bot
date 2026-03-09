@@ -8,6 +8,7 @@ from typing import List
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, HTTPException
+from sqlalchemy.exc import IntegrityError
 
 from shared.models.common import (
     CloneTemplateRequestP,
@@ -211,7 +212,17 @@ async def _delete_template_impl(template_name: str):
             )
 
         # Status check removed to allow deleting published templates if no surveys exist.
-        # The safety check is handled by the survey-service proxy.
+        # Template deletes route directly here through the gateway, so enforce the
+        # survey dependency check in this service before attempting the delete.
+        linked_surveys = sql_execute(
+            "SELECT id FROM surveys WHERE template_name = :template_name LIMIT 1",
+            {"template_name": template_name},
+        )
+        if linked_surveys:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot delete template '{template_name}' because it has existing surveys. Delete surveys first.",
+            )
 
         sql_execute(
             """DELETE FROM question_category_mappings qcm
@@ -250,6 +261,11 @@ async def _delete_template_impl(template_name: str):
         return {"message": f"Template '{template_name}' deleted successfully"}
     except HTTPException:
         raise
+    except IntegrityError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete template '{template_name}' because it has existing surveys. Delete surveys first.",
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -47,6 +47,7 @@ const TemplateTableBase = ({
   const [openCloneDialog, setOpenCloneDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [page, setPage] = useState(1);
   const [newTemplateName, setNewTemplateName] = useState("");
@@ -87,6 +88,7 @@ const TemplateTableBase = ({
   const handleDeleteClick = (e, template) => {
     e.stopPropagation();
     setSelectedTemplate(template);
+    setDeleteError("");
     setOpenDeleteDialog(true);
   };
 
@@ -190,6 +192,7 @@ const TemplateTableBase = ({
           message: `Template "${templateIdentifier}" deleted successfully`,
           severity: 'success'
         });
+        setDeleteError("");
         
         const updatedData = localTableData.filter(template => {
           const mappedTemplate = dataMapper(template);
@@ -205,7 +208,10 @@ const TemplateTableBase = ({
         }
         
         if (refreshTable) refreshTable();
+        setOpenDeleteDialog(false);
+        setSelectedTemplate(null);
       } else {
+        setDeleteError(result.error || 'Failed to delete template. Please try again.');
         setSnackbar({
           open: true,
           message: `Failed to delete template: ${result.error}`,
@@ -213,6 +219,7 @@ const TemplateTableBase = ({
         });
       }
     } catch (error) {
+      setDeleteError(error.message || 'Failed to delete template. Please try again.');
       setSnackbar({
         open: true,
         message: `Failed to delete template: ${error.message}`,
@@ -220,8 +227,6 @@ const TemplateTableBase = ({
       });
     } finally {
       setActionLoading(prev => ({ ...prev, delete: false }));
-      setOpenDeleteDialog(false);
-      setSelectedTemplate(null);
     }
   };
 
@@ -236,6 +241,8 @@ const TemplateTableBase = ({
 
   const handleCloseDeleteDialog = () => {
     setOpenDeleteDialog(false);
+    setDeleteError("");
+    setSelectedTemplate(null);
   };
 
   const handleRowsPerPageChange = (newRowsPerPage) => {
@@ -445,6 +452,7 @@ const TemplateTableBase = ({
         selectedTemplate={selectedTemplate}
         onDelete={handleDeleteTemplateAction}
         loading={actionLoading.delete}
+        error={deleteError}
       />
 
       <LoadingOverlay 

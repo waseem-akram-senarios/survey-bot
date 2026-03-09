@@ -86,7 +86,8 @@ class TemplateService {
       return response;
     } catch (error) {
       console.error("Error deleting template:", error);
-      throw new Error("Failed to delete template. Please try again.");
+      const detail = error.response?.data?.detail;
+      throw new Error(detail || "Failed to delete template. Please try again.");
     }
   }
 

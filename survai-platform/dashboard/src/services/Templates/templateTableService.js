@@ -66,7 +66,8 @@ class TemplateTableService {
       });
     } catch (error) {
       console.error('Error deleting template:', error);
-      throw error;
+      const detail = error.response?.data?.detail;
+      throw new Error(detail || 'Failed to delete template. Please try again.');
     }
   }
 

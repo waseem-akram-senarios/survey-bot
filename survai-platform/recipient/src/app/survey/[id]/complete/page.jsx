@@ -25,6 +25,20 @@ export default function Survey() {
   const params = useParams();
   const router = useRouter();
   const surveyId = params.id || "102";
+  const backgroundStyle = {
+    position: 'absolute',
+    backgroundImage: 'url(/Background.png)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    opacity: 0.3,
+    top: '20vh',
+    left: '30vw',
+    right: 0,
+    bottom: 0,
+    transform: 'scale(0.6)',
+    pointerEvents: 'none',
+  };
 
   const checkSurveyStatus = async () => {
     try {
@@ -209,7 +223,7 @@ export default function Survey() {
   return (
     <div className="min-h-screen bg-white relative overflow-hidden">
       {/* Background image positioned as per design specs */}
-      <div className="background-image"></div>
+      <div style={backgroundStyle}></div>
 
       {/* Main content */}
       <div className="flex flex-col items-center justify-center min-h-screen px-4 md:px-8 relative z-10">
@@ -282,7 +296,7 @@ export default function Survey() {
                 {/* Success message */}
                 {submitSuccess && (
                   <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-sm text-green-600 animate-fade-in" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                    <p className="text-sm text-green-600" style={{ fontFamily: 'Poppins, sans-serif' }}>
                       {lang === 'es'
                         ? `✅ ¡Gracias por calificarnos con ${rating} estrella${rating !== 1 ? 's' : ''}! Sus comentarios se han guardado correctamente.`
                         : `✅ Thank you for rating us ${rating} star${rating !== 1 ? 's' : ''}! Your feedback has been saved successfully.`}
@@ -311,58 +325,6 @@ export default function Survey() {
         </div>
       </div>
 
-      <style jsx>{`
-        .background-image {
-          position: absolute;
-          background-image: url(/Background.png);
-          background-size: cover;
-          background-position: center;
-          background-repeat: no-repeat;
-          opacity: 0.3;
-          transform: rotate(0deg);
-        }
-        
-        /* Desktop positioning */
-        @media (min-width: 1024px) {
-          .background-image {
-            top: 224px;
-            left: 570px;
-          }
-        }
-        
-        /* Tablet positioning */
-        @media (min-width: 768px) and (max-width: 1023px) {
-          .background-image {
-            top: 15vh;
-            left: 40vw;
-            transform: rotate(0deg) scale(0.8);
-          }
-        }
-        
-        /* Mobile positioning */
-        @media (max-width: 767px) {
-          .background-image {
-            top: 20vh;
-            left: 30vw;
-            transform: rotate(0deg) scale(0.6);
-          }
-        }
-
-        .animate-fade-in {
-          animation: fadeIn 0.5s ease-in;
-          }
-        
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </div>
   );
 }

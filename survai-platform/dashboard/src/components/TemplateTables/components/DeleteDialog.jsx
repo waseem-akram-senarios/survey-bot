@@ -1,11 +1,12 @@
-import { Dialog, Typography, Box, Button, CircularProgress } from "@mui/material";
+import { Dialog, Typography, Box, Button, CircularProgress, Alert } from "@mui/material";
 
 const DeleteDialog = ({ 
   open, 
   onClose, 
   selectedTemplate, 
   onDelete, 
-  loading 
+  loading,
+  error
 }) => {
   return (
     <Dialog
@@ -46,6 +47,12 @@ const DeleteDialog = ({
         </strong>
         ? This action cannot be undone.
       </Typography>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
 
       <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
         <Button
