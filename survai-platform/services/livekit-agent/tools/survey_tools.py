@@ -52,6 +52,7 @@ def create_survey_tools(
     disconnect_fn: Callable = None,
     question_ids: List[str] = None,
     questions_map: dict = None,
+    questions_map_es: dict = None,
     survey_id: Optional[str] = None,
     survey_url: Optional[str] = None,
     rider_email: Optional[str] = None,
@@ -59,7 +60,13 @@ def create_survey_tools(
 ):
     total_questions = len(question_ids) if question_ids else 0
     qmap = questions_map or {}
+    qmap_es = questions_map_es or {}
     person_name = rider_name or "there"
+
+    def _next_question_text(next_id: str, lang: str) -> str:
+        if lang == "es" and qmap_es:
+            return qmap_es.get(next_id, "") or qmap.get(next_id, "")
+        return qmap.get(next_id, "")
 
     async def _save_and_notify(reason: str, call_duration: float):
         """Save results and notify backend services."""
@@ -113,7 +120,7 @@ def create_survey_tools(
                 remaining = [q for q in question_ids if q not in done]
                 if remaining:
                     next_id = remaining[0]
-                    next_text = qmap.get(next_id, "")
+                    next_text = _next_question_text(next_id, lang)
                     return f"Already recorded. Ask: \"{next_text}\" (id:{next_id}).{lang_reminder}"
                 else:
                     return f"All questions answered. Call end_survey(\"completed\") now.{lang_reminder}"
@@ -134,7 +141,7 @@ def create_survey_tools(
             remaining = [q for q in question_ids if q not in done]
             if remaining:
                 next_id = remaining[0]
-                next_text = qmap.get(next_id, "")
+                next_text = _next_question_text(next_id, lang)
                 return f"Recorded. Ask: \"{next_text}\" (id:{next_id}).{lang_reminder}"
             else:
                 logger.info(f"ALL {total_questions} questions answered")

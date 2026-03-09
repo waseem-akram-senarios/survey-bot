@@ -92,26 +92,18 @@ class EnglishGreeterAgent(Agent):
                 if name_known
                 else "¿Con quién tengo el gusto de hablar?"
             )
-            return (
-                "Language LOCKED to Spanish. From this moment you MUST speak ONLY in Spanish. "
-                "NEVER use English again for the rest of this call. "
-                f"Now ask for their identity in Spanish: '{next_q}'"
-            )
+            return f"Español confirmado. Pregunta: '{next_q}'"
 
         next_q = (
             f"Am I speaking with {name}?"
             if name_known
             else "May I know who I'm speaking with?"
         )
-        return (
-            "Language LOCKED to English. From this moment you MUST speak ONLY in English. "
-            "NEVER use Spanish again for the rest of this call. "
-            f"Now ask for their identity: '{next_q}'"
-        )
+        return f"English confirmed. Ask: '{next_q}'"
 
     async def on_enter(self) -> None:
         """Speak the opening line and wait for full playout before the LLM takes over."""
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(0.8)
 
         org = self.organization_name
 
