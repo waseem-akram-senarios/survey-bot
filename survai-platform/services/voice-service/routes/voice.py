@@ -11,6 +11,7 @@ import asyncio
 import logging
 import os
 import time
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, HTTPException
 
@@ -42,6 +43,16 @@ def _extract_rider_first_name(rider_name: str) -> str:
     if first.lower() in _placeholders or len(first.replace("-", "").replace("'", "")) < 2:
         return ""
     return first
+
+
+def _with_language_query(url: str, language: str) -> str:
+    """Force a survey URL into a specific language when requested."""
+    if language not in {"en", "es"} or not url:
+        return url
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["lang"] = language
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 @router.post("/make-call")
@@ -209,6 +220,7 @@ async def send_email_fallback(
     subject = "We'd love your feedback! / ¡Nos encantaría conocer su opinión!" if language == "bilingual" else (
         "¡Su Encuesta Está Lista!" if language == "es" else "We'd love your feedback!"
     )
+    survey_url = _with_language_query(survey_url, language)
     html_body = build_html_email(survey_url, language=language)
     text_body = build_text_email(survey_url, language=language)
     smtp_host = (os.getenv("SMTP_HOST", "") or "").lower()

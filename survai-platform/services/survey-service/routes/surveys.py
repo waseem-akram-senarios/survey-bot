@@ -7,6 +7,7 @@ import logging
 import os
 import smtplib
 import resend
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from concurrent.futures import ThreadPoolExecutor
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -882,11 +883,21 @@ def _send_via_resend(to_email: str, subject: str, html_body: str):
     return True
 
 
+def _with_language_query(url: str, language: str) -> str:
+    """Force a survey URL into a specific language when requested."""
+    if language not in {"en", "es"} or not url:
+        return url
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["lang"] = language
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
 @router.post("/surveys/sendemail")
 async def sendemail(email: Email):
     """Send email survey, preferring SMTP when AWS SES is configured."""
-    url = email.SurveyURL
     lang = getattr(email, "Language", "en") or "en"
+    url = _with_language_query(email.SurveyURL, lang)
     html_body = build_html_email(url, language=lang)
     text_body = build_text_email(url, language=lang)
     if lang == "es":

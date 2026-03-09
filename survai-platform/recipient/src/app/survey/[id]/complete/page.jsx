@@ -43,10 +43,11 @@ export default function Survey() {
       }
       
       const result = await response.json();
+      const urlLang = searchParams.get("lang");
       
       // If survey is still In-Progress, redirect back to start page
       if (result.Status === 'In-Progress') {
-        router.push(`/survey/${surveyId}`);
+        router.push(`/survey/${surveyId}${urlLang ? `?lang=${urlLang}` : ""}`);
         return;
       }
       

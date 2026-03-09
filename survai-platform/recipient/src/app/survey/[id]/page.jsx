@@ -1,7 +1,7 @@
 "use client";
 import { Box, Typography, Button, CircularProgress, Card, Avatar, Chip, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import { AutoAwesome, TextFields, Language } from "@mui/icons-material";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Background from '../../../../public/StartBackground.svg'
 import { detectLanguage, t } from '../../../lib/i18n';
@@ -12,14 +12,16 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 export default function Survey() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params?.id;
+  const urlLang = searchParams.get("lang");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [recipientName, setRecipientName] = useState("");
   const [riderName, setRiderName] = useState("");
   const [surveyName, setSurveyName] = useState("");
   const [biodata, setBiodata] = useState("");
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(urlLang || "en");
   const [isBilingual, setIsBilingual] = useState(true);
   const [visibleLines, setVisibleLines] = useState(0);
   const [personalizedGreeting, setPersonalizedGreeting] = useState("");
@@ -45,7 +47,7 @@ export default function Survey() {
       setBiodata(result.Biodata || "");
       const bilingual = result.Bilingual !== false;
       setIsBilingual(bilingual);
-      if (result.Name) {
+      if (!urlLang && result.Name) {
         const detected = detectLanguage(result.Name);
         setLang(detected);
       }
@@ -76,7 +78,8 @@ export default function Survey() {
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const result = await response.json();
       if (result.Status === "Completed") {
-        router.push(`/survey/${id}/complete`);
+        const targetLang = urlLang || lang;
+        router.push(`/survey/${id}/complete${targetLang ? `?lang=${targetLang}` : ""}`);
         return;
       }
       setIsLoading(false);
@@ -92,7 +95,7 @@ export default function Survey() {
       await Promise.all([fetchRecipientInfo(), checkSurveyStatus()]);
     };
     initializePage();
-  }, [id, router]);
+  }, [id, router, urlLang, lang]);
 
   useEffect(() => {
     if (isLoading || error) return;
