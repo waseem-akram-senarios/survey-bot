@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Survey System Prompt Builder for Voice Service.
 
@@ -11,11 +12,22 @@ No bilingual mode.
 build_survey_prompt() is kept as a backward-compatible alias (returns joined text).
 """
 
+import hashlib
 import logging
 import os
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+_ES_TRANSLATION_CACHE: Dict[str, Dict[str, str]] = {}
+
+
+def _translation_cache_key(questions: List[Dict[str, Any]]) -> str:
+    payload = "\n".join(
+        f"{q.get('id', '')}|{q.get('text', '')}"
+        for q in questions
+        if isinstance(q, dict)
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 async def _translate_questions_to_es(questions: List[Dict[str, Any]]) -> Dict[str, str]:
@@ -26,6 +38,12 @@ async def _translate_questions_to_es(questions: List[Dict[str, Any]]) -> Dict[st
     """
     if not questions:
         return {}
+
+    cache_key = _translation_cache_key(questions)
+    cached = _ES_TRANSLATION_CACHE.get(cache_key)
+    if cached:
+        logger.info(f"Using cached Spanish translation for {len(cached)} questions")
+        return cached
 
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key:
@@ -69,6 +87,7 @@ async def _translate_questions_to_es(questions: List[Dict[str, Any]]) -> Dict[st
                 text = text.split(". ", 1)[-1]
             result[qid] = text
 
+        _ES_TRANSLATION_CACHE[cache_key] = result
         logger.info(f"Translated {len(result)} questions to Spanish")
         return result
 
@@ -298,7 +317,7 @@ Call end_survey("declined") immediately.
 3. Do NOT start asking survey questions — that is the questions agent's job.
 4. Every call ends with ONE call to end_survey() OR a handoff via to_questions().
 5. After set_language() is called, speak ONLY in that language. NEVER mix languages.
-6. When set_language() returns, say ONLY the identity question given in the return value. Do NOT repeat or paraphrase any other part of the return value aloud."""
+6. When set_language() returns, say ONLY the identity question given in the return value. Do NOT repeat or paraphrase any other part of the return value aloud.
 7. NEVER call end_survey("wrong_person") on an uncertain, empty, or low-confidence reply. Only do it after an explicit negative identity response."""
 
 

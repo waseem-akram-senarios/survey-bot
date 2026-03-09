@@ -48,9 +48,9 @@ FALSE_INTERRUPTION_TIMEOUT = 0.5
 MAX_TOOL_STEPS = 15
 
 # VAD tuning for phone calls
-# min_speech_duration: 0.25s filters phone-line click/noise artifacts (was 0.08s which fires on pickup sounds)
-# activation_threshold: 0.55 requires stronger signal to avoid preemptive LLM triggers during TTS
-VAD_MIN_SILENCE_DURATION = float(os.getenv("VAD_MIN_SILENCE_DURATION", "0.25"))
+# min_silence_duration: 0.5s waits longer before the agent treats a pause as end-of-turn
+# min_speech_duration: 0.2s filters short phone-line artifacts without delaying normal replies too much
+VAD_MIN_SILENCE_DURATION = float(os.getenv("VAD_MIN_SILENCE_DURATION", "0.5"))
 VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.2"))
 VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.4"))
 
