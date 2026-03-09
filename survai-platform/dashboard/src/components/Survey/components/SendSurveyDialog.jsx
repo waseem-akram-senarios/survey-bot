@@ -32,6 +32,7 @@ const SendSurveyDialog = ({
   const isCompleted = surveyStatus?.toLowerCase() === "completed";
   const isMobile = useMediaQuery("(max-width: 600px)");
   const [currentState, setCurrentState] = useState("default"); // "default", "email", "phone"
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");

@@ -175,7 +175,7 @@ const SurveyMainInfoPanel = ({
       </Box>
 
       {/* Send Survey Button */}
-      {!isCompleted && <Box sx={{ mb: 1 }}>
+      <Box sx={{ mb: 1 }}>
         <Button
           variant="outlined"
           onClick={() => onSendSurvey && onSendSurvey(surveyInfo)}
@@ -203,7 +203,7 @@ const SurveyMainInfoPanel = ({
         >
           Send Survey
         </Button>
-      </Box>}
+      </Box>
 
       {/* Bottom Buttons */}
       <Box

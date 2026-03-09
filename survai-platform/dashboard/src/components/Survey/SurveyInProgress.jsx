@@ -123,7 +123,7 @@ const SurveyInProgress = () => {
       showSuccess(`Survey "${selectedSurvey.Name}" sent successfully to ${email}`);
     } catch (error) {
       console.error('Error sending email:', error);
-      showError('Failed to send survey via email. Please try again.');
+      showError(error.message || 'Failed to send survey via email. Please try again.');
     } finally {
       setSendDialogOpen(false);
       setSelectedSurvey(null);

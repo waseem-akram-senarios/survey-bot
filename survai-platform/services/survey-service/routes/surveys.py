@@ -834,7 +834,6 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str, text_body: str):
     msg["To"] = to_email
     msg["Reply-To"] = smtp_from
     msg["X-Mailer"] = "SurvAI Platform"
-    msg["MIME-Version"] = "1.0"
 
     # Deliverability headers — help land in inbox instead of spam
     import email.utils
@@ -885,7 +884,7 @@ def _send_via_resend(to_email: str, subject: str, html_body: str):
 
 @router.post("/surveys/sendemail")
 async def sendemail(email: Email):
-    """Send email survey. Tries MailerSend (verified domain) first, then Resend, then SMTP."""
+    """Send email survey, preferring SMTP when AWS SES is configured."""
     url = email.SurveyURL
     lang = getattr(email, "Language", "en") or "en"
     html_body = build_html_email(url, language=lang)
@@ -897,8 +896,19 @@ async def sendemail(email: Email):
     else:
         subject = "Your Survey is Ready!"
     errors = []
+    smtp_host = (os.getenv("SMTP_HOST") or "").lower()
+    prefer_smtp = "amazonaws.com" in smtp_host or "mailjet.com" in smtp_host
 
-    # 1. Try MailerSend with verified domain first (best deliverability)
+    if prefer_smtp:
+        try:
+            if _send_via_smtp(email.EmailTo, subject, html_body, text_body):
+                logger.info(f"Survey email sent via SMTP to {email.EmailTo}")
+                return {"message": "Email sent successfully"}
+        except Exception as e:
+            errors.append(f"SMTP: {e}")
+            logger.warning(f"SMTP failed for {email.EmailTo}: {e}")
+
+    # 1. Try MailerSend
     api_key = os.getenv("MAILERSEND_API_KEY")
     if api_key:
         try:
@@ -929,14 +939,15 @@ async def sendemail(email: Email):
         errors.append(f"Resend: {e}")
         logger.warning(f"Resend failed for {email.EmailTo}: {e}")
 
-    # 3. Try SMTP (last resort)
-    try:
-        if _send_via_smtp(email.EmailTo, subject, html_body, text_body):
-            logger.info(f"Survey email sent via SMTP to {email.EmailTo}")
-            return {"message": "Email sent successfully"}
-    except Exception as e:
-        errors.append(f"SMTP: {e}")
-        logger.warning(f"SMTP failed for {email.EmailTo}: {e}")
+    # 3. Try SMTP (last resort unless SES was configured above)
+    if not prefer_smtp:
+        try:
+            if _send_via_smtp(email.EmailTo, subject, html_body, text_body):
+                logger.info(f"Survey email sent via SMTP to {email.EmailTo}")
+                return {"message": "Email sent successfully"}
+        except Exception as e:
+            errors.append(f"SMTP: {e}")
+            logger.warning(f"SMTP failed for {email.EmailTo}: {e}")
 
     if not errors:
         raise HTTPException(status_code=503, detail="No email provider configured. Set MAILERSEND_API_KEY, RESEND_API_KEY, or SMTP credentials.")

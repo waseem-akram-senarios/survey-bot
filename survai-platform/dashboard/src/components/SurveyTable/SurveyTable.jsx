@@ -77,9 +77,9 @@ const DashboardTable = ({ tableData = [], onRowClick, onDataChange, onEditSurvey
     }
   };
 
-  const handleSendEmailConfirm = async (email) => {
+  const handleSendEmailConfirm = async (email, language) => {
     try {
-      const emailLang = selectedSurvey.Bilingual ? "bilingual" : "en";
+      const emailLang = language || (selectedSurvey.Bilingual ? "bilingual" : "en");
       const result = await sendSurveyByEmail(
         selectedSurvey.SurveyId, 
         email, 

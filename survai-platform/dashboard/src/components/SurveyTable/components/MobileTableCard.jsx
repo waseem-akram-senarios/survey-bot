@@ -154,14 +154,14 @@ const MobileTableCard = ({ item, onItemClick, onSendEmail }) => {
       </Box>
 
       {/* Send Survey Buttons */}
-      {item.Status !== "Completed" && <Box className="send-buttons" sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
+      <Box className="send-buttons" sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
         <IconButton
           sx={{borderRadius: '15px', width: '142px', height: '40px'}}
           onClick={handleSendEmail}
         >
           <img src={SendSurveyButton} alt="Send Survey" />
         </IconButton>
-      </Box>}
+      </Box>
     </Paper>
   );
 };

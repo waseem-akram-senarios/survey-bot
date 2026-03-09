@@ -211,6 +211,52 @@ async def send_email_fallback(
     )
     html_body = build_html_email(survey_url, language=language)
     text_body = build_text_email(survey_url, language=language)
+    smtp_host = (os.getenv("SMTP_HOST", "") or "").lower()
+    prefer_smtp = "amazonaws.com" in smtp_host or "mailjet.com" in smtp_host
+
+    if prefer_smtp:
+        try:
+            import smtplib
+            from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
+
+            smtp_port = int(os.getenv("SMTP_PORT", "587"))
+            smtp_user = os.getenv("SMTP_USER", "")
+            smtp_pass = os.getenv("SMTP_PASSWORD", "")
+            smtp_from = os.getenv("SMTP_FROM_EMAIL") or smtp_user or "noreply@aidevlab.com"
+            smtp_from_name = os.getenv("SMTP_FROM_NAME", "SurvAI")
+
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"{smtp_from_name} <{smtp_from}>"
+            msg["To"] = email
+            msg["Reply-To"] = smtp_from
+
+            import email.utils as _eu
+            msg["Message-ID"] = _eu.make_msgid(domain=smtp_from.split("@")[-1] if "@" in smtp_from else "aidevlab.com")
+            msg["Date"] = _eu.formatdate(localtime=True)
+            msg["X-Priority"] = "3"
+            msg["List-Unsubscribe"] = f"<mailto:{smtp_from}?subject=unsubscribe>"
+
+            msg.attach(MIMEText(text_body, "plain"))
+            msg.attach(MIMEText(html_body, "html"))
+
+            if smtp_port == 465:
+                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
+            else:
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
+                try:
+                    server.starttls()
+                except smtplib.SMTPNotSupportedError:
+                    pass
+            if smtp_user and smtp_pass:
+                server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_from, [email], msg.as_string())
+            server.quit()
+            logger.info(f"Email fallback sent via SMTP for survey {survey_id} to {email}")
+            return {"status": "sent", "email": email, "survey_id": survey_id}
+        except Exception as e:
+            logger.warning(f"SMTP fallback failed for {email}: {e}")
 
     # 1) Try MailerSend
     try:
@@ -243,52 +289,52 @@ async def send_email_fallback(
     except Exception as e:
         logger.warning(f"Resend fallback failed for {email}: {e}")
 
-    # 3) Try SMTP (Mailjet)
-    try:
-        import smtplib
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text import MIMEText
+    # 3) Try SMTP as a final fallback when SES was not preferred above
+    if not prefer_smtp:
+        try:
+            import smtplib
+            from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
 
-        smtp_host = os.getenv("SMTP_HOST", "")
-        smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        smtp_user = os.getenv("SMTP_USER", "")
-        smtp_pass = os.getenv("SMTP_PASSWORD", "")
-        smtp_from = os.getenv("SMTP_FROM_EMAIL") or smtp_user or "noreply@aidevlab.com"
-        smtp_from_name = os.getenv("SMTP_FROM_NAME", "SurvAI")
+            smtp_host = os.getenv("SMTP_HOST", "")
+            smtp_port = int(os.getenv("SMTP_PORT", "587"))
+            smtp_user = os.getenv("SMTP_USER", "")
+            smtp_pass = os.getenv("SMTP_PASSWORD", "")
+            smtp_from = os.getenv("SMTP_FROM_EMAIL") or smtp_user or "noreply@aidevlab.com"
+            smtp_from_name = os.getenv("SMTP_FROM_NAME", "SurvAI")
 
-        if smtp_host:
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = subject
-            msg["From"] = f"{smtp_from_name} <{smtp_from}>"
-            msg["To"] = email
-            msg["Reply-To"] = smtp_from
+            if smtp_host:
+                msg = MIMEMultipart("alternative")
+                msg["Subject"] = subject
+                msg["From"] = f"{smtp_from_name} <{smtp_from}>"
+                msg["To"] = email
+                msg["Reply-To"] = smtp_from
 
-            # Deliverability headers
-            import email.utils as _eu
-            msg["Message-ID"] = _eu.make_msgid(domain=smtp_from.split("@")[-1] if "@" in smtp_from else "aidevlab.com")
-            msg["Date"] = _eu.formatdate(localtime=True)
-            msg["X-Priority"] = "3"
-            msg["List-Unsubscribe"] = f"<mailto:{smtp_from}?subject=unsubscribe>"
+                import email.utils as _eu
+                msg["Message-ID"] = _eu.make_msgid(domain=smtp_from.split("@")[-1] if "@" in smtp_from else "aidevlab.com")
+                msg["Date"] = _eu.formatdate(localtime=True)
+                msg["X-Priority"] = "3"
+                msg["List-Unsubscribe"] = f"<mailto:{smtp_from}?subject=unsubscribe>"
 
-            msg.attach(MIMEText(text_body, "plain"))
-            msg.attach(MIMEText(html_body, "html"))
+                msg.attach(MIMEText(text_body, "plain"))
+                msg.attach(MIMEText(html_body, "html"))
 
-            if smtp_port == 465:
-                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
-            else:
-                server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
-                try:
-                    server.starttls()
-                except smtplib.SMTPNotSupportedError:
-                    pass
-            if smtp_user and smtp_pass:
-                server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_from, [email], msg.as_string())
-            server.quit()
-            logger.info(f"Email fallback sent via SMTP for survey {survey_id} to {email}")
-            return {"status": "sent", "email": email, "survey_id": survey_id}
-    except Exception as e:
-        logger.warning(f"SMTP fallback failed for {email}: {e}")
+                if smtp_port == 465:
+                    server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
+                else:
+                    server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
+                    try:
+                        server.starttls()
+                    except smtplib.SMTPNotSupportedError:
+                        pass
+                if smtp_user and smtp_pass:
+                    server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_from, [email], msg.as_string())
+                server.quit()
+                logger.info(f"Email fallback sent via SMTP for survey {survey_id} to {email}")
+                return {"status": "sent", "email": email, "survey_id": survey_id}
+        except Exception as e:
+            logger.warning(f"SMTP fallback failed for {email}: {e}")
 
     logger.error(f"All email fallback methods failed for survey {survey_id} to {email}")
     return {"status": "failed", "error": "All email providers failed", "survey_url": survey_url}

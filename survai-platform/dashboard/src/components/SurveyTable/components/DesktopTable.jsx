@@ -181,14 +181,12 @@ const DesktopTable = ({
               </TableCell>
               <TableCell>
                 <Box className="action-buttons" sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                  {item.Status !== "Completed" && (
-                    <IconButton
-                      sx={{borderRadius: '15px', width: '142px', height: '40px'}}
-                      onClick={(e) => handleSendEmail(item, e)}
-                    >
-                      <img src={SendSurveyButton} alt="Send Survey" />
-                    </IconButton>
-                  )}
+                  <IconButton
+                    sx={{borderRadius: '15px', width: '142px', height: '40px'}}
+                    onClick={(e) => handleSendEmail(item, e)}
+                  >
+                    <img src={SendSurveyButton} alt="Send Survey" />
+                  </IconButton>
                   {item.Status === "Completed" && (
                     <Tooltip title="View Results">
                       <IconButton
