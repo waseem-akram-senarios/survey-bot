@@ -800,6 +800,7 @@ async def makecall(request: MakeCallRequest):
                     "survey_id": request.survey_id,
                     "phone": request.phone,
                     "provider": request.provider,
+                    "language": request.language,
                 },
             )
             if resp.status_code != 200:
@@ -1136,9 +1137,9 @@ async def send_sms_alias(request: SMSRequest):
 
 
 @router.post("/surveys/make-call")
-async def make_call_alias(to: str, survey_id: str, run_at: Optional[str] = None, provider: str = "livekit"):
+async def make_call_alias(to: str, survey_id: str, run_at: Optional[str] = None, provider: str = "livekit", language: str = "bilingual"):
     """Alias: /surveys/make-call (dashboard expects hyphenated version)."""
-    return await makecall(MakeCallRequest(survey_id=survey_id, phone=to, provider=provider))
+    return await makecall(MakeCallRequest(survey_id=survey_id, phone=to, provider=provider, language=language))
 
 
 @router.post("/answers/qna", response_model=SurveyQnAP)

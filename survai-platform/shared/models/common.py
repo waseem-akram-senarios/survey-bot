@@ -209,6 +209,7 @@ class MakeCallRequest(BaseModel):
     survey_id: str
     phone: str
     provider: Literal["livekit"] = "livekit"
+    language: Literal["en", "es", "bilingual"] = "bilingual"
 
 
 class CallbackRequest(BaseModel):
