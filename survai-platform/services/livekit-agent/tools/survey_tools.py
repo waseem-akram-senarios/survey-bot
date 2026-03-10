@@ -58,6 +58,7 @@ def create_survey_tools(
     rider_email: Optional[str] = None,
     rider_name: Optional[str] = None,
     questions_metadata: List[dict] = None,
+    language_mode: str = "bilingual",
 ):
     total_questions = len(question_ids) if question_ids else 0
     qmap = questions_map or {}
@@ -404,6 +405,39 @@ def create_survey_tools(
         logger.info("[HANDOFF] to_questions → questions")
         return call_data.agents["questions"]
 
+    @function_tool()
+    async def set_language(context: RunContext, language: str):
+        """
+        Record the recipient's language preference detected from their reply.
+        Call this as soon as the language is clear. This LOCKS the language for the entire call.
+        language must be 'en' for English or 'es' for Spanish.
+        """
+        context.userdata.detected_language = language
+        logger.info(f"[LANGUAGE] Recipient selected: {language}")
+
+        name = rider_name or ""
+        name_known = bool(name and len(name.strip()) >= 2 and name.strip().lower() not in {
+            "customer", "unknown", "user", "recipient", "test", "n/a", "na", "none", "name"
+        })
+
+        if language == "es":
+            next_q = (
+                f"¿Estoy hablando con {name}?"
+                if name_known
+                else "¿Con quién tengo el gusto de hablar?"
+            )
+            return f"Español confirmado. Pregunta: '{next_q}'"
+
+        next_q = (
+            f"Am I speaking with {name}?"
+            if name_known
+            else "May I know who I'm speaking with?"
+        )
+        return f"English confirmed. Ask: '{next_q}'"
+
     greeter_tools = [end_survey, schedule_callback, send_survey_link, to_questions]
+    if language_mode == "bilingual":
+        greeter_tools.insert(0, set_language)
+
     question_tools = [record_answer, end_survey]
     return greeter_tools, question_tools

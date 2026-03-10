@@ -86,5 +86,10 @@ class SpanishGreeterAgent(Agent):
                     f"¿Con quién tengo el gusto de hablar?"
                 )
 
-        logger.info(f"[AGENT] {greeting}")
+        logger.info(f"[GREETER] mode=es | greeting={greeting[:80]}...")
+
+        chat_ctx = self.chat_ctx.copy()
+        chat_ctx.add_message(role="assistant", content=greeting)
+        await self.update_chat_ctx(chat_ctx)
+
         await self.session.say(greeting).wait_for_playout()

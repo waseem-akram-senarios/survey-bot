@@ -7,20 +7,21 @@ Supports two modes:
 
 Call flow (bilingual):
   1. on_enter(): "Hi, I'm Cameron... To continue in English say English / Para continuar en español..."
-  2. Language preference → set_language()
+  2. Language preference → set_language() (provided as external tool, NOT on this class)
   3. Identity → Availability → to_questions()
 
 Call flow (English-only):
   1. on_enter(): "Hi, I'm Cameron... Am I speaking with {name}?"
   2. Identity → Availability → to_questions()
+
+IMPORTANT: set_language is NOT a class method here — it is created externally
+in survey_tools.py and only included in the bilingual greeter tool list.
 """
 
 import asyncio
 import re
-from typing import Annotated
 
 from livekit.agents.voice import Agent
-from livekit.agents import function_tool
 
 from config.settings import ORGANIZATION_NAME
 from utils.logging import get_logger
@@ -51,9 +52,13 @@ def _is_real_name(name: str) -> bool:
 
 class EnglishGreeterAgent(Agent):
     """
-    Handles opening, language detection, identity confirmation, and availability check
+    Handles opening, identity confirmation, and availability check
     for English-initiated calls. Hands off to the correct QuestionsAgent once the
     recipient confirms they are available.
+
+    In bilingual mode, the external set_language tool (from survey_tools)
+    handles language detection. In English-only mode, no set_language tool
+    is provided.
     """
 
     def __init__(
@@ -71,38 +76,8 @@ class EnglishGreeterAgent(Agent):
         self.greetings = greetings
         self.language_mode = language_mode
 
-    @function_tool
-    async def set_language(
-        self,
-        language: Annotated[str, "Language code: 'en' for English, 'es' for Spanish"],
-    ) -> str:
-        """
-        Record the recipient's language preference detected from their reply.
-        Call this as soon as the language is clear. This LOCKS the language for the entire call.
-        """
-        self.session.userdata.detected_language = language
-        logger.info(f"[LANGUAGE] Recipient selected: {language}")
-
-        name = self.rider_first_name
-        name_known = _is_real_name(name)
-
-        if language == "es":
-            next_q = (
-                f"¿Estoy hablando con {name}?"
-                if name_known
-                else "¿Con quién tengo el gusto de hablar?"
-            )
-            return f"Español confirmado. Pregunta: '{next_q}'"
-
-        next_q = (
-            f"Am I speaking with {name}?"
-            if name_known
-            else "May I know who I'm speaking with?"
-        )
-        return f"English confirmed. Ask: '{next_q}'"
-
     async def on_enter(self) -> None:
-        """Speak the opening line and wait for full playout before the LLM takes over."""
+        """Speak the opening line, inject it into chat context, then let the LLM continue."""
         await asyncio.sleep(1.5)
 
         org = self.organization_name
@@ -128,5 +103,10 @@ class EnglishGreeterAgent(Agent):
                 "Para continuar en español, di español."
             )
 
-        logger.info(f"[AGENT] {greeting}")
+        logger.info(f"[GREETER] mode={self.language_mode} | greeting={greeting[:80]}...")
+
+        chat_ctx = self.chat_ctx.copy()
+        chat_ctx.add_message(role="assistant", content=greeting)
+        await self.update_chat_ctx(chat_ctx)
+
         await self.session.say(greeting).wait_for_playout()

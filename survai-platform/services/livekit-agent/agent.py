@@ -239,6 +239,7 @@ async def entrypoint(ctx: JobContext):
         rider_email=rider_email,
         rider_name=rider_first_name,
         questions_metadata=questions_list,
+        language_mode=call_language,
     )
 
     # Build agents based on call language mode
