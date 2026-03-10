@@ -29,9 +29,9 @@ DEFAULT_RIDER = {
 # ===========================================
 # Speech-to-Text (Deepgram)
 STT_MODEL = os.getenv("STT_MODEL", "nova-3")
-STT_LANGUAGE = os.getenv("STT_LANGUAGE", "en-US")
-STT_DETECT_LANGUAGE = os.getenv("STT_DETECT_LANGUAGE", "true").lower() == "true"
-STT_ENDPOINTING_MS = int(os.getenv("STT_ENDPOINTING_MS", "120"))
+STT_LANGUAGE = os.getenv("STT_LANGUAGE", "multi")
+STT_DETECT_LANGUAGE = os.getenv("STT_DETECT_LANGUAGE", "false").lower() == "true"
+STT_ENDPOINTING_MS = int(os.getenv("STT_ENDPOINTING_MS", "300"))
 
 # Large Language Model (OpenAI)
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4.1-mini")
