@@ -307,18 +307,27 @@ async def entrypoint(ctx: JobContext):
     tts_model = TTS_MODEL_ES if call_language == "es" else TTS_MODEL
     tts_voice = TTS_VOICE_ID_ES if call_language == "es" else TTS_VOICE_ID
 
+    # Nova-3 uses keyterm prompting; Nova-2 and older use keywords
+    stt_kw: dict = {
+        "model": STT_MODEL,
+        "language": stt_language,
+        "detect_language": stt_detect_language,
+        "endpointing_ms": STT_ENDPOINTING_MS,
+    }
+    if (STT_MODEL or "").strip().lower().startswith("nova-3"):
+        stt_kw["keyterm"] = [
+            "Yes", "No", "Yeah", "Yep", "Nope",
+            "Sí", "Bueno",
+        ]
+    else:
+        stt_kw["keywords"] = [
+            "Yes:2", "No:2", "Yeah:2", "Yep:2", "Nope:2",
+            "Sí:2", "No:2", "Bueno:1",
+        ]
+
     session = AgentSession[SurveyCallData](
         userdata=call_data,
-        stt=deepgram.STT(
-            model=STT_MODEL,
-            language=stt_language,
-            detect_language=stt_detect_language,
-            endpointing_ms=STT_ENDPOINTING_MS,
-            keywords=[
-                "Yes:2", "No:2", "Yeah:2", "Yep:2", "Nope:2",
-                "Sí:2", "No:2", "Bueno:1",
-            ],
-        ),
+        stt=deepgram.STT(**stt_kw),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
         tts=elevenlabs.TTS(
                 voice_id=tts_voice,
