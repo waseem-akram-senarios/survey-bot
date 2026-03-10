@@ -26,7 +26,6 @@ from livekit.agents import (
     AutoSubscribe,
     RoomInputOptions,
 )
-from livekit.agents.voice.room_io import RoomOptions, AudioInputOptions
 from livekit.agents.voice import AgentSession
 from livekit.plugins import deepgram, openai, silero, elevenlabs, noise_cancellation
 
@@ -311,7 +310,13 @@ async def entrypoint(ctx: JobContext):
         userdata=call_data,
         stt=deepgram.STT(
             model=STT_MODEL,
-            language=stt_language
+            language=stt_language,
+            detect_language=stt_detect_language,
+            endpointing_ms=STT_ENDPOINTING_MS,
+            keywords=[
+                "Yes:2", "No:2", "Yeah:2", "Yep:2", "Nope:2",
+                "Sí:2", "No:2", "Bueno:1",
+            ],
         ),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
         tts=elevenlabs.TTS(
@@ -319,7 +324,11 @@ async def entrypoint(ctx: JobContext):
                 model=tts_model,
                 apply_text_normalization="on"
             ),
-        vad=silero.VAD.load(),
+        vad=silero.VAD.load(
+            min_silence_duration=VAD_MIN_SILENCE_DURATION,
+            min_speech_duration=VAD_MIN_SPEECH_DURATION,
+            activation_threshold=VAD_ACTIVATION_THRESHOLD,
+        ),
         preemptive_generation=PREEMPTIVE_GENERATION,
         resume_false_interruption=RESUME_FALSE_INTERRUPTION,
         false_interruption_timeout=FALSE_INTERRUPTION_TIMEOUT,
@@ -392,9 +401,7 @@ async def entrypoint(ctx: JobContext):
             room=ctx.room,
             agent=call_data.agents["greeter"],
             room_input_options=RoomInputOptions(
-                text_enabled=True,
                 noise_cancellation=noise_cancellation.BVCTelephony(),
-                close_on_disconnect=False,
             ),
         )
     finally:
