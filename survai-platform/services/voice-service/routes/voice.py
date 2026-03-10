@@ -32,7 +32,8 @@ router = APIRouter(prefix="/api/voice", tags=["voice"])
 _active_calls: dict[str, dict[str, float | str]] = {}
 _active_surveys: dict[str, str] = {}
 _active_calls_lock = asyncio.Lock()
-ACTIVE_CALL_STALE_SECONDS = 15 * 60
+ACTIVE_CALL_STALE_SECONDS = 4 * 60  # 4 min — calls rarely last longer
+ACTIVE_CALL_HARD_LIMIT = 10 * 60    # 10 min — unconditional release
 
 
 def _normalize_phone(phone: str) -> str:
@@ -40,8 +41,15 @@ def _normalize_phone(phone: str) -> str:
     return (phone or "").strip().replace(" ", "")
 
 
-async def _survey_lock_matches_phone(survey_id: str, phone: str) -> bool:
-    """Return True only when the locked survey still belongs to this phone."""
+def _lock_age(meta: dict) -> float:
+    return time.monotonic() - float(meta.get("started_at", 0))
+
+
+async def _is_lock_still_valid(survey_id: str, phone: str, age_seconds: float) -> bool:
+    """Check if a call lock still represents a genuinely active call."""
+    if age_seconds > ACTIVE_CALL_HARD_LIMIT:
+        return False
+
     rows = await async_execute(
         "SELECT phone, status, end_reason FROM surveys WHERE id = :survey_id",
         {"survey_id": survey_id},
@@ -54,11 +62,13 @@ async def _survey_lock_matches_phone(survey_id: str, phone: str) -> bool:
     status = str(row.get("status") or "")
     end_reason = str(row.get("end_reason") or "")
 
+    if status == "Completed" or end_reason:
+        return False
     if not db_phone:
         return False
-    if db_phone and db_phone != _normalize_phone(phone):
+    if db_phone != _normalize_phone(phone):
         return False
-    if status == "Completed" or end_reason:
+    if age_seconds > ACTIVE_CALL_STALE_SECONDS:
         return False
     return True
 
@@ -67,23 +77,27 @@ async def _reserve_call(phone: str, survey_id: str) -> None:
     """Reserve a phone number while a live call is active."""
     async with _active_calls_lock:
         now = time.monotonic()
+
+        # Sweep all locks older than the hard limit
         expired = [
-            number
-            for number, meta in _active_calls.items()
-            if now - float(meta.get("started_at", 0)) > ACTIVE_CALL_STALE_SECONDS
+            number for number, meta in _active_calls.items()
+            if now - float(meta.get("started_at", 0)) > ACTIVE_CALL_HARD_LIMIT
         ]
         for number in expired:
-            stale_survey_id = str(_active_calls[number].get("survey_id", ""))
-            if stale_survey_id:
-                _active_surveys.pop(stale_survey_id, None)
+            sid = str(_active_calls[number].get("survey_id", ""))
+            logger.info(f"Auto-releasing expired lock: {number} (survey {sid})")
+            _active_surveys.pop(sid, None)
             del _active_calls[number]
 
         existing = _active_calls.get(phone)
         if existing:
             active_survey_id = str(existing.get("survey_id", ""))
-            if active_survey_id and not await _survey_lock_matches_phone(active_survey_id, phone):
-                logger.warning(
-                    f"Releasing stale call lock for {phone}: survey {active_survey_id} no longer matches active DB state"
+            age = _lock_age(existing)
+
+            if not await _is_lock_still_valid(active_survey_id, phone, age):
+                logger.info(
+                    f"Auto-releasing stale lock for {phone}: survey {active_survey_id}, "
+                    f"age={age:.0f}s"
                 )
                 del _active_calls[phone]
                 _active_surveys.pop(active_survey_id, None)
@@ -91,14 +105,14 @@ async def _reserve_call(phone: str, survey_id: str) -> None:
 
         if existing:
             active_survey_id = str(existing.get("survey_id", ""))
-            if active_survey_id == survey_id:
-                raise HTTPException(
-                    status_code=429,
-                    detail=f"A call for survey {survey_id} to {phone} is already in progress.",
-                )
+            age = _lock_age(existing)
             raise HTTPException(
                 status_code=429,
-                detail=f"A call to {phone} is already in progress for survey {active_survey_id or 'another active survey'}. Please wait until it finishes before retrying.",
+                detail=(
+                    f"A call to {phone} is already in progress "
+                    f"(survey {active_survey_id}, started {age:.0f}s ago). "
+                    f"It will auto-expire after {ACTIVE_CALL_STALE_SECONDS}s."
+                ),
             )
 
         _active_calls[phone] = {"survey_id": survey_id, "started_at": now}
@@ -119,6 +133,7 @@ async def _release_call(*, survey_id: str | None = None, phone: str | None = Non
                     del _active_calls[resolved_phone]
                     if meta_survey_id:
                         _active_surveys.pop(meta_survey_id, None)
+                    logger.info(f"Released call lock: {resolved_phone} (survey {meta_survey_id})")
 
 
 def _extract_rider_first_name(rider_name: str) -> str:
