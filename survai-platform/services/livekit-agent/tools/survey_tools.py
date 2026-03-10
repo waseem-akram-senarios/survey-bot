@@ -57,16 +57,73 @@ def create_survey_tools(
     survey_url: Optional[str] = None,
     rider_email: Optional[str] = None,
     rider_name: Optional[str] = None,
+    questions_metadata: List[dict] = None,
 ):
     total_questions = len(question_ids) if question_ids else 0
     qmap = questions_map or {}
     qmap_es = questions_map_es or {}
     person_name = rider_name or "there"
 
+    # Build lookup for full question metadata (parent_id, criteria, categories, etc.)
+    _qmeta: dict = {}
+    for q in (questions_metadata or []):
+        _qmeta[q.get("id", "")] = q
+
     def _next_question_text(next_id: str, lang: str) -> str:
         if lang == "es" and qmap_es:
             return qmap_es.get(next_id, "") or qmap.get(next_id, "")
         return qmap.get(next_id, "")
+
+    def _should_skip_conditional(qid: str) -> bool:
+        """Check if a conditional question should be skipped based on its parent's answer."""
+        meta = _qmeta.get(qid, {})
+        parent_id = meta.get("parent_id")
+        if not parent_id:
+            return False
+        parent_answer = survey_responses.get("answers", {}).get(parent_id)
+        if parent_answer is None:
+            return True
+        trigger_cats = meta.get("parent_category_texts", [])
+        if not trigger_cats:
+            return False
+        answer_lower = str(parent_answer).lower().strip()
+        for cat in trigger_cats:
+            if cat.lower().strip() in answer_lower or answer_lower in cat.lower().strip():
+                return False
+        return True
+
+    def _find_next_question(remaining: List[str]) -> Optional[str]:
+        """Find the next non-skippable question from the remaining list."""
+        for qid in remaining:
+            if _should_skip_conditional(qid):
+                survey_responses["answers"][qid] = "__skipped__"
+                logger.info(f"[SKIP] {qid} — conditional not met")
+                continue
+            return qid
+        return None
+
+    def _format_next_instruction(next_id: str, lang: str) -> str:
+        """Build the instruction for the next question, including options for categorical."""
+        next_text = _next_question_text(next_id, lang)
+        meta = _qmeta.get(next_id, {})
+        criteria = meta.get("criteria", "open")
+        categories = meta.get("categories", [])
+        if isinstance(categories, str):
+            try:
+                categories = __import__("json").loads(categories)
+            except Exception:
+                categories = []
+
+        instruction = f'Ask VERBATIM: "{next_text}" (id:{next_id}).'
+        if criteria == "categorical" and categories:
+            opts = [c for c in categories if c.lower() != "none of the above"]
+            if opts:
+                opts_str = ", ".join(opts)
+                instruction += f" READ these options: {opts_str}."
+        elif criteria == "scale":
+            scale_max = meta.get("scales") or 5
+            instruction += f" Tell them the scale: 1 is very poor, {scale_max} is excellent."
+        return instruction
 
     async def _save_and_notify(reason: str, call_duration: float):
         """Save results and notify backend services."""
@@ -106,6 +163,7 @@ def create_survey_tools(
         """
         Record the caller's answer to a survey question.
         IMPORTANT: After calling this, read the response carefully — it tells you EXACTLY what to do next.
+        It gives you the exact next question to ask. Do NOT ask any other question.
 
         Args:
             question_id: The question identifier from the survey
@@ -118,10 +176,10 @@ def create_survey_tools(
             done = list(survey_responses["answers"].keys())
             if question_ids:
                 remaining = [q for q in question_ids if q not in done]
-                if remaining:
-                    next_id = remaining[0]
-                    next_text = _next_question_text(next_id, lang)
-                    return f"Already recorded. Ask: \"{next_text}\" (id:{next_id}).{lang_reminder}"
+                next_id = _find_next_question(remaining) if remaining else None
+                if next_id:
+                    instr = _format_next_instruction(next_id, lang)
+                    return f"Already recorded. {instr}{lang_reminder}"
                 else:
                     return f"All questions answered. Call end_survey(\"completed\") now.{lang_reminder}"
             return f"Already recorded. Continue.{lang_reminder}"
@@ -139,10 +197,10 @@ def create_survey_tools(
 
         if question_ids:
             remaining = [q for q in question_ids if q not in done]
-            if remaining:
-                next_id = remaining[0]
-                next_text = _next_question_text(next_id, lang)
-                return f"Recorded. Ask: \"{next_text}\" (id:{next_id}).{lang_reminder}"
+            next_id = _find_next_question(remaining) if remaining else None
+            if next_id:
+                instr = _format_next_instruction(next_id, lang)
+                return f"Recorded. {instr}{lang_reminder}"
             else:
                 logger.info(f"ALL {total_questions} questions answered")
                 return f"All questions answered. Call end_survey(\"completed\") now.{lang_reminder}"

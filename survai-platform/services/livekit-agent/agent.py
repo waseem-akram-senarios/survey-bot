@@ -231,6 +231,7 @@ async def entrypoint(ctx: JobContext):
         survey_url=survey_url,
         rider_email=rider_email,
         rider_name=rider_first_name,
+        questions_metadata=questions_list,
     )
 
     # Build agents based on call language mode

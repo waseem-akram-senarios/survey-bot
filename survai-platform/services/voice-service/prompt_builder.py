@@ -126,11 +126,20 @@ def _format_question_en(order: int, q: Dict[str, Any]) -> str:
         )
     elif criteria == "categorical":
         cats_str = ", ".join(categories) if categories else "open"
+        if categories:
+            return (
+                f"Q{order} [{qid}] CHOICE [{cats_str}]: {question_text}\n"
+                f"  ALWAYS read the options aloud after asking the question.\n"
+                f"  Say something like: \"Your options are: {cats_str}.\"\n"
+                f"  Accept their choice. If unclear, repeat the options once.\n"
+                f"  Negative choice: empathize briefly and move on.\n"
+                f"  Positive choice: acknowledge briefly and move on."
+            )
         return (
-            f"Q{order} [{qid}] CHOICE [{cats_str}]: {question_text}\n"
-            f"  Let them answer freely. Only list the options if they seem stuck.\n"
-            f"  Negative choice: empathize and ask ONE follow-up.\n"
-            f"  Positive choice: celebrate briefly and move on."
+            f"Q{order} [{qid}] CHOICE: {question_text}\n"
+            f"  Let them answer freely.\n"
+            f"  Negative choice: empathize briefly and move on.\n"
+            f"  Positive choice: acknowledge briefly and move on."
         )
     else:
         return (
@@ -170,11 +179,20 @@ def _format_question_es(order: int, q: Dict[str, Any], es_text: str) -> str:
         )
     elif criteria == "categorical":
         cats_str = ", ".join(categories) if categories else "abierto"
+        if categories:
+            return (
+                f"P{order} [{qid}] OPCIÓN [{cats_str}]: {question_text}\n"
+                f"  SIEMPRE lee las opciones en voz alta después de hacer la pregunta.\n"
+                f"  Di algo como: \"Las opciones son: {cats_str}.\"\n"
+                f"  Acepta su elección. Si no queda claro, repite las opciones una vez.\n"
+                f"  Respuesta negativa: empatiza brevemente y avanza.\n"
+                f"  Respuesta positiva: reconoce brevemente y avanza."
+            )
         return (
-            f"P{order} [{qid}] OPCIÓN [{cats_str}]: {question_text}\n"
-            f"  Deja que respondan libremente. Solo menciona las opciones si parecen perdidos.\n"
-            f"  Respuesta negativa: empatiza y haz UNA pregunta de seguimiento.\n"
-            f"  Respuesta positiva: celebra brevemente y avanza."
+            f"P{order} [{qid}] OPCIÓN: {question_text}\n"
+            f"  Deja que respondan libremente.\n"
+            f"  Respuesta negativa: empatiza brevemente y avanza.\n"
+            f"  Respuesta positiva: reconoce brevemente y avanza."
         )
     else:
         return (
@@ -467,16 +485,19 @@ After the last question: call end_survey("completed"). The tool handles farewell
 1. Every call ends with ONE call to end_survey(). No exceptions.
 2. Do NOT say goodbye yourself — end_survey() does it.
 3. Call record_answer() immediately after each answer. No batching.
-4. Ask EXACTLY ONE question per response. Never combine two questions.
-5. NEVER re-ask a question you already asked, even if the caller gives a short or unclear answer. Record what they said and move to the next question.
+4. Ask EXACTLY ONE question per turn. Your response must contain AT MOST one question. NEVER combine, stack, or batch two or more questions in the same response.
+5. NEVER re-ask a question you already asked. Record what they said and move on.
 6. Only discuss the survey.
-7. If asked if you are AI: say "¡Sí! Tu opinión va directamente al equipo de {organization_name}." Then continue.
-8. After asking a question, stop speaking immediately. Do not add filler or another question. Wait for the caller's answer.
-9. NEVER explain your internal reasoning or mention what the tool told you. Speak only as Cameron.
-10. NEVER say things like "ya que respondiste X, saltaremos Y". Just ask the next question.
-11. If the caller says "hello?", "are you there?", or seems to be waiting for you, respond immediately. If you were waiting for their answer, gently repeat the current question ONCE.
-12. NEVER ask the same question more than once. If record_answer returns "Already recorded", move to the next question immediately without commenting.
-13. ONLY ask questions that appear in the PREGUNTAS section above. Do NOT invent, generate, or add ANY question that is not explicitly listed there. Follow-up probes must be brief clarifications about the SAME question (e.g. "¿Podrías contarme más?"), NEVER a new topic or a new question you made up.{restricted_block}"""
+7. If asked if you are AI: "¡Sí! Tu opinión va directamente al equipo de {organization_name}." Then continue.
+8. After asking a question, STOP. Do not add filler or another question. Wait silently for the caller's answer.
+9. NEVER explain your internal reasoning. Speak only as Cameron.
+10. NEVER say "ya que respondiste X, saltaremos Y". Just proceed.
+11. If the caller says "¿hola?" or "¿estás ahí?", gently repeat the current question ONCE.
+12. NEVER ask the same question more than once. If record_answer says "Already recorded", move on silently.
+13. ONLY ask questions listed in PREGUNTAS. Do NOT invent or add ANY new question.
+14. For OPCIÓN questions: ALWAYS read the options aloud. The caller is on the phone and cannot see them.
+15. The record_answer tool response tells you EXACTLY which question to ask next. Follow it precisely. Do NOT skip ahead or choose a different question.
+16. For CONDICIONAL questions: the tool automatically skips them when the condition is not met. Trust the tool's next-question instruction.{restricted_block}"""
         return prompt, es_map
 
     # ── English prompt ─────────────────────────────────────────────────────────
@@ -527,17 +548,20 @@ After last question: call end_survey("completed"). Tool handles farewell and han
 1. Every call ends with ONE call to end_survey(). No exceptions.
 2. Do NOT say goodbye yourself — end_survey() does it.
 3. Call record_answer() immediately after each answer. No batching.
-4. Ask EXACTLY ONE question per response. Never combine two questions.
-5. NEVER re-ask a question you already asked, even if the caller gives a short or unclear answer. Record what they said and move to the next question.
+4. Ask EXACTLY ONE question per turn. Your response must contain AT MOST one question. NEVER combine, stack, or batch two or more questions in the same response.
+5. NEVER re-ask a question you already asked. Record what they said and move on.
 6. Only discuss the survey.
 7. If asked if AI: "Yes — your feedback goes to the {organization_name} team!" Then continue.
-8. Ask each question VERBATIM as written in the QUESTIONS section above. Do NOT rephrase, expand, shorten, or add context to the question text.
-9. After asking a question, stop speaking immediately. Do not add filler, explanation, or another question. Wait for the caller's answer.
-10. NEVER explain your internal reasoning or mention that you are skipping a question based on a previous answer.
-11. NEVER say things like "since you already answered X, I'll move to Y". Just ask Y.
-12. If the caller says "hello?", "are you there?", or seems to be waiting for you, respond immediately. If you were waiting for their answer, gently repeat the current question ONCE.
-13. NEVER ask the same question more than once. If record_answer returns "Already recorded", move to the next question immediately without commenting.
-14. ONLY ask questions that appear in the QUESTIONS section above. Do NOT invent, generate, or add ANY question that is not explicitly listed there. Follow-up probes must be brief clarifications about the SAME question (e.g. "Could you tell me more?"), NEVER a new topic or a new question you made up.{restricted_block}"""
+8. Ask each question VERBATIM as written. Do NOT rephrase, expand, shorten, or add context.
+9. After asking a question, STOP. Do not add filler, explanation, or another question. Wait silently for the caller's answer.
+10. NEVER explain your internal reasoning or mention skipping questions.
+11. NEVER say "since you already answered X". Just proceed.
+12. If the caller says "hello?" or "are you there?", gently repeat the current question ONCE.
+13. NEVER ask the same question more than once. If record_answer says "Already recorded", move on silently.
+14. ONLY ask questions listed in the QUESTIONS section. Do NOT invent or add ANY new question.
+15. For CHOICE questions: ALWAYS read the options aloud. The caller is on the phone and cannot see them.
+16. The record_answer tool response tells you EXACTLY which question to ask next. Follow it precisely. Do NOT skip ahead or choose a different question.
+17. For CONDITIONAL questions: the tool automatically skips them when the condition is not met. Trust the tool's next-question instruction.{restricted_block}"""
 
     return prompt, es_map if language == "es" else {}
 
