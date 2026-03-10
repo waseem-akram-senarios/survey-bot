@@ -63,10 +63,13 @@ class SpanishQuestionsAgent(Agent):
                     "NO repitas P1. Espera en silencio a que el receptor responda."
                 )
                 chat_ctx.add_message(role="system", content=system_note)
-                chat_ctx.add_message(role="assistant", content=intro)
                 await self.update_chat_ctx(chat_ctx)
 
-                self.session.say(intro)
+                await self.session.say(intro).wait_for_playout()
+
+                chat_ctx_after_intro = self.chat_ctx.copy()
+                chat_ctx_after_intro.add_message(role="assistant", content=intro)
+                await self.update_chat_ctx(chat_ctx_after_intro)
                 return
 
         # Fallback: no questions or missing Q1 text

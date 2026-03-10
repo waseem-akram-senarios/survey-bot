@@ -33,6 +33,9 @@ from config.settings import (
     ORGANIZATION_NAME,
     SIP_OUTBOUND_TRUNK_ID,
     STT_MODEL,
+    STT_LANGUAGE,
+    STT_DETECT_LANGUAGE,
+    STT_ENDPOINTING_MS,
     LLM_MODEL,
     LLM_TEMPERATURE,
     TTS_MODEL,
@@ -258,11 +261,16 @@ async def entrypoint(ctx: JobContext):
         call_data.agents["questions_es"] = questions_agent_es
         questions_agent = questions_agent_en  # default; actual selection done in to_questions()
 
+    stt_language = "es" if call_language == "es" else STT_LANGUAGE
+    stt_detect_language = STT_DETECT_LANGUAGE and call_language != "es"
+
     session = AgentSession[SurveyCallData](
         userdata=call_data,
         stt=deepgram.STT(
             model=STT_MODEL,
-            language="es" if call_language == "es" else "multi"
+            language=stt_language,
+            detect_language=stt_detect_language,
+            endpointing_ms=STT_ENDPOINTING_MS,
         ),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
         tts=elevenlabs.TTS(

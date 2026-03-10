@@ -198,10 +198,16 @@ def build_html_email(url: str, language: str = "en") -> str:
         </td></tr>
         <tr><td style="padding:32px 40px;">
           <p style="margin:0 0 12px;font-size:16px;color:#333333;line-height:1.6;">
-            We value your opinion and would appreciate a few minutes of your time to complete a short survey.
+            We invite you to share your thoughts to help us support your needs and enhance your experience.
+          </p>
+          <p style="margin:0 0 12px;font-size:16px;color:#666666;line-height:1.6;font-style:italic;">
+            Te invitamos a compartir tus opiniones para ayudarnos a apoyar tus necesidades y mejorar tu experiencia.
+          </p>
+          <p style="margin:0 0 20px;font-size:16px;color:#333333;line-height:1.6;">
+            Your feedback matters&#8212;please take a moment to participate!
           </p>
           <p style="margin:0 0 20px;font-size:16px;color:#666666;line-height:1.6;font-style:italic;">
-            Valoramos su opinión y le agradeceríamos unos minutos de su tiempo para completar una breve encuesta.
+            &#161;Tu opinión importa, te invitamos a participar!
           </p>
           <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
             <tr><td style="background-color:#1958F7;border-radius:8px;text-align:center;">
@@ -225,15 +231,15 @@ def build_html_email(url: str, language: str = "en") -> str:
 
     if language == "es":
         heading = "Nos Encantaría Conocer Su Opinión"
-        intro = "Valoramos su opinión y le agradeceríamos unos minutos de su tiempo para completar una breve encuesta."
-        body2 = "Sus respuestas nos ayudan a mejorar nuestros productos y servicios."
+        intro = "Te invitamos a compartir tus opiniones para ayudarnos a apoyar tus necesidades y mejorar tu experiencia."
+        body2 = "\u00a1Tu opinión importa, te invitamos a participar!"
         cta = "Realizar la Encuesta"
         fallback = "Si el botón de arriba no funciona, copie y pegue este enlace en su navegador:"
         footer = "Gracias por su tiempo y sus comentarios."
     else:
         heading = "We'd Love Your Feedback"
-        intro = "We value your opinion and would appreciate a few minutes of your time to complete a short survey."
-        body2 = "Your responses help us improve our products and services."
+        intro = "We invite you to share your thoughts to help us support your needs and enhance your experience."
+        body2 = "Your feedback matters\u2014please take a moment to participate!"
         cta = "Take the Survey"
         fallback = "If the button above doesn't work, copy and paste this link into your browser:"
         footer = "Thank you for your time and insights."
@@ -281,28 +287,30 @@ def build_text_email(url: str, language: str = "en") -> str:
     """Build plain text email body for survey link with bilingual support."""
     if language == "bilingual":
         return (
-            "We'd Love Your Feedback / Nos Encantaría Conocer Su Opinión\n\n"
-            "We value your opinion and would appreciate a few minutes of your time "
-            "to complete a short survey.\n"
-            "Valoramos su opinión y le agradeceríamos unos minutos de su "
-            "tiempo para completar una breve encuesta.\n\n"
+            "We'd Love Your Feedback / Nos Encantar\u00eda Conocer Su Opini\u00f3n\n\n"
+            "We invite you to share your thoughts to help us support your needs "
+            "and enhance your experience.\n"
+            "Te invitamos a compartir tus opiniones para ayudarnos a apoyar tus "
+            "necesidades y mejorar tu experiencia.\n\n"
+            "Your feedback matters\u2014please take a moment to participate!\n"
+            "\u00a1Tu opini\u00f3n importa, te invitamos a participar!\n\n"
             f"Take the survey / Realizar la encuesta: {url}\n\n"
             "Thank you / Gracias"
         )
     if language == "es":
         return (
-            "Nos Encantaría Conocer Su Opinión\n\n"
-            "Valoramos su opinión y le agradeceríamos unos minutos de su "
-            "tiempo para completar una breve encuesta.\n\n"
-            "Sus respuestas nos ayudan a mejorar nuestros productos y servicios.\n\n"
+            "Nos Encantar\u00eda Conocer Su Opini\u00f3n\n\n"
+            "Te invitamos a compartir tus opiniones para ayudarnos a apoyar tus "
+            "necesidades y mejorar tu experiencia.\n\n"
+            "\u00a1Tu opini\u00f3n importa, te invitamos a participar!\n\n"
             f"Realizar la encuesta: {url}\n\n"
             "Gracias por su tiempo y sus comentarios."
         )
     return (
         "We'd Love Your Feedback\n\n"
-        "We value your opinion and would appreciate a few minutes of your time "
-        "to complete a short survey.\n\n"
-        "Your responses help us improve our products and services.\n\n"
+        "We invite you to share your thoughts to help us support your needs "
+        "and enhance your experience.\n\n"
+        "Your feedback matters\u2014please take a moment to participate!\n\n"
         f"Take the survey: {url}\n\n"
         "Thank you for your time and insights!"
     )

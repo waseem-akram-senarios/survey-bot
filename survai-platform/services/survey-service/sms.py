@@ -89,15 +89,11 @@ def send_survey_link_sms(
         language: 'en' or 'es' for message language
     """
     if language == "es":
-        if rider_name:
-            message = f"Hola {rider_name}! Nos gustaría conocer tu opinión sobre tu viaje reciente. Por favor completa nuestra breve encuesta: {survey_url}"
-        else:
-            message = f"Hola! Nos gustaría conocer tu opinión sobre tu viaje reciente. Por favor completa nuestra breve encuesta: {survey_url}"
+        name_part = f" {rider_name}" if rider_name else ""
+        message = f"\u00a1Hola{name_part}! Te invitamos a compartir tus opiniones para ayudarnos a mejorar tu experiencia. Por favor completa nuestra breve encuesta: {survey_url}"
     else:
-        if rider_name:
-            message = f"Hi {rider_name}! We'd love to hear about your recent trip. Please take our brief survey: {survey_url}"
-        else:
-            message = f"Hi! We'd love to hear about your recent trip. Please take our brief survey: {survey_url}"
+        name_part = f" {rider_name}" if rider_name else ""
+        message = f"Hi{name_part}! We invite you to share your thoughts to help us enhance your experience. Please take our brief survey: {survey_url}"
     
     return send_sms(to_phone, message)
 

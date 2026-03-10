@@ -67,16 +67,16 @@ const translations = {
 
     // Greeting lines
     greetingHi: "Hi",
-    greetingIntro: "I'm your AI survey assistant. I'm here to collect your feedback quickly and easily.",
-    greetingTime: "It only takes a few minutes. Your opinion matters!",
+    greetingIntro: "We invite you to share your thoughts to help us support your needs and enhance your experience.",
+    greetingTime: "Your feedback matters\u2014please take a moment to participate!",
 
     // Language selector
     selectLanguage: "Select Language",
     english: "English",
     spanish: "Espa\u00f1ol",
-    bilingualPrompt: "To continue in English, please continue speaking English. To continue in Spanish, please speak Spanish to indicate your preference.",
+    bilingualPrompt: "What language would you like to complete the survey in?",
     bilingualQuestion: "What language would you like to complete the survey in?",
-    languageIntro: "Para continuar en inglés, por favor continúe hablando en inglés. Para continuar en español, por favor hable en español.",
+    languageIntro: "\u00bfEn qu\u00e9 idioma le gustar\u00eda completar la encuesta?",
     whatLanguage: "What language would you like to complete the survey in?",
   },
   es: {
@@ -147,17 +147,17 @@ const translations = {
 
     // Greeting lines
     greetingHi: "\u00a1Hola",
-    greetingIntro: "Soy tu asistente de encuesta de IA. Estoy aqu\u00ed para recopilar tus comentarios de forma r\u00e1pida y sencilla.",
-    greetingTime: "Solo toma unos minutos. \u00a1Tu opini\u00f3n importa!",
+    greetingIntro: "Te invitamos a compartir tus opiniones para ayudarnos a apoyar tus necesidades y mejorar tu experiencia.",
+    greetingTime: "\u00a1Tu opini\u00f3n importa, te invitamos a participar!",
 
     // Language selector
     selectLanguage: "Seleccionar Idioma",
     english: "English",
     spanish: "Espa\u00f1ol",
-    bilingualPrompt: "To continue in English, please continue speaking English. To continue in Spanish, please speak Spanish to indicate your preference.",
+    bilingualPrompt: "\u00bfEn qu\u00e9 idioma le gustar\u00eda completar la encuesta?",
     bilingualQuestion: "\u00bfEn qu\u00e9 idioma le gustar\u00eda completar la encuesta?",
-    languageIntro: "Para continuar en ingl\u00e9s, por favor contin\u00fae hablando en ingl\u00e9s. Para continuar en espa\u00f1ol, por favor hable en espa\u00f1ol.",
-    whatLanguage: "What language would you like to complete the survey in?",
+    languageIntro: "What language would you like to complete the survey in?",
+    whatLanguage: "\u00bfEn qu\u00e9 idioma le gustar\u00eda completar la encuesta?",
   },
 };
 

@@ -87,4 +87,4 @@ class SpanishGreeterAgent(Agent):
                 )
 
         logger.info(f"[AGENT] {greeting}")
-        self.session.say(greeting)
+        await self.session.say(greeting).wait_for_playout()

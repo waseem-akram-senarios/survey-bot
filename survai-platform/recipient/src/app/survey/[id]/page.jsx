@@ -1,11 +1,10 @@
 "use client";
 import { Box, Typography, Button, CircularProgress, Card, Avatar, Chip, ToggleButton, ToggleButtonGroup } from "@mui/material";
-import { AutoAwesome, TextFields, Language } from "@mui/icons-material";
+import { AutoAwesome, TextFields } from "@mui/icons-material";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Background from '../../../../public/StartBackground.svg'
 import { detectLanguage, t } from '../../../lib/i18n';
-import { generatePersonalizedGreeting } from '../../../lib/aiService';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -20,11 +19,10 @@ export default function Survey() {
   const [recipientName, setRecipientName] = useState("");
   const [riderName, setRiderName] = useState("");
   const [surveyName, setSurveyName] = useState("");
-  const [biodata, setBiodata] = useState("");
   const [lang, setLang] = useState(urlLang || "en");
   const [isBilingual, setIsBilingual] = useState(true);
   const [visibleLines, setVisibleLines] = useState(0);
-  const [personalizedGreeting, setPersonalizedGreeting] = useState("");
+  const dataFetched = useRef(false);
 
   const getGreetingLines = (name, language) => [
     language === 'es' ? `¡Hola${name ? `, ${name}` : ''}! 👋` : `Hi${name ? `, ${name}` : ''}! 👋`,
@@ -32,70 +30,63 @@ export default function Survey() {
     t('greetingTime', language) + ' 🙏',
   ];
 
-  const fetchRecipientInfo = async () => {
-    if (!id) return;
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/surveys/${id}/recipient`, {
-        method: "GET",
-        headers: { accept: "application/json" },
-      });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const result = await response.json();
-      setRecipientName(result.Recipient || "");
-      setRiderName(result.RiderName || "");
-      setSurveyName(result.Name || "");
-      setBiodata(result.Biodata || "");
-      const bilingual = result.Bilingual !== false;
-      setIsBilingual(bilingual);
-      if (!urlLang && result.Name) {
-        const detected = detectLanguage(result.Name);
-        setLang(detected);
+  const handleLangChange = useCallback((newLang) => {
+    if (!newLang || newLang === lang) return;
+    setLang(newLang);
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", newLang);
+    window.history.replaceState(null, "", url.toString());
+  }, [lang]);
+
+  useEffect(() => {
+    if (!id || dataFetched.current) return;
+    dataFetched.current = true;
+
+    const initializePage = async () => {
+      let detectedLang = urlLang || "en";
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/surveys/${id}/recipient`, {
+          method: "GET",
+          headers: { accept: "application/json" },
+        });
+        if (response.ok) {
+          const result = await response.json();
+          setRecipientName(result.Recipient || "");
+          setRiderName(result.RiderName || "");
+          setSurveyName(result.Name || "");
+          const bilingual = result.Bilingual !== false;
+          setIsBilingual(bilingual);
+          if (!urlLang && result.Name) {
+            detectedLang = detectLanguage(result.Name);
+            setLang(detectedLang);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching recipient info:", err);
       }
 
       try {
-        const greeting = await generatePersonalizedGreeting(
-          result.Recipient || result.RiderName,
-          result.Name,
-          lang,
-          result.Biodata || ""
-        );
-        setPersonalizedGreeting(greeting);
-      } catch (error) {
-        console.error("Failed to generate AI greeting:", error);
+        const response = await fetch(`${API_BASE_URL}/api/surveys/${id}/status`, {
+          method: "GET",
+          headers: { accept: "application/json" },
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const result = await response.json();
+        if (result.Status === "Completed") {
+          router.push(`/survey/${id}/complete?lang=${detectedLang}`);
+          return;
+        }
+      } catch (err) {
+        console.error("Error checking survey status:", err);
+        setError(t('errorLoading', detectedLang));
       }
-    } catch (error) {
-      console.error("Error fetching recipient info:", error);
-    }
-  };
 
-  const checkSurveyStatus = async () => {
-    if (!id) return;
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/surveys/${id}/status`, {
-        method: "GET",
-        headers: { accept: "application/json" },
-      });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const result = await response.json();
-      if (result.Status === "Completed") {
-        const targetLang = urlLang || lang;
-        router.push(`/survey/${id}/complete${targetLang ? `?lang=${targetLang}` : ""}`);
-        return;
-      }
       setIsLoading(false);
-    } catch (error) {
-      console.error("Error checking survey status:", error);
-      setError(t('errorLoading', lang));
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const initializePage = async () => {
-      await Promise.all([fetchRecipientInfo(), checkSurveyStatus()]);
     };
+
     initializePage();
-  }, [id, router, urlLang, lang]);
+  }, [id]);
 
   useEffect(() => {
     if (isLoading || error) return;
@@ -167,7 +158,7 @@ export default function Survey() {
         <ToggleButtonGroup
           value={lang}
           exclusive
-          onChange={(_, newLang) => { if (newLang) setLang(newLang); }}
+          onChange={(_, newLang) => handleLangChange(newLang)}
           size="small"
           sx={{
             backgroundColor: "rgba(255,255,255,0.9)",
@@ -246,7 +237,14 @@ export default function Survey() {
               {t('survaiAssistant', lang)}
             </Typography>
             <Box display="flex" alignItems="center" gap={0.5}>
-              <Box sx={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#00C853", animation: "pulse 1.5s infinite" }} />
+              <Box sx={{
+                width: 7, height: 7, borderRadius: "50%", backgroundColor: "#00C853",
+                animation: "pulse 1.5s infinite",
+                "@keyframes pulse": {
+                  "0%, 100%": { opacity: 1 },
+                  "50%": { opacity: 0.4 },
+                },
+              }} />
               <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "11px", color: "#7D7D7D" }}>
                 {t('online', lang)}
               </Typography>
@@ -281,13 +279,13 @@ export default function Survey() {
                   lineHeight: 1.5,
                 }}
               >
-                {personalizedGreeting ? (personalizedGreeting.split('\n')[i] || line) : line}
+                {line}
               </Typography>
             </Box>
           )
         ))}
 
-        {/* Proactive Bilingual Prompt */}
+        {/* Bilingual Language Selector */}
         {isBilingual && visibleLines >= greetingLines.length && (
           <Box
             sx={{
@@ -299,26 +297,24 @@ export default function Survey() {
               animation: "fadeSlideIn 0.4s ease",
             }}
           >
-            <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "14px", fontWeight: 600, color: "#7A5C00", mb: 1 }}>
-              {t('bilingualQuestion', 'en')} / {t('bilingualQuestion', 'es')}
+            <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "14px", fontWeight: 600, color: "#7A5C00", mb: 0.5 }}>
+              {t('bilingualQuestion', 'en')}
             </Typography>
-            <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "13px", color: "#333", mb: 2, lineHeight: 1.4 }}>
-              {t('bilingualPrompt', 'en')}
-              <br />
-              <span style={{ fontStyle: 'italic', color: '#666' }}>{t('languageIntro', 'es')}</span>
+            <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "13px", fontStyle: "italic", color: "#7A5C00", mb: 2 }}>
+              {t('bilingualQuestion', 'es')}
             </Typography>
             
             <Box display="flex" gap={2}>
               <Button 
                 variant={lang === 'en' ? "contained" : "outlined"}
-                onClick={() => setLang('en')}
+                onClick={() => handleLangChange('en')}
                 sx={{ flex: 1, borderRadius: "10px", textTransform: "none", fontFamily: "Poppins, sans-serif" }}
               >
                 English
               </Button>
               <Button 
                 variant={lang === 'es' ? "contained" : "outlined"}
-                onClick={() => setLang('es')}
+                onClick={() => handleLangChange('es')}
                 sx={{ flex: 1, borderRadius: "10px", textTransform: "none", fontFamily: "Poppins, sans-serif" }}
               >
                 Español
@@ -378,12 +374,6 @@ export default function Survey() {
         </Typography>
       </Card>
 
-      <style jsx global>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
     </Box>
   );
 }
