@@ -32,8 +32,9 @@ router = APIRouter(prefix="/api/voice", tags=["voice"])
 _active_calls: dict[str, dict[str, float | str]] = {}
 _active_surveys: dict[str, str] = {}
 _active_calls_lock = asyncio.Lock()
-ACTIVE_CALL_STALE_SECONDS = 4 * 60  # 4 min — calls rarely last longer
-ACTIVE_CALL_HARD_LIMIT = 10 * 60    # 10 min — unconditional release
+ACTIVE_CALL_STALE_SECONDS = 4 * 60
+ACTIVE_CALL_HARD_LIMIT = 10 * 60
+LOCK_WATCHDOG_SECONDS = 75  # auto-release if agent never confirms the call connected
 
 
 def _normalize_phone(phone: str) -> str:
@@ -73,12 +74,30 @@ async def _is_lock_still_valid(survey_id: str, phone: str, age_seconds: float) -
     return True
 
 
+async def _lock_watchdog(phone: str, survey_id: str) -> None:
+    """Background task: release the lock if the call was never answered."""
+    await asyncio.sleep(LOCK_WATCHDOG_SECONDS)
+    async with _active_calls_lock:
+        meta = _active_calls.get(phone)
+        if not meta:
+            return
+        if str(meta.get("survey_id", "")) != survey_id:
+            return
+        if meta.get("confirmed"):
+            return
+        logger.info(
+            f"Watchdog: releasing unconfirmed lock for {phone} "
+            f"(survey {survey_id}, age={_lock_age(meta):.0f}s)"
+        )
+        del _active_calls[phone]
+        _active_surveys.pop(survey_id, None)
+
+
 async def _reserve_call(phone: str, survey_id: str) -> None:
     """Reserve a phone number while a live call is active."""
     async with _active_calls_lock:
         now = time.monotonic()
 
-        # Sweep all locks older than the hard limit
         expired = [
             number for number, meta in _active_calls.items()
             if now - float(meta.get("started_at", 0)) > ACTIVE_CALL_HARD_LIMIT
@@ -117,6 +136,16 @@ async def _reserve_call(phone: str, survey_id: str) -> None:
 
         _active_calls[phone] = {"survey_id": survey_id, "started_at": now}
         _active_surveys[survey_id] = phone
+
+    asyncio.create_task(_lock_watchdog(phone, survey_id))
+
+
+async def _confirm_call(phone: str, survey_id: str) -> None:
+    """Mark a lock as confirmed (call was answered), so the watchdog won't release it."""
+    async with _active_calls_lock:
+        meta = _active_calls.get(phone)
+        if meta and str(meta.get("survey_id", "")) == survey_id:
+            meta["confirmed"] = True
 
 
 async def _release_call(*, survey_id: str | None = None, phone: str | None = None) -> None:
@@ -497,6 +526,14 @@ async def api_complete_survey(survey_id: str, reason: str = "completed"):
         pass
     await _release_call(survey_id=survey_id)
     return {"status": status, "survey_id": survey_id, "end_reason": reason}
+
+
+@router.post("/confirm-call")
+async def api_confirm_call(survey_id: str, phone: str | None = None):
+    """Agent confirms the call was answered — prevents the watchdog from releasing the lock."""
+    normalized_phone = _normalize_phone(phone or "")
+    await _confirm_call(normalized_phone, survey_id)
+    return {"status": "confirmed", "survey_id": survey_id}
 
 
 @router.post("/release-call")

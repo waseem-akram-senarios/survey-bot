@@ -89,20 +89,28 @@ async def entrypoint(ctx: JobContext):
     phone_number = metadata.get("phone_number")
     survey_id = metadata.get("survey_id")
 
-    async def release_call_lock() -> None:
-        if not survey_id and not phone_number:
-            return
+    async def _voice_service_post(endpoint: str, params: dict) -> None:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{VOICE_SERVICE_URL}/api/voice/release-call",
-                    params={"survey_id": survey_id or "", "phone": phone_number or ""},
+                    f"{VOICE_SERVICE_URL}/api/voice/{endpoint}",
+                    params=params,
                     timeout=aiohttp.ClientTimeout(total=8),
                 ) as resp:
                     if resp.status != 200:
-                        logger.warning(f"release-call returned {resp.status}: {await resp.text()}")
+                        logger.warning(f"{endpoint} returned {resp.status}: {await resp.text()}")
         except Exception as e:
-            logger.warning(f"Failed to release call lock for survey {survey_id}: {e}")
+            logger.warning(f"Failed to call {endpoint} for survey {survey_id}: {e}")
+
+    async def release_call_lock() -> None:
+        if not survey_id and not phone_number:
+            return
+        await _voice_service_post("release-call", {"survey_id": survey_id or "", "phone": phone_number or ""})
+
+    async def confirm_call_lock() -> None:
+        if not survey_id:
+            return
+        await _voice_service_post("confirm-call", {"survey_id": survey_id or "", "phone": phone_number or ""})
 
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
@@ -120,6 +128,7 @@ async def entrypoint(ctx: JobContext):
                 )
             )
             logger.info(f"Answered: {phone_number}")
+            await confirm_call_lock()
         except Exception as e:
             logger.error(f"Call to {phone_number} failed: {e}")
             await release_call_lock()
