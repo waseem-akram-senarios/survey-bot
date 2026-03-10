@@ -362,11 +362,13 @@ async def entrypoint(ctx: JobContext):
 
     @session.on("conversation_item_added")
     def _on_conversation_item(ev) -> None:
-        msg = getattr(ev, "item", None)
-        if msg is None:
-            return
-        role = getattr(msg, "role", None)
-        if role == "assistant":
+        try:
+            msg = getattr(ev, "item", None)
+            if msg is None:
+                return
+            role = getattr(msg, "role", None)
+            if role != "assistant":
+                return
             text = ""
             content = getattr(msg, "content", None)
             if hasattr(msg, "text_content"):
@@ -383,6 +385,8 @@ async def entrypoint(ctx: JobContext):
                     "text": text.strip()[:400],
                     "ts": datetime.now().isoformat(),
                 })
+        except Exception as e:
+            logger.warning("[conversation_item_added] %s", e, exc_info=False)
 
     @session.on("metrics_collected")
     def _on_metrics(ev) -> None:
