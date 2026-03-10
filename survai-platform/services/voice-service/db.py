@@ -186,20 +186,24 @@ def store_transcript(
     call_attempts: int = 1,
     channel: str = "phone",
     call_id: str = None,
+    audio_url: str = None,
 ) -> str:
     transcript_id = str(uuid4())
     now = datetime.now(timezone.utc).isoformat()
     sql_execute(
         """INSERT INTO call_transcripts
            (id, survey_id, full_transcript, call_duration_seconds,
-            call_started_at, call_ended_at, call_status, call_attempts, channel)
+            call_started_at, call_ended_at, call_status, call_attempts, channel,
+            audio_url)
            VALUES (:id, :survey_id, :transcript, :duration,
-                   :started, :ended, :status, :attempts, :channel)""",
+                   :started, :ended, :status, :attempts, :channel,
+                   :audio_url)""",
         {
             "id": transcript_id, "survey_id": survey_id,
             "transcript": full_transcript, "duration": call_duration_seconds,
             "started": now, "ended": now, "status": call_status,
             "attempts": call_attempts, "channel": channel,
+            "audio_url": audio_url,
         },
     )
     if call_id:
@@ -207,7 +211,7 @@ def store_transcript(
             "UPDATE surveys SET call_id = :call_id WHERE id = :survey_id",
             {"call_id": call_id, "survey_id": survey_id},
         )
-    logger.info(f"Stored transcript {transcript_id} for survey {survey_id}")
+    logger.info(f"Stored transcript {transcript_id} for survey {survey_id} (audio={bool(audio_url)})")
     return transcript_id
 
 

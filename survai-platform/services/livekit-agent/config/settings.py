@@ -71,6 +71,16 @@ RESPONSES_DIR = os.getenv("RESPONSES_DIR", "survey_responses")
 SIP_OUTBOUND_TRUNK_ID = os.getenv("SIP_OUTBOUND_TRUNK_ID", "")
 
 # ===========================================
+# CALL RECORDING (LiveKit Egress → S3)
+# ===========================================
+RECORDING_ENABLED = os.getenv("RECORDING_ENABLED", "false").lower() == "true"
+S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY", "")
+S3_SECRET_KEY = os.getenv("S3_SECRET_KEY", "")
+S3_BUCKET = os.getenv("S3_BUCKET", "")
+S3_REGION = os.getenv("S3_REGION", "us-east-1")
+S3_ENDPOINT = os.getenv("S3_ENDPOINT", "")
+
+# ===========================================
 # WORKER SETTINGS
 # ===========================================
 WORKER_INITIALIZE_TIMEOUT = 120.0

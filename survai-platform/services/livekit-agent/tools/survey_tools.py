@@ -142,15 +142,34 @@ def create_survey_tools(
                 f"{VOICE_SERVICE_URL}/api/voice/complete-survey",
                 {"survey_id": survey_id, "reason": reason},
             )
-            transcript_lines = []
-            for qid, ans in survey_responses.get("answers", {}).items():
-                transcript_lines.append(f"Q[{qid}]: {ans}")
+
+            convo_log = survey_responses.get("_conversation_log", [])
+            if convo_log:
+                transcript_lines = []
+                for entry in convo_log:
+                    role_label = "AGENT" if entry["role"] == "agent" else "CALLER"
+                    transcript_lines.append(
+                        f'[{entry["ts"]}] {role_label}: {entry["text"]}'
+                    )
+                answers_section = []
+                for qid, ans in survey_responses.get("answers", {}).items():
+                    answers_section.append(f"  Q[{qid}]: {ans}")
+                if answers_section:
+                    transcript_lines.append("\n--- RECORDED ANSWERS ---")
+                    transcript_lines.extend(answers_section)
+                full_transcript = "\n".join(transcript_lines)
+            else:
+                transcript_lines = []
+                for qid, ans in survey_responses.get("answers", {}).items():
+                    transcript_lines.append(f"Q[{qid}]: {ans}")
+                full_transcript = "\n".join(transcript_lines)
+
             try:
                 await _call_service(
                     f"{VOICE_SERVICE_URL}/api/voice/store-transcript",
                     {
                         "survey_id": survey_id,
-                        "full_transcript": "\n".join(transcript_lines),
+                        "full_transcript": full_transcript,
                         "call_duration_seconds": str(int(call_duration)),
                         "call_status": reason,
                     },

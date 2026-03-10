@@ -175,6 +175,17 @@ class SurveyService {
     }
   }
 
+  static async fetchTranscript(surveyId) {
+    try {
+      const response = await ApiBaseHelper.get(ApiLinks.SURVEY_TRANSCRIPT(surveyId));
+      return response;
+    } catch (error) {
+      if (error.response?.status === 404) return null;
+      console.error('Error fetching transcript:', error);
+      return null;
+    }
+  }
+
   static async sendSurveyBySMS(surveyId, phone, provider = "livekit", language = "bilingual") {
     try {
       const queryParams = new URLSearchParams({

@@ -54,6 +54,9 @@ class ApiLinks {
     static SCHEDULE_CALL = '/api/scheduler/schedule-call';
     static SCHEDULE_CAMPAIGN = '/api/scheduler/schedule-campaign';
 
+    // Call transcript / recording
+    static SURVEY_TRANSCRIPT = (surveyId) => `/api/voice/transcript/${surveyId}`;
+
     // SMS endpoints
     static SURVEY_SEND_SMS = '/api/surveys/sendsms';
     static SURVEY_SMS = '/api/surveys/sms';
