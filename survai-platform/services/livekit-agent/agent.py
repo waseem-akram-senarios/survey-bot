@@ -370,7 +370,8 @@ async def entrypoint(ctx: JobContext):
             text = ""
             content = getattr(msg, "content", None)
             if hasattr(msg, "text_content"):
-                text = msg.text_content() or ""
+                tc = getattr(msg, "text_content", None)
+                text = (tc() if callable(tc) else tc) or ""
             elif isinstance(content, str):
                 text = content
             elif isinstance(content, list):
