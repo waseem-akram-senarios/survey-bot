@@ -148,8 +148,9 @@ async def entrypoint(ctx: JobContext):
 
     rider_first_name = platform_recipient.split()[0] if platform_recipient else ""
     org_name = platform_org or ORGANIZATION_NAME
-    call_language = metadata.get("language", "en")
+    call_language = metadata.get("language", "bilingual")
     greetings = metadata.get("greetings", "")
+    logger.info(f"Call config: language={call_language}, recipient={rider_first_name}, org={org_name}")
 
     # Ensure detected_language is pre-set to the call language
     # (for Spanish calls it is always "es"; for English calls it may change after lang-pref)
