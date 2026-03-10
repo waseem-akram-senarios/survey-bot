@@ -102,12 +102,13 @@ const DashboardTable = ({ tableData = [], onRowClick, onDataChange, onEditSurvey
     }
   };
 
-  const handleSendPhoneConfirm = async (phone, provider = "livekit") => {
+  const handleSendPhoneConfirm = async (phone, provider = "livekit", language = "bilingual") => {
     try {
       const result = await sendSurveyBySMS(
         selectedSurvey.SurveyId, 
         phone, 
-        provider
+        provider,
+        language
       );
       
       console.log('SMS send result:', result);

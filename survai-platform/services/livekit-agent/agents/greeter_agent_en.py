@@ -1,20 +1,18 @@
 """
-English Greeter Agent — first agent for English-language calls.
+English Greeter Agent — first agent for English and bilingual calls.
 
-Call flow:
-  1. on_enter(): speak the combined lang-pref + survey-intent opening line
-       "Hi, I'm Cameron from {org}. I want to conduct a quick survey.
-        To continue in English say English / Para continuar en español di español."
-  2. STEP 1 — Language preference (explicit & implicit):
-       - English response → set_language("en") → ask identity in English
-       - Spanish response → set_language("es") → ask identity in Spanish
-       - Decline          → end_survey("declined")
-  3. STEP 2 — Identity: confirm who they are (in chosen language)
-  4. STEP 3 — Availability: confirm they have time
-  5. Hand off via to_questions() → loads EnglishQuestionsAgent or SpanishQuestionsAgent
+Supports two modes:
+  - language_mode="bilingual": asks caller to choose English or Spanish, then verifies identity
+  - language_mode="en": English-only, skips language question, goes straight to identity
 
-Tools (from survey_tools): end_survey, schedule_callback, send_survey_link, to_questions
-Tools (on class):          set_language
+Call flow (bilingual):
+  1. on_enter(): "Hi, I'm Cameron... To continue in English say English / Para continuar en español..."
+  2. Language preference → set_language()
+  3. Identity → Availability → to_questions()
+
+Call flow (English-only):
+  1. on_enter(): "Hi, I'm Cameron... Am I speaking with {name}?"
+  2. Identity → Availability → to_questions()
 """
 
 import asyncio
@@ -64,12 +62,14 @@ class EnglishGreeterAgent(Agent):
         rider_first_name: str,
         organization_name: str = None,
         greetings: str = "",
+        language_mode: str = "bilingual",
         **kwargs,
     ):
         super().__init__(instructions=instructions, **kwargs)
         self.rider_first_name = rider_first_name
         self.organization_name = organization_name or ORGANIZATION_NAME
         self.greetings = greetings
+        self.language_mode = language_mode
 
     @function_tool
     async def set_language(
@@ -106,9 +106,21 @@ class EnglishGreeterAgent(Agent):
         await asyncio.sleep(1.5)
 
         org = self.organization_name
+        name = self.rider_first_name
 
         if self.greetings:
             greeting = self.greetings
+        elif self.language_mode == "en":
+            if _is_real_name(name):
+                greeting = (
+                    f"Hi, I'm Cameron from {org}. I'd like to conduct a brief survey with you. "
+                    f"Am I speaking with {name}?"
+                )
+            else:
+                greeting = (
+                    f"Hi, I'm Cameron from {org}. I'd like to conduct a brief survey with you. "
+                    "May I know who I'm speaking with?"
+                )
         else:
             greeting = (
                 f"Hi, I'm Cameron from {org}. I'd like to conduct a brief survey with you. "

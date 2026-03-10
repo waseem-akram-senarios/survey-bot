@@ -79,10 +79,10 @@ export const useSurvey = () => {
     }
   };
 
-  const sendSurveyBySMS = async (surveyId, phone, provider = "livekit") => {
+  const sendSurveyBySMS = async (surveyId, phone, provider = "livekit", language = "bilingual") => {
     setIsSendingSMS(true);
     try {
-      const result = await SurveyService.sendSurveyBySMS(surveyId, phone, provider);
+      const result = await SurveyService.sendSurveyBySMS(surveyId, phone, provider, language);
       return result;
     } catch (error) {
       console.error('Error sending survey via SMS:', error);

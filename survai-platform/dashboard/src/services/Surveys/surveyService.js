@@ -175,12 +175,13 @@ class SurveyService {
     }
   }
 
-  static async sendSurveyBySMS(surveyId, phone, provider = "livekit") {
+  static async sendSurveyBySMS(surveyId, phone, provider = "livekit", language = "bilingual") {
     try {
       const queryParams = new URLSearchParams({
         to: phone,
         survey_id: surveyId,
         provider: provider,
+        language: language,
       });
       
       const response = await ApiBaseHelper.post(`${ApiLinks.SURVEY_SEND_PHONE}?${queryParams.toString()}`);

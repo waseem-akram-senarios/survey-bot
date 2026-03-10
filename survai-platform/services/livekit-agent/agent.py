@@ -223,10 +223,10 @@ async def entrypoint(ctx: JobContext):
         rider_name=rider_first_name,
     )
 
-    # Build agents based on call language
+    # Build agents based on call language mode
     if call_language == "es":
-        # Spanish pipeline: SpanishGreeterAgent → SpanishQuestionsAgent (fixed)
-        call_data.detected_language = "es"  # pre-set so tools use Spanish from the first tool call
+        # Spanish-only pipeline: SpanishGreeterAgent → SpanishQuestionsAgent
+        call_data.detected_language = "es"
         greeter_agent = SpanishGreeterAgent(
             instructions=greeter_prompt,
             rider_first_name=rider_first_name,
@@ -240,14 +240,32 @@ async def entrypoint(ctx: JobContext):
         )
         call_data.agents["questions"] = questions_agent
         call_data.agents["greeter"] = greeter_agent
-    else:
-        # English pipeline: EnglishGreeterAgent → EnglishQuestionsAgent or SpanishQuestionsAgent
-        # Both questions agents are registered; to_questions() picks by detected_language
+    elif call_language == "en":
+        # English-only pipeline: EnglishGreeterAgent (no lang question) → EnglishQuestionsAgent
+        call_data.detected_language = "en"
         greeter_agent = EnglishGreeterAgent(
             instructions=greeter_prompt,
             rider_first_name=rider_first_name,
             organization_name=org_name,
             greetings=greetings,
+            language_mode="en",
+            tools=greeter_tools,
+        )
+        questions_agent = EnglishQuestionsAgent(
+            instructions=questions_prompt,
+            tools=question_tools,
+        )
+        call_data.agents["greeter"] = greeter_agent
+        call_data.agents["questions"] = questions_agent
+        call_data.agents["questions_en"] = questions_agent
+    else:
+        # Bilingual pipeline: EnglishGreeterAgent (asks lang pref) → EnglishQuestionsAgent or SpanishQuestionsAgent
+        greeter_agent = EnglishGreeterAgent(
+            instructions=greeter_prompt,
+            rider_first_name=rider_first_name,
+            organization_name=org_name,
+            greetings=greetings,
+            language_mode="bilingual",
             tools=greeter_tools,
         )
         questions_agent_en = EnglishQuestionsAgent(
@@ -262,10 +280,10 @@ async def entrypoint(ctx: JobContext):
         call_data.agents["greeter"] = greeter_agent
         call_data.agents["questions_en"] = questions_agent_en
         call_data.agents["questions_es"] = questions_agent_es
-        questions_agent = questions_agent_en  # default; actual selection done in to_questions()
+        questions_agent = questions_agent_en
 
     stt_language = "es" if call_language == "es" else STT_LANGUAGE
-    stt_detect_language = STT_DETECT_LANGUAGE and call_language != "es"
+    stt_detect_language = STT_DETECT_LANGUAGE and call_language not in ("es", "en")
 
     tts_model = TTS_MODEL_ES if call_language == "es" else TTS_MODEL
     tts_voice = TTS_VOICE_ID_ES if call_language == "es" else TTS_VOICE_ID

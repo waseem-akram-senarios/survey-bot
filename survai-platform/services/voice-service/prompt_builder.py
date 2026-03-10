@@ -188,18 +188,19 @@ def _format_question_es(order: int, q: Dict[str, Any], es_text: str) -> str:
 def build_greeter_prompt(
     organization_name: str,
     rider_first_name: str,
-    language: str = "en",
+    language: str = "bilingual",
 ) -> str:
     """
-    Build the greeter agent system prompt (~300 tokens).
+    Build the greeter agent system prompt.
 
-    language="en": English greeter with lang-pref detection step.
-    language="es": Spanish greeter — identity + availability only, no lang-pref.
+    language="bilingual": Bilingual greeter — asks caller to choose English or Spanish.
+    language="en":        English-only greeter — skips language question, goes to identity.
+    language="es":        Spanish-only greeter — skips language question, speaks Spanish.
     """
     name_is_known = bool(rider_first_name and rider_first_name.strip())
 
+    # ── Spanish-Only Greeter ──────────────────────────────────────────────────
     if language == "es":
-        # ── Spanish Greeter (instructions in English; agent speaks Spanish to caller) ──
         if name_is_known:
             identity_line = (
                 f'The greeting already introduced you as Cameron calling on behalf of {organization_name} '
@@ -253,7 +254,64 @@ Call end_survey("declined") immediately.
 4. Every call ends with ONE call to end_survey() OR a handoff via to_questions().
 5. SPEAK to the caller ALWAYS and ONLY in Spanish. NEVER use English when talking to the caller."""
 
-    # ── English Greeter ────────────────────────────────────────────────────────
+    # ── English-Only Greeter ──────────────────────────────────────────────────
+    if language == "en":
+        if name_is_known:
+            identity_line = (
+                f'The greeting already introduced you as Cameron calling on behalf of {organization_name} '
+                f'and asked "Am I speaking with {rider_first_name}?" — wait for their response. '
+                f'Do NOT repeat the introduction or ask their name again.'
+            )
+        else:
+            identity_line = (
+                f'The greeting already introduced you as Cameron calling on behalf of {organization_name} '
+                f'and asked "May I know who I\'m speaking with?" — wait for them to give their name. '
+                f'Do NOT repeat the introduction.'
+            )
+
+        return f"""You are Cameron, a warm and professional survey caller for {organization_name}.
+
+## LANGUAGE — CRITICAL
+You MUST speak ONLY in English for the ENTIRE call. NEVER use Spanish.
+
+## YOUR ROLE
+Handle the introduction and verify availability. There are exactly TWO steps you must complete IN ORDER before handing off.
+
+## CALL FLOW
+
+**STEP 1 — IDENTITY ONLY**
+{identity_line}
+- Confirmed → go to STEP 2. Do nothing else — just proceed to STEP 2.
+- Wrong person → call end_survey("wrong_person").
+- Confused → say "I'm Cameron calling on behalf of {organization_name}." Ask once more.
+
+CRITICAL: What the person says in STEP 1 is ONLY about their identity. It is NOT about availability.
+
+**STEP 2 — AVAILABILITY (MANDATORY — do not skip)**
+You MUST ask: "Great! Do you have some time to walk through a brief survey?"
+- YES → call to_questions() immediately. Say nothing else before calling it.
+- NO → say "No problem! Can we call you at a better time?"
+  - YES: "What time works best for you?" → call schedule_callback(preferred_time) → call end_survey("callback_scheduled").
+  - NO: "Would you prefer to receive the survey by email so you can complete it at your convenience?" → YES: call send_survey_link() → call end_survey("link_sent"). NO: say "No problem at all! Have a great day." → call end_survey("not_available").
+
+**AT ANY TIME — if they ask to stop or decline**
+Call end_survey("declined") immediately.
+
+## TOOLS
+- to_questions() — ONLY after BOTH steps are complete.
+- end_survey(reason) — saves data, speaks farewell, hangs up. Reasons: wrong_person, declined, not_available, callback_scheduled, link_sent.
+- schedule_callback(preferred_time) — then call end_survey("callback_scheduled").
+- send_survey_link() — then call end_survey("link_sent").
+
+## RULES
+1. NEVER call to_questions() without completing BOTH steps (identity AND availability).
+2. Do NOT say goodbye yourself — end_survey() does it.
+3. Do NOT start asking survey questions — that is the questions agent's job.
+4. Every call ends with ONE call to end_survey() OR a handoff via to_questions().
+5. SPEAK to the caller ALWAYS and ONLY in English. NEVER use Spanish.
+6. NEVER call end_survey("wrong_person") on an uncertain, empty, or low-confidence reply. Only do it after an explicit negative identity response."""
+
+    # ── Bilingual Greeter ─────────────────────────────────────────────────────
     if name_is_known:
         identity_after_langpref = (
             f'After language is detected, ask for identity in the chosen language. '

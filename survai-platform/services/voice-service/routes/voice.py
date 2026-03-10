@@ -148,6 +148,7 @@ async def make_call(
     phone: str,
     provider: str = "livekit",
     greetings: str = "",
+    language: str = "bilingual",
 ):
     """Initiate an AI-powered survey call via LiveKit SIP."""
     normalized_phone = phone.strip().replace(" ", "")
@@ -171,8 +172,8 @@ async def make_call(
     else:
         template_config = {}
 
-    # Language is always a single, fixed language per call — no bilingual mode
-    language = survey.get("language") or "en"
+    if language not in ("en", "es", "bilingual"):
+        language = "bilingual"
 
     company_name = template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves")
     callback_url = os.getenv("SURVEY_SUBMIT_URL", "http://survey-service:8020/api/answers/qna_phone")
@@ -205,24 +206,30 @@ async def make_call(
     }
 
     try:
+        # For prompt building: bilingual uses the bilingual greeter,
+        # en/es use their respective fixed-language prompts
+        prompt_language = language  # "en", "es", or "bilingual"
         greeter_prompt = build_greeter_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
-            language=language,
+            language=prompt_language,
         )
+
+        # For questions prompt: bilingual and en both default to English questions
+        questions_lang = "es" if language == "es" else "en"
         questions_prompt, translated_questions_map = await build_questions_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
             survey_name=template_name or f"Survey {survey_id}",
             questions=questions,
-            language=language,
+            language=questions_lang,
         )
         survey_context["greeter_prompt"] = greeter_prompt
         survey_context["questions_prompt"] = questions_prompt
         survey_context["translated_questions"] = translated_questions_map
         survey_context["system_prompt"] = greeter_prompt  # backward compat
-        # For English-initiated calls, also build Spanish prompt and map so user can get Spanish questions if they choose Spanish
-        if language == "en":
+        # For bilingual calls, also build Spanish prompts so user can switch
+        if language == "bilingual":
             questions_prompt_es, questions_es_map = await build_questions_prompt(
                 organization_name=company_name,
                 rider_first_name=rider_first_name,
@@ -488,9 +495,9 @@ async def api_release_call(survey_id: str | None = None, phone: str | None = Non
 # ─── Direct call endpoint (dashboard calls this via gateway, skipping survey-service hop)
 
 @router.post("/direct-call")
-async def direct_call(to: str, survey_id: str, provider: str = "livekit", greetings: str = ""):
+async def direct_call(to: str, survey_id: str, provider: str = "livekit", greetings: str = "", language: str = "bilingual"):
     """Dashboard-compatible endpoint: accepts 'to' param instead of 'phone'."""
-    return await make_call(survey_id=survey_id, phone=to, provider=provider, greetings=greetings)
+    return await make_call(survey_id=survey_id, phone=to, provider=provider, greetings=greetings, language=language)
 
 
 # ─── Backward Compatibility Aliases ──────────────────────────────────────────
