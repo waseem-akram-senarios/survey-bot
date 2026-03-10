@@ -24,6 +24,7 @@ from livekit.agents import (
     WorkerOptions,
     cli,
     AutoSubscribe,
+    RoomInputOptions,
 )
 from livekit.agents.voice.room_io import RoomOptions, AudioInputOptions
 from livekit.agents.voice import AgentSession
@@ -302,24 +303,15 @@ async def entrypoint(ctx: JobContext):
         userdata=call_data,
         stt=deepgram.STT(
             model=STT_MODEL,
-            language=stt_language,
-            detect_language=stt_detect_language,
-            endpointing_ms=STT_ENDPOINTING_MS,
-            keywords=[
-                "Yes:2", "No:2", "Yeah:2", "Yep:2", "Nope:2",
-                "Sí:2", "No:2", "Bueno:1",
-            ],
+            language=stt_language
         ),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
         tts=elevenlabs.TTS(
                 voice_id=tts_voice,
                 model=tts_model,
+                apply_text_normalization="on"
             ),
-        vad=silero.VAD.load(
-            min_silence_duration=VAD_MIN_SILENCE_DURATION,
-            min_speech_duration=VAD_MIN_SPEECH_DURATION,
-            activation_threshold=VAD_ACTIVATION_THRESHOLD,
-        ),
+        vad=silero.VAD.load(),
         preemptive_generation=PREEMPTIVE_GENERATION,
         resume_false_interruption=RESUME_FALSE_INTERRUPTION,
         false_interruption_timeout=FALSE_INTERRUPTION_TIMEOUT,
@@ -360,8 +352,9 @@ async def entrypoint(ctx: JobContext):
         await session.start(
             room=ctx.room,
             agent=call_data.agents["greeter"],
-            room_options=RoomOptions(
-                audio_input=AudioInputOptions(noise_cancellation=noise_cancellation.BVCTelephony()),
+            room_input_options=RoomInputOptions(
+                text_enabled=True,
+                noise_cancellation=noise_cancellation.BVCTelephony(),
                 close_on_disconnect=False,
             ),
         )
@@ -397,7 +390,7 @@ if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
-            agent_name="survey-agent-local",
+            agent_name="survey-agent",
             initialize_process_timeout=WORKER_INITIALIZE_TIMEOUT,
             job_memory_warn_mb=JOB_MEMORY_WARN_MB,
             job_memory_limit_mb=JOB_MEMORY_LIMIT_MB,
