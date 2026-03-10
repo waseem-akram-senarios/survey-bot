@@ -365,6 +365,30 @@ async def entrypoint(ctx: JobContext):
             ),
         )
     finally:
+        if survey_id and not survey_responses.get("_finalized"):
+            reason = survey_responses.get("end_reason") or "disconnected"
+            answered = len(survey_responses.get("answers", {}))
+            total = len(question_ids) if question_ids else 0
+            if answered > 0 and answered >= total and reason == "disconnected":
+                reason = "completed"
+            logger.info(
+                f"Session ended without end_survey — finalizing as '{reason}' "
+                f"({answered}/{total} answered)"
+            )
+            survey_responses["_finalized"] = True
+            call_duration = (datetime.now() - call_start_time).total_seconds()
+            try:
+                await _voice_service_post("complete-survey", {
+                    "survey_id": survey_id, "reason": reason,
+                })
+            except Exception as e:
+                logger.warning(f"Failed to finalize survey on exit: {e}")
+            try:
+                from utils.storage import save_survey_responses
+                save_survey_responses(caller_number, survey_responses, call_duration)
+                cleanup_survey_logging(log_handler)
+            except Exception as e:
+                logger.warning(f"Failed to save responses on exit: {e}")
         await release_call_lock()
 
 
