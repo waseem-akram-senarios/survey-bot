@@ -35,11 +35,11 @@ STT_ENDPOINTING_MS = int(os.getenv("STT_ENDPOINTING_MS", "300"))
 
 # Large Language Model (OpenAI)
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4.1-mini")
-LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
 
 # Text-to-Speech
 TTS_MODEL = os.getenv("TTS_MODEL", "eleven_flash_v2_5")
-TTS_MODEL_ES = os.getenv("TTS_MODEL_ES", "eleven_multilingual_v2")
+TTS_MODEL_ES = os.getenv("TTS_MODEL_ES", "eleven_flash_v2_5")
 TTS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9")
 TTS_VOICE_ID_ES = os.getenv("ELEVENLABS_VOICE_ID_ES", os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9"))
 
@@ -48,7 +48,7 @@ TTS_VOICE_ID_ES = os.getenv("ELEVENLABS_VOICE_ID_ES", os.getenv("ELEVENLABS_VOIC
 # ===========================================
 PREEMPTIVE_GENERATION = True
 RESUME_FALSE_INTERRUPTION = True
-FALSE_INTERRUPTION_TIMEOUT = 0.5
+FALSE_INTERRUPTION_TIMEOUT = 0.2
 MAX_TOOL_STEPS = 15
 
 # VAD tuning for phone calls
@@ -83,7 +83,7 @@ S3_ENDPOINT = os.getenv("S3_ENDPOINT", "")
 # ===========================================
 # WORKER SETTINGS
 # ===========================================
-WORKER_INITIALIZE_TIMEOUT = 120.0
-JOB_MEMORY_WARN_MB = 1000
+WORKER_INITIALIZE_TIMEOUT = 600.0
+JOB_MEMORY_WARN_MB = 2000
 JOB_MEMORY_LIMIT_MB = 1500
 
