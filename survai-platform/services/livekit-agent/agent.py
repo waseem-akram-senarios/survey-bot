@@ -116,6 +116,7 @@ async def entrypoint(ctx: JobContext):
                     sip_call_to=phone_number,
                     participant_identity=phone_number,
                     wait_until_answered=True,
+                    display_name=ORGANIZATION_NAME,
                 )
             )
             logger.info(f"Answered: {phone_number}")

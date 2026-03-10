@@ -417,7 +417,8 @@ After the last question: call end_survey("completed"). The tool handles farewell
 9. NEVER explain your internal reasoning or mention what the tool told you. Speak only as Cameron.
 10. NEVER say things like "ya que respondiste X, saltaremos Y". Just ask the next question.
 11. If the caller says "hello?", "are you there?", or seems to be waiting for you, respond immediately. If you were waiting for their answer, gently repeat the current question ONCE.
-12. NEVER ask the same question more than once. If record_answer returns "Already recorded", move to the next question immediately without commenting.{restricted_block}"""
+12. NEVER ask the same question more than once. If record_answer returns "Already recorded", move to the next question immediately without commenting.
+13. ONLY ask questions that appear in the PREGUNTAS section above. Do NOT invent, generate, or add ANY question that is not explicitly listed there. Follow-up probes must be brief clarifications about the SAME question (e.g. "¿Podrías contarme más?"), NEVER a new topic or a new question you made up.{restricted_block}"""
         return prompt, es_map
 
     # ── English prompt ─────────────────────────────────────────────────────────
@@ -477,7 +478,8 @@ After last question: call end_survey("completed"). Tool handles farewell and han
 10. NEVER explain your internal reasoning or mention that you are skipping a question based on a previous answer.
 11. NEVER say things like "since you already answered X, I'll move to Y". Just ask Y.
 12. If the caller says "hello?", "are you there?", or seems to be waiting for you, respond immediately. If you were waiting for their answer, gently repeat the current question ONCE.
-13. NEVER ask the same question more than once. If record_answer returns "Already recorded", move to the next question immediately without commenting.{restricted_block}"""
+13. NEVER ask the same question more than once. If record_answer returns "Already recorded", move to the next question immediately without commenting.
+14. ONLY ask questions that appear in the QUESTIONS section above. Do NOT invent, generate, or add ANY question that is not explicitly listed there. Follow-up probes must be brief clarifications about the SAME question (e.g. "Could you tell me more?"), NEVER a new topic or a new question you made up.{restricted_block}"""
 
     return prompt, es_map if language == "es" else {}
 
