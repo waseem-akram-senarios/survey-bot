@@ -32,7 +32,9 @@ router = APIRouter(prefix="/api/voice", tags=["voice"])
 _active_calls: dict[str, dict[str, float | str]] = {}
 _active_surveys: dict[str, str] = {}
 _active_calls_lock = asyncio.Lock()
-ACTIVE_CALL_STALE_SECONDS = 15 * 60
+ACTIVE_CALL_STALE_SECONDS = 4 * 60
+ACTIVE_CALL_HARD_LIMIT = 10 * 60
+LOCK_WATCHDOG_SECONDS = 75  # auto-release if agent never confirms the call connected
 
 
 def _normalize_phone(phone: str) -> str:
@@ -40,8 +42,15 @@ def _normalize_phone(phone: str) -> str:
     return (phone or "").strip().replace(" ", "")
 
 
-async def _survey_lock_matches_phone(survey_id: str, phone: str) -> bool:
-    """Return True only when the locked survey still belongs to this phone."""
+def _lock_age(meta: dict) -> float:
+    return time.monotonic() - float(meta.get("started_at", 0))
+
+
+async def _is_lock_still_valid(survey_id: str, phone: str, age_seconds: float) -> bool:
+    """Check if a call lock still represents a genuinely active call."""
+    if age_seconds > ACTIVE_CALL_HARD_LIMIT:
+        return False
+
     rows = await async_execute(
         "SELECT phone, status, end_reason FROM surveys WHERE id = :survey_id",
         {"survey_id": survey_id},
@@ -54,34 +63,60 @@ async def _survey_lock_matches_phone(survey_id: str, phone: str) -> bool:
     status = str(row.get("status") or "")
     end_reason = str(row.get("end_reason") or "")
 
-    if db_phone and db_phone != _normalize_phone(phone):
-        return False
     if status == "Completed" or end_reason:
         return False
+    if not db_phone:
+        return False
+    if db_phone != _normalize_phone(phone):
+        return False
+    if age_seconds > ACTIVE_CALL_STALE_SECONDS:
+        return False
     return True
+
+
+async def _lock_watchdog(phone: str, survey_id: str) -> None:
+    """Background task: release the lock if the call was never answered."""
+    await asyncio.sleep(LOCK_WATCHDOG_SECONDS)
+    async with _active_calls_lock:
+        meta = _active_calls.get(phone)
+        if not meta:
+            return
+        if str(meta.get("survey_id", "")) != survey_id:
+            return
+        if meta.get("confirmed"):
+            return
+        logger.info(
+            f"Watchdog: releasing unconfirmed lock for {phone} "
+            f"(survey {survey_id}, age={_lock_age(meta):.0f}s)"
+        )
+        del _active_calls[phone]
+        _active_surveys.pop(survey_id, None)
 
 
 async def _reserve_call(phone: str, survey_id: str) -> None:
     """Reserve a phone number while a live call is active."""
     async with _active_calls_lock:
         now = time.monotonic()
+
         expired = [
-            number
-            for number, meta in _active_calls.items()
-            if now - float(meta.get("started_at", 0)) > ACTIVE_CALL_STALE_SECONDS
+            number for number, meta in _active_calls.items()
+            if now - float(meta.get("started_at", 0)) > ACTIVE_CALL_HARD_LIMIT
         ]
         for number in expired:
-            stale_survey_id = str(_active_calls[number].get("survey_id", ""))
-            if stale_survey_id:
-                _active_surveys.pop(stale_survey_id, None)
+            sid = str(_active_calls[number].get("survey_id", ""))
+            logger.info(f"Auto-releasing expired lock: {number} (survey {sid})")
+            _active_surveys.pop(sid, None)
             del _active_calls[number]
 
         existing = _active_calls.get(phone)
         if existing:
             active_survey_id = str(existing.get("survey_id", ""))
-            if active_survey_id and not await _survey_lock_matches_phone(active_survey_id, phone):
-                logger.warning(
-                    f"Releasing stale call lock for {phone}: survey {active_survey_id} no longer matches active DB state"
+            age = _lock_age(existing)
+
+            if not await _is_lock_still_valid(active_survey_id, phone, age):
+                logger.info(
+                    f"Auto-releasing stale lock for {phone}: survey {active_survey_id}, "
+                    f"age={age:.0f}s"
                 )
                 del _active_calls[phone]
                 _active_surveys.pop(active_survey_id, None)
@@ -89,18 +124,28 @@ async def _reserve_call(phone: str, survey_id: str) -> None:
 
         if existing:
             active_survey_id = str(existing.get("survey_id", ""))
-            if active_survey_id == survey_id:
-                raise HTTPException(
-                    status_code=429,
-                    detail=f"A call for survey {survey_id} to {phone} is already in progress.",
-                )
+            age = _lock_age(existing)
             raise HTTPException(
                 status_code=429,
-                detail=f"A call to {phone} is already in progress for survey {active_survey_id or 'another active survey'}. Please wait until it finishes before retrying.",
+                detail=(
+                    f"A call to {phone} is already in progress "
+                    f"(survey {active_survey_id}, started {age:.0f}s ago). "
+                    f"It will auto-expire after {ACTIVE_CALL_STALE_SECONDS}s."
+                ),
             )
 
         _active_calls[phone] = {"survey_id": survey_id, "started_at": now}
         _active_surveys[survey_id] = phone
+
+    asyncio.create_task(_lock_watchdog(phone, survey_id))
+
+
+async def _confirm_call(phone: str, survey_id: str) -> None:
+    """Mark a lock as confirmed (call was answered), so the watchdog won't release it."""
+    async with _active_calls_lock:
+        meta = _active_calls.get(phone)
+        if meta and str(meta.get("survey_id", "")) == survey_id:
+            meta["confirmed"] = True
 
 
 async def _release_call(*, survey_id: str | None = None, phone: str | None = None) -> None:
@@ -117,6 +162,7 @@ async def _release_call(*, survey_id: str | None = None, phone: str | None = Non
                     del _active_calls[resolved_phone]
                     if meta_survey_id:
                         _active_surveys.pop(meta_survey_id, None)
+                    logger.info(f"Released call lock: {resolved_phone} (survey {meta_survey_id})")
 
 
 def _extract_rider_first_name(rider_name: str) -> str:
@@ -146,6 +192,7 @@ async def make_call(
     phone: str,
     provider: str = "livekit",
     greetings: str = "",
+    language: str = "bilingual",
 ):
     """Initiate an AI-powered survey call via LiveKit SIP."""
     normalized_phone = phone.strip().replace(" ", "")
@@ -169,8 +216,8 @@ async def make_call(
     else:
         template_config = {}
 
-    # Language is always a single, fixed language per call — no bilingual mode
-    language = survey.get("language") or "en"
+    if language not in ("en", "es", "bilingual"):
+        language = "bilingual"
 
     company_name = template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves")
     callback_url = os.getenv("SURVEY_SUBMIT_URL", "http://survey-service:8020/api/answers/qna_phone")
@@ -179,6 +226,14 @@ async def make_call(
     public_url = os.getenv("NEXT_PUBLIC_API_BASE_URL", os.getenv("PUBLIC_URL", ""))
     survey_url = f"{public_url}/survey/{survey_id}" if public_url else ""
     rider_email = survey.get("email", "")
+
+    try:
+        await async_execute(
+            "UPDATE surveys SET phone = :phone WHERE id = :sid",
+            {"phone": normalized_phone, "sid": survey_id},
+        )
+    except Exception as e:
+        logger.warning(f"Failed to persist phone {normalized_phone} on survey {survey_id}: {e}")
 
     await _reserve_call(normalized_phone, survey_id)
 
@@ -195,24 +250,30 @@ async def make_call(
     }
 
     try:
+        # For prompt building: bilingual uses the bilingual greeter,
+        # en/es use their respective fixed-language prompts
+        prompt_language = language  # "en", "es", or "bilingual"
         greeter_prompt = build_greeter_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
-            language=language,
+            language=prompt_language,
         )
+
+        # For questions prompt: bilingual and en both default to English questions
+        questions_lang = "es" if language == "es" else "en"
         questions_prompt, translated_questions_map = await build_questions_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
             survey_name=template_name or f"Survey {survey_id}",
             questions=questions,
-            language=language,
+            language=questions_lang,
         )
         survey_context["greeter_prompt"] = greeter_prompt
         survey_context["questions_prompt"] = questions_prompt
         survey_context["translated_questions"] = translated_questions_map
         survey_context["system_prompt"] = greeter_prompt  # backward compat
-        # For English-initiated calls, also build Spanish prompt and map so user can get Spanish questions if they choose Spanish
-        if language == "en":
+        # For bilingual calls, also build Spanish prompts so user can switch
+        if language == "bilingual":
             questions_prompt_es, questions_es_map = await build_questions_prompt(
                 organization_name=company_name,
                 rider_first_name=rider_first_name,
@@ -467,12 +528,28 @@ async def api_complete_survey(survey_id: str, reason: str = "completed"):
     return {"status": status, "survey_id": survey_id, "end_reason": reason}
 
 
+@router.post("/confirm-call")
+async def api_confirm_call(survey_id: str, phone: str | None = None):
+    """Agent confirms the call was answered — prevents the watchdog from releasing the lock."""
+    normalized_phone = _normalize_phone(phone or "")
+    await _confirm_call(normalized_phone, survey_id)
+    return {"status": "confirmed", "survey_id": survey_id}
+
+
+@router.post("/release-call")
+async def api_release_call(survey_id: str | None = None, phone: str | None = None):
+    """Release an in-memory active call lock when an agent job exits."""
+    normalized_phone = _normalize_phone(phone or "")
+    await _release_call(survey_id=survey_id, phone=normalized_phone or None)
+    return {"status": "released", "survey_id": survey_id, "phone": normalized_phone}
+
+
 # ─── Direct call endpoint (dashboard calls this via gateway, skipping survey-service hop)
 
 @router.post("/direct-call")
-async def direct_call(to: str, survey_id: str, provider: str = "livekit", greetings: str = ""):
+async def direct_call(to: str, survey_id: str, provider: str = "livekit", greetings: str = "", language: str = "bilingual"):
     """Dashboard-compatible endpoint: accepts 'to' param instead of 'phone'."""
-    return await make_call(survey_id=survey_id, phone=to, provider=provider, greetings=greetings)
+    return await make_call(survey_id=survey_id, phone=to, provider=provider, greetings=greetings, language=language)
 
 
 # ─── Backward Compatibility Aliases ──────────────────────────────────────────

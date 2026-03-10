@@ -358,10 +358,10 @@ def build_html_email(url: str) -> str:
     html_body = f"""
     <html>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <h2 style="color: #4CAF50;">We'd love your input!</h2>
-            <p>We value your feedback and would appreciate it if you could take a few moments to answer a survey:</p>
-            <p>Click the link below to complete the survey:</p>
-            <p><a href="{url}">Survey Link</a></p>
+            <h2 style="color: #4CAF50;">We'd Love Your Feedback</h2>
+            <p>We invite you to share your thoughts to help us support your needs and enhance your experience.</p>
+            <p>Your feedback matters&mdash;please take a moment to participate!</p>
+            <p><a href="{url}" style="color:#1958F7;">Take the Survey</a></p>
             <p>Thank you for your time and insights!</p>
         </body>
     </html>
@@ -371,9 +371,11 @@ def build_html_email(url: str) -> str:
 
 def build_text_email(url: str) -> str:
     text_body = (
-        "We'd love your input!\n\n"
-        "We value your feedback and would appreciate it if you could take a few moments to answer a survey:\n\n"
-        f"Click the link below to complete the survey:\n\n{url}\n\n"
+        "We'd Love Your Feedback\n\n"
+        "We invite you to share your thoughts to help us support your needs "
+        "and enhance your experience.\n\n"
+        "Your feedback matters\u2014please take a moment to participate!\n\n"
+        f"Take the survey: {url}\n\n"
         "Thank you for your time and insights!"
     )
     return text_body

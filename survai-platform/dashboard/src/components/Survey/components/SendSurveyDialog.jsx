@@ -37,6 +37,7 @@ const SendSurveyDialog = ({
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [emailLanguage, setEmailLanguage] = useState("bilingual");
+  const [phoneLanguage, setPhoneLanguage] = useState("bilingual");
   const [voiceProvider, setVoiceProvider] = useState("livekit");
 
   const surveyLink = `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyId}`;
@@ -115,7 +116,7 @@ const SendSurveyDialog = ({
     setPhoneError(error);
     if (error) return;
     const cleanNumber = formatPhoneForApi(phone.trim());
-    onConfirmPhone(cleanNumber, voiceProvider);
+    onConfirmPhone(cleanNumber, voiceProvider, phoneLanguage);
   };
 
   const [copied, setCopied] = useState(false);
@@ -163,6 +164,7 @@ const SendSurveyDialog = ({
       setEmailTouched(false);
       setPhoneTouched(false);
       setEmailLanguage("bilingual");
+      setPhoneLanguage("bilingual");
       setVoiceProvider("livekit");
       onClose();
     }
@@ -371,7 +373,36 @@ const SendSurveyDialog = ({
                   mb: 2,
                 }}
               >
-                Enter Phone Number
+                Call Options
+              </Typography>
+              <FormControl fullWidth sx={{ mb: 3 }}>
+                <InputLabel id="phone-language-label" sx={{ fontFamily: "Poppins, sans-serif" }}>Language</InputLabel>
+                <Select
+                  labelId="phone-language-label"
+                  value={phoneLanguage}
+                  label="Language"
+                  onChange={(e) => setPhoneLanguage(e.target.value)}
+                  sx={{
+                    borderRadius: "12px",
+                    fontFamily: "Poppins, sans-serif",
+                    fontSize: "14px",
+                  }}
+                >
+                  <MenuItem value="bilingual" sx={{ fontFamily: "Poppins, sans-serif" }}>Bilingual (ask caller to choose)</MenuItem>
+                  <MenuItem value="en" sx={{ fontFamily: "Poppins, sans-serif" }}>English Only</MenuItem>
+                  <MenuItem value="es" sx={{ fontFamily: "Poppins, sans-serif" }}>Spanish Only</MenuItem>
+                </Select>
+              </FormControl>
+              <Typography
+                sx={{
+                  fontFamily: "Poppins, sans-serif",
+                  fontWeight: 500,
+                  fontSize: "14px",
+                  color: "#1E1E1E",
+                  mb: 1,
+                }}
+              >
+                Recipient Phone Number
               </Typography>
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <img src={PhoneIcon} alt="Phone-Icon" style={{ marginRight: '7.5px' }} />

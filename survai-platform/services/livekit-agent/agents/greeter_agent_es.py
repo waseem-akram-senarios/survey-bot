@@ -67,7 +67,7 @@ class SpanishGreeterAgent(Agent):
 
     async def on_enter(self) -> None:
         """Speak the Spanish opening greeting and wait for playout before the LLM takes over."""
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(1.5)
 
         if self.greetings:
             greeting = self.greetings
@@ -87,4 +87,4 @@ class SpanishGreeterAgent(Agent):
                 )
 
         logger.info(f"[AGENT] {greeting}")
-        self.session.say(greeting)
+        await self.session.say(greeting).wait_for_playout()

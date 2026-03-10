@@ -16,6 +16,7 @@ import asyncio
 import os
 import json
 from datetime import datetime
+import aiohttp
 
 from livekit import api
 from livekit.agents import (
@@ -23,6 +24,7 @@ from livekit.agents import (
     WorkerOptions,
     cli,
     AutoSubscribe,
+    RoomInputOptions,
 )
 from livekit.agents.voice.room_io import RoomOptions, AudioInputOptions
 from livekit.agents.voice import AgentSession
@@ -32,10 +34,15 @@ from config.settings import (
     ORGANIZATION_NAME,
     SIP_OUTBOUND_TRUNK_ID,
     STT_MODEL,
+    STT_LANGUAGE,
+    STT_DETECT_LANGUAGE,
+    STT_ENDPOINTING_MS,
     LLM_MODEL,
     LLM_TEMPERATURE,
     TTS_MODEL,
+    TTS_MODEL_ES,
     TTS_VOICE_ID,
+    TTS_VOICE_ID_ES,
     PREEMPTIVE_GENERATION,
     RESUME_FALSE_INTERRUPTION,
     FALSE_INTERRUPTION_TIMEOUT,
@@ -62,6 +69,7 @@ from utils.metrics_logger import log_pipeline_metrics
 from utils.storage import create_empty_response_dict
 
 logger = get_logger()
+VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
 
 MINIMAL_GREETER_PROMPT = (
     "You are Cameron, a friendly survey caller. "
@@ -82,6 +90,29 @@ async def entrypoint(ctx: JobContext):
     phone_number = metadata.get("phone_number")
     survey_id = metadata.get("survey_id")
 
+    async def _voice_service_post(endpoint: str, params: dict) -> None:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{VOICE_SERVICE_URL}/api/voice/{endpoint}",
+                    params=params,
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as resp:
+                    if resp.status != 200:
+                        logger.warning(f"{endpoint} returned {resp.status}: {await resp.text()}")
+        except Exception as e:
+            logger.warning(f"Failed to call {endpoint} for survey {survey_id}: {e}")
+
+    async def release_call_lock() -> None:
+        if not survey_id and not phone_number:
+            return
+        await _voice_service_post("release-call", {"survey_id": survey_id or "", "phone": phone_number or ""})
+
+    async def confirm_call_lock() -> None:
+        if not survey_id:
+            return
+        await _voice_service_post("confirm-call", {"survey_id": survey_id or "", "phone": phone_number or ""})
+
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     if phone_number:
@@ -94,11 +125,14 @@ async def entrypoint(ctx: JobContext):
                     sip_call_to=phone_number,
                     participant_identity=phone_number,
                     wait_until_answered=True,
+                    display_name=ORGANIZATION_NAME,
                 )
             )
             logger.info(f"Answered: {phone_number}")
+            await confirm_call_lock()
         except Exception as e:
             logger.error(f"Call to {phone_number} failed: {e}")
+            await release_call_lock()
             return
         participant = await ctx.wait_for_participant()
         caller_number = phone_number
@@ -115,8 +149,9 @@ async def entrypoint(ctx: JobContext):
 
     rider_first_name = platform_recipient.split()[0] if platform_recipient else ""
     org_name = platform_org or ORGANIZATION_NAME
-    call_language = metadata.get("language", "en")
+    call_language = metadata.get("language", "bilingual")
     greetings = metadata.get("greetings", "")
+    logger.info(f"Call config: language={call_language}, recipient={rider_first_name}, org={org_name}")
 
     # Ensure detected_language is pre-set to the call language
     # (for Spanish calls it is always "es"; for English calls it may change after lang-pref)
@@ -197,12 +232,13 @@ async def entrypoint(ctx: JobContext):
         survey_url=survey_url,
         rider_email=rider_email,
         rider_name=rider_first_name,
+        questions_metadata=questions_list,
     )
 
-    # Build agents based on call language
+    # Build agents based on call language mode
     if call_language == "es":
-        # Spanish pipeline: SpanishGreeterAgent → SpanishQuestionsAgent (fixed)
-        call_data.detected_language = "es"  # pre-set so tools use Spanish from the first tool call
+        # Spanish-only pipeline: SpanishGreeterAgent → SpanishQuestionsAgent
+        call_data.detected_language = "es"
         greeter_agent = SpanishGreeterAgent(
             instructions=greeter_prompt,
             rider_first_name=rider_first_name,
@@ -216,14 +252,32 @@ async def entrypoint(ctx: JobContext):
         )
         call_data.agents["questions"] = questions_agent
         call_data.agents["greeter"] = greeter_agent
-    else:
-        # English pipeline: EnglishGreeterAgent → EnglishQuestionsAgent or SpanishQuestionsAgent
-        # Both questions agents are registered; to_questions() picks by detected_language
+    elif call_language == "en":
+        # English-only pipeline: EnglishGreeterAgent (no lang question) → EnglishQuestionsAgent
+        call_data.detected_language = "en"
         greeter_agent = EnglishGreeterAgent(
             instructions=greeter_prompt,
             rider_first_name=rider_first_name,
             organization_name=org_name,
             greetings=greetings,
+            language_mode="en",
+            tools=greeter_tools,
+        )
+        questions_agent = EnglishQuestionsAgent(
+            instructions=questions_prompt,
+            tools=question_tools,
+        )
+        call_data.agents["greeter"] = greeter_agent
+        call_data.agents["questions"] = questions_agent
+        call_data.agents["questions_en"] = questions_agent
+    else:
+        # Bilingual pipeline: EnglishGreeterAgent (asks lang pref) → EnglishQuestionsAgent or SpanishQuestionsAgent
+        greeter_agent = EnglishGreeterAgent(
+            instructions=greeter_prompt,
+            rider_first_name=rider_first_name,
+            organization_name=org_name,
+            greetings=greetings,
+            language_mode="bilingual",
             tools=greeter_tools,
         )
         questions_agent_en = EnglishQuestionsAgent(
@@ -238,24 +292,27 @@ async def entrypoint(ctx: JobContext):
         call_data.agents["greeter"] = greeter_agent
         call_data.agents["questions_en"] = questions_agent_en
         call_data.agents["questions_es"] = questions_agent_es
-        questions_agent = questions_agent_en  # default; actual selection done in to_questions()
+        questions_agent = questions_agent_en
+
+    stt_language = "es" if call_language == "es" else STT_LANGUAGE
+    stt_detect_language = STT_DETECT_LANGUAGE and call_language not in ("es", "en")
+
+    tts_model = TTS_MODEL_ES if call_language == "es" else TTS_MODEL
+    tts_voice = TTS_VOICE_ID_ES if call_language == "es" else TTS_VOICE_ID
 
     session = AgentSession[SurveyCallData](
         userdata=call_data,
         stt=deepgram.STT(
             model=STT_MODEL,
-            language="es" if call_language == "es" else "multi"
+            language=stt_language
         ),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
         tts=elevenlabs.TTS(
-                voice_id=TTS_VOICE_ID,
-                model=TTS_MODEL
+                voice_id=tts_voice,
+                model=tts_model,
+                apply_text_normalization="on"
             ),
-        vad=silero.VAD.load(
-            min_silence_duration=VAD_MIN_SILENCE_DURATION,
-            min_speech_duration=VAD_MIN_SPEECH_DURATION,
-            activation_threshold=VAD_ACTIVATION_THRESHOLD,
-        ),
+        vad=silero.VAD.load(),
         preemptive_generation=PREEMPTIVE_GENERATION,
         resume_false_interruption=RESUME_FALSE_INTERRUPTION,
         false_interruption_timeout=FALSE_INTERRUPTION_TIMEOUT,
@@ -292,21 +349,49 @@ async def entrypoint(ctx: JobContext):
 
     asyncio.create_task(_time_limit_watchdog())
 
-    await session.start(
-        room=ctx.room,
-        agent=call_data.agents["greeter"],
-        room_options=RoomOptions(
-            audio_input=AudioInputOptions(noise_cancellation=noise_cancellation.BVC()),
-            close_on_disconnect=False,
-        ),
-    )
+    try:
+        await session.start(
+            room=ctx.room,
+            agent=call_data.agents["greeter"],
+            room_input_options=RoomInputOptions(
+                text_enabled=True,
+                noise_cancellation=noise_cancellation.BVCTelephony(),
+                close_on_disconnect=False,
+            ),
+        )
+    finally:
+        if survey_id and not survey_responses.get("_finalized"):
+            reason = survey_responses.get("end_reason") or "disconnected"
+            answered = len(survey_responses.get("answers", {}))
+            total = len(question_ids) if question_ids else 0
+            if answered > 0 and answered >= total and reason == "disconnected":
+                reason = "completed"
+            logger.info(
+                f"Session ended without end_survey — finalizing as '{reason}' "
+                f"({answered}/{total} answered)"
+            )
+            survey_responses["_finalized"] = True
+            call_duration = (datetime.now() - call_start_time).total_seconds()
+            try:
+                await _voice_service_post("complete-survey", {
+                    "survey_id": survey_id, "reason": reason,
+                })
+            except Exception as e:
+                logger.warning(f"Failed to finalize survey on exit: {e}")
+            try:
+                from utils.storage import save_survey_responses
+                save_survey_responses(caller_number, survey_responses, call_duration)
+                cleanup_survey_logging(log_handler)
+            except Exception as e:
+                logger.warning(f"Failed to save responses on exit: {e}")
+        await release_call_lock()
 
 
 if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
-            agent_name="survey-agent-local",
+            agent_name="survey-agent",
             initialize_process_timeout=WORKER_INITIALIZE_TIMEOUT,
             job_memory_warn_mb=JOB_MEMORY_WARN_MB,
             job_memory_limit_mb=JOB_MEMORY_LIMIT_MB,

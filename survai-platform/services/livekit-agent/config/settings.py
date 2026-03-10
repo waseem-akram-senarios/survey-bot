@@ -29,30 +29,35 @@ DEFAULT_RIDER = {
 # ===========================================
 # Speech-to-Text (Deepgram)
 STT_MODEL = os.getenv("STT_MODEL", "nova-3")
-STT_LANGUAGE = os.getenv("STT_LANGUAGE", "en")
+STT_LANGUAGE = os.getenv("STT_LANGUAGE", "multi")
+STT_DETECT_LANGUAGE = os.getenv("STT_DETECT_LANGUAGE", "false").lower() == "true"
+STT_ENDPOINTING_MS = int(os.getenv("STT_ENDPOINTING_MS", "300"))
 
 # Large Language Model (OpenAI)
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
-LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4.1-mini")
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
 
 # Text-to-Speech
 TTS_MODEL = os.getenv("TTS_MODEL", "eleven_flash_v2_5")
+TTS_MODEL_ES = os.getenv("TTS_MODEL_ES", "eleven_flash_v2_5")
 TTS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9")
+TTS_VOICE_ID_ES = os.getenv("ELEVENLABS_VOICE_ID_ES", os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9"))
 
 # ===========================================
 # SESSION SETTINGS
 # ===========================================
 PREEMPTIVE_GENERATION = True
 RESUME_FALSE_INTERRUPTION = True
-FALSE_INTERRUPTION_TIMEOUT = 0.5
+FALSE_INTERRUPTION_TIMEOUT = 0.2
 MAX_TOOL_STEPS = 15
 
 # VAD tuning for phone calls
-# min_speech_duration: 0.25s filters phone-line click/noise artifacts (was 0.08s which fires on pickup sounds)
-# activation_threshold: 0.55 requires stronger signal to avoid preemptive LLM triggers during TTS
-VAD_MIN_SILENCE_DURATION = float(os.getenv("VAD_MIN_SILENCE_DURATION", "0.25"))
-VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.2"))
-VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.4"))
+# min_silence_duration: 0.35s reduces "stuck waiting" after the caller stops speaking
+# min_speech_duration: 0.08s allows short "yes"/"no" to pass through (200ms was too aggressive)
+# activation_threshold: 0.3 — lower threshold captures quieter/softer short responses
+VAD_MIN_SILENCE_DURATION = float(os.getenv("VAD_MIN_SILENCE_DURATION", "0.35"))
+VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.08"))
+VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.3"))
 
 # ===========================================
 # FILE/DIRECTORY PATHS
@@ -68,7 +73,7 @@ SIP_OUTBOUND_TRUNK_ID = os.getenv("SIP_OUTBOUND_TRUNK_ID", "")
 # ===========================================
 # WORKER SETTINGS
 # ===========================================
-WORKER_INITIALIZE_TIMEOUT = 120.0
-JOB_MEMORY_WARN_MB = 1000
+WORKER_INITIALIZE_TIMEOUT = 600.0
+JOB_MEMORY_WARN_MB = 2000
 JOB_MEMORY_LIMIT_MB = 1500
 
