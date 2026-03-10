@@ -248,3 +248,126 @@ def update_survey_status(survey_id: str, status: str = "Completed") -> bool:
     except Exception as e:
         logger.error(f"Failed to update survey status: {e}")
         return False
+
+
+def build_html_email(url: str, language: str = "en") -> str:
+    """Build HTML email body for survey link with bilingual support."""
+    if language == "bilingual":
+        return f"""\
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background-color:#1958F7;padding:30px 40px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">We'd Love Your Feedback</h1>
+          <h2 style="margin:8px 0 0;color:#ffffffcc;font-size:18px;font-weight:500;">Nos Encantar\u00eda Conocer Su Opini\u00f3n</h2>
+        </td></tr>
+        <tr><td style="padding:32px 40px;">
+          <p style="margin:0 0 12px;font-size:16px;color:#333333;line-height:1.6;">
+            We invite you to share your thoughts to help us support your needs and enhance your experience.
+          </p>
+          <p style="margin:0 0 12px;font-size:16px;color:#666666;line-height:1.6;font-style:italic;">
+            Te invitamos a compartir tus opiniones para ayudarnos a apoyar tus necesidades y mejorar tu experiencia.
+          </p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+            <tr><td style="background-color:#1958F7;border-radius:8px;text-align:center;">
+              <a href="{url}" style="display:inline-block;padding:14px 36px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;">Take the Survey / Realizar la Encuesta</a>
+            </td></tr>
+          </table>
+          <p style="margin:24px 0 0;font-size:14px;color:#666666;line-height:1.5;">
+            If the button above doesn't work, copy and paste this link into your browser:
+            <br><span style="color:#999;font-style:italic;">Si el bot\u00f3n no funciona, copie y pegue este enlace:</span>
+            <br><a href="{url}" style="color:#1958F7;word-break:break-all;">{url}</a>
+          </p>
+        </td></tr>
+        <tr><td style="padding:20px 40px;background-color:#f9f9f9;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#999999;">Thank you for your time. / Gracias por su tiempo.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    if language == "es":
+        heading = "Nos Encantar\u00eda Conocer Su Opini\u00f3n"
+        intro = "Te invitamos a compartir tus opiniones para ayudarnos a apoyar tus necesidades y mejorar tu experiencia."
+        body2 = "\u00a1Tu opini\u00f3n importa, te invitamos a participar!"
+        cta = "Realizar la Encuesta"
+        fallback = "Si el bot\u00f3n de arriba no funciona, copie y pegue este enlace en su navegador:"
+        footer = "Gracias por su tiempo y sus comentarios."
+    else:
+        heading = "We'd Love Your Feedback"
+        intro = "We invite you to share your thoughts to help us support your needs and enhance your experience."
+        body2 = "Your feedback matters\u2014please take a moment to participate!"
+        cta = "Take the Survey"
+        fallback = "If the button above doesn't work, copy and paste this link into your browser:"
+        footer = "Thank you for your time and insights."
+
+    html_lang = "es" if language == "es" else "en"
+    return f"""\
+<!DOCTYPE html>
+<html lang="{html_lang}">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background-color:#1958F7;padding:30px 40px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:600;">{heading}</h1>
+        </td></tr>
+        <tr><td style="padding:32px 40px;">
+          <p style="margin:0 0 16px;font-size:16px;color:#333333;line-height:1.6;">{intro}</p>
+          <p style="margin:0 0 24px;font-size:16px;color:#333333;line-height:1.6;">{body2}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+            <tr><td style="background-color:#1958F7;border-radius:8px;text-align:center;">
+              <a href="{url}" style="display:inline-block;padding:14px 36px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;">{cta}</a>
+            </td></tr>
+          </table>
+          <p style="margin:24px 0 0;font-size:14px;color:#666666;line-height:1.5;">
+            {fallback}
+            <br><a href="{url}" style="color:#1958F7;word-break:break-all;">{url}</a>
+          </p>
+        </td></tr>
+        <tr><td style="padding:20px 40px;background-color:#f9f9f9;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#999999;">{footer}</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+
+def build_text_email(url: str, language: str = "en") -> str:
+    """Build plain text email body for survey link with bilingual support."""
+    if language == "bilingual":
+        return (
+            "We'd Love Your Feedback / Nos Encantar\u00eda Conocer Su Opini\u00f3n\n\n"
+            "We invite you to share your thoughts to help us support your needs "
+            "and enhance your experience.\n"
+            "Te invitamos a compartir tus opiniones para ayudarnos a apoyar tus "
+            "necesidades y mejorar tu experiencia.\n\n"
+            f"Take the survey / Realizar la encuesta: {url}\n\n"
+            "Thank you / Gracias"
+        )
+    if language == "es":
+        return (
+            "Nos Encantar\u00eda Conocer Su Opini\u00f3n\n\n"
+            "Te invitamos a compartir tus opiniones para ayudarnos a apoyar tus "
+            "necesidades y mejorar tu experiencia.\n\n"
+            "\u00a1Tu opini\u00f3n importa, te invitamos a participar!\n\n"
+            f"Realizar la encuesta: {url}\n\n"
+            "Gracias por su tiempo y sus comentarios."
+        )
+    return (
+        "We'd Love Your Feedback\n\n"
+        "We invite you to share your thoughts to help us support your needs "
+        "and enhance your experience.\n\n"
+        "Your feedback matters\u2014please take a moment to participate!\n\n"
+        f"Take the survey: {url}\n\n"
+        "Thank you for your time and insights!"
+    )

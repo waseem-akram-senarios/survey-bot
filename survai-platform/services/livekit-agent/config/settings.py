@@ -39,7 +39,9 @@ LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))
 
 # Text-to-Speech
 TTS_MODEL = os.getenv("TTS_MODEL", "eleven_flash_v2_5")
+TTS_MODEL_ES = os.getenv("TTS_MODEL_ES", "eleven_multilingual_v2")
 TTS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9")
+TTS_VOICE_ID_ES = os.getenv("ELEVENLABS_VOICE_ID_ES", os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9"))
 
 # ===========================================
 # SESSION SETTINGS

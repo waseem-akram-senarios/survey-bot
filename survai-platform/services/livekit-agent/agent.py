@@ -39,7 +39,9 @@ from config.settings import (
     LLM_MODEL,
     LLM_TEMPERATURE,
     TTS_MODEL,
+    TTS_MODEL_ES,
     TTS_VOICE_ID,
+    TTS_VOICE_ID_ES,
     PREEMPTIVE_GENERATION,
     RESUME_FALSE_INTERRUPTION,
     FALSE_INTERRUPTION_TIMEOUT,
@@ -264,6 +266,9 @@ async def entrypoint(ctx: JobContext):
     stt_language = "es" if call_language == "es" else STT_LANGUAGE
     stt_detect_language = STT_DETECT_LANGUAGE and call_language != "es"
 
+    tts_model = TTS_MODEL_ES if call_language == "es" else TTS_MODEL
+    tts_voice = TTS_VOICE_ID_ES if call_language == "es" else TTS_VOICE_ID
+
     session = AgentSession[SurveyCallData](
         userdata=call_data,
         stt=deepgram.STT(
@@ -274,8 +279,8 @@ async def entrypoint(ctx: JobContext):
         ),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
         tts=elevenlabs.TTS(
-                voice_id=TTS_VOICE_ID,
-                model=TTS_MODEL
+                voice_id=tts_voice,
+                model=tts_model,
             ),
         vad=silero.VAD.load(
             min_silence_duration=VAD_MIN_SILENCE_DURATION,

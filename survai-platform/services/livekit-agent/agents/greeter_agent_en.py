@@ -103,7 +103,7 @@ class EnglishGreeterAgent(Agent):
 
     async def on_enter(self) -> None:
         """Speak the opening line and wait for full playout before the LLM takes over."""
-        await asyncio.sleep(0.35)
+        await asyncio.sleep(1.5)
 
         org = self.organization_name
 
