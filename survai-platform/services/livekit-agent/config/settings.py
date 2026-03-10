@@ -53,11 +53,11 @@ MAX_TOOL_STEPS = 15
 
 # VAD tuning for phone calls
 # min_silence_duration: 0.35s reduces "stuck waiting" after the caller stops speaking
-# without making end-of-turn detection too jumpy on phone audio.
-# min_speech_duration: 0.2s filters short phone-line artifacts without delaying normal replies too much
+# min_speech_duration: 0.08s allows short "yes"/"no" to pass through (200ms was too aggressive)
+# activation_threshold: 0.3 — lower threshold captures quieter/softer short responses
 VAD_MIN_SILENCE_DURATION = float(os.getenv("VAD_MIN_SILENCE_DURATION", "0.35"))
-VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.2"))
-VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.4"))
+VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.08"))
+VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.3"))
 
 # ===========================================
 # FILE/DIRECTORY PATHS

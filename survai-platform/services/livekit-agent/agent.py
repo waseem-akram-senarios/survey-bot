@@ -304,6 +304,10 @@ async def entrypoint(ctx: JobContext):
             language=stt_language,
             detect_language=stt_detect_language,
             endpointing_ms=STT_ENDPOINTING_MS,
+            keywords=[
+                "Yes:2", "No:2", "Yeah:2", "Yep:2", "Nope:2",
+                "Sí:2", "No:2", "Bueno:1",
+            ],
         ),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
         tts=elevenlabs.TTS(
