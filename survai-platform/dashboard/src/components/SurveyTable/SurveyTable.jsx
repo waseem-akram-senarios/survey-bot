@@ -79,7 +79,7 @@ const DashboardTable = ({ tableData = [], onRowClick, onDataChange, onEditSurvey
 
   const handleSendEmailConfirm = async (email, language) => {
     try {
-      const emailLang = language || (selectedSurvey.Bilingual ? "bilingual" : "en");
+      const emailLang = language || "en";
       const result = await sendSurveyByEmail(
         selectedSurvey.SurveyId, 
         email, 
@@ -102,7 +102,7 @@ const DashboardTable = ({ tableData = [], onRowClick, onDataChange, onEditSurvey
     }
   };
 
-  const handleSendPhoneConfirm = async (phone, provider = "livekit", language = "bilingual") => {
+  const handleSendPhoneConfirm = async (phone, provider = "livekit", language = "en") => {
     try {
       const result = await sendSurveyBySMS(
         selectedSurvey.SurveyId, 

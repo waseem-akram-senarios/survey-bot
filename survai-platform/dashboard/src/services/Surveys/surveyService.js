@@ -29,7 +29,7 @@ class SurveyService {
         TenantId: surveyData.tenantId,
         Phone: (surveyData.phone || "").replace(/\s+/g, ""),
         URL: `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyData.surveyId}`,
-        Bilingual: surveyData.bilingual ?? true,
+        Bilingual: surveyData.bilingual ?? false,
       });
 
       console.log("Generated survey response:", response);
@@ -186,7 +186,7 @@ class SurveyService {
     }
   }
 
-  static async sendSurveyBySMS(surveyId, phone, provider = "livekit", language = "bilingual") {
+  static async sendSurveyBySMS(surveyId, phone, provider = "livekit", language = "en") {
     try {
       const queryParams = new URLSearchParams({
         to: phone,

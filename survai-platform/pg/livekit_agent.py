@@ -36,7 +36,9 @@ logger.setLevel(logging.INFO)
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8081/pg")
 BRAIN_SERVICE_URL = os.getenv("BRAIN_SERVICE_URL", "http://brain-service:8016")
 outbound_trunk_id = os.getenv("SIP_OUTBOUND_TRUNK_ID", "")
-ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME", "IT Curves")
+# Caller ID: must be "IT Curves" (with s)
+_def_org = (os.getenv("ORGANIZATION_NAME") or "IT Curves").strip()
+ORGANIZATION_NAME = "IT Curves" if _def_org == "IT Curve" else (_def_org or "IT Curves")
 
 
 # ─── Backend API helpers ─────────────────────────────────────────────────────

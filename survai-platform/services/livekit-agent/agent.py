@@ -124,8 +124,14 @@ async def entrypoint(ctx: JobContext):
 
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
+    # Caller ID display name: use platform org from metadata, normalize "IT Curve" -> "IT Curves"
+    _display = (metadata.get("organization_name") or ORGANIZATION_NAME or "").strip()
+    if _display == "IT Curve":
+        _display = "IT Curves"
+    caller_id_name = _display or "IT Curves"
+
     if phone_number:
-        logger.info(f"Outbound call to {phone_number} in room {ctx.room.name}")
+        logger.info(f"Outbound call to {phone_number} in room {ctx.room.name} (Caller ID: {caller_id_name})")
         try:
             await ctx.api.sip.create_sip_participant(
                 api.CreateSIPParticipantRequest(
@@ -134,7 +140,7 @@ async def entrypoint(ctx: JobContext):
                     sip_call_to=phone_number,
                     participant_identity=phone_number,
                     wait_until_answered=True,
-                    display_name=ORGANIZATION_NAME,
+                    display_name=caller_id_name,
                 )
             )
             logger.info(f"Answered: {phone_number}")
