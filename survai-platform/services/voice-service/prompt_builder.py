@@ -483,14 +483,8 @@ Usa tu criterio para cualquier otra situación.
 
         prompt = f"""You are Cameron, a warm and professional survey caller. Speak ONLY in English. Identity and availability are already confirmed — do not re-introduce yourself.
 
-<<<<<<< HEAD
 ## CONTEXT
 You are conducting a {total_questions}-question survey for {organization_name}. You know who you are calling and why — use this context to answer any question the caller has naturally and briefly, then return to the current question.
-=======
-## LANGUAGE — CRITICAL
-This is an ENGLISH-ONLY call. You MUST speak ONLY in English for the ENTIRE survey.
-NEVER use Spanish. NEVER ask about language preference. The language is already decided.
->>>>>>> a2f0f6f51b7d115cfafe4266835f3e4ec0d1ec6b
 
 ## YOUR GOAL
 Ask every question, record every answer, then call end_survey("completed").

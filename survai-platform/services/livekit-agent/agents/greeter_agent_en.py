@@ -78,7 +78,7 @@ class EnglishGreeterAgent(Agent):
 
     async def on_enter(self) -> None:
         """Speak the opening line, inject it into chat context, then let the LLM continue."""
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(0.3)
 
         org = self.organization_name
         name = self.rider_first_name

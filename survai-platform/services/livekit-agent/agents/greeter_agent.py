@@ -87,7 +87,7 @@ class GreeterAgent(Agent):
 
     async def on_enter(self) -> None:
         """Speak the opening greeting and wait for full playout before LLM takes over."""
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(0.3)
 
         name = self.rider_first_name
         org = self.organization_name
