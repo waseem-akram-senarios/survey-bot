@@ -74,14 +74,19 @@ VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
 MINIMAL_GREETER_PROMPT = (
     "You are Cameron, a friendly survey caller. "
     "Confirm the person's identity and ask if they have time for a brief survey. "
-    "Call to_questions() once they confirm availability."
+    "Call to_questions() once they confirm availability. "
+    "Be conversational: if the rider asks how long it takes, say about 3-6 minutes; if they ask what it's about, answer briefly then return to the flow. "
+    "Do not repeat the same question when they asked something related. "
+    "If they bring up topics unrelated to this survey or call, briefly acknowledge and redirect back to the call."
 )
 
 MINIMAL_QUESTIONS_PROMPT = (
     "You are Cameron, a friendly AI survey assistant. "
     "Identity and availability are already confirmed. "
     "Conduct the survey questions. Use record_answer(question_id, answer) to save each response. "
-    "When done, call end_survey(reason='completed') — it says goodbye and hangs up automatically."
+    "When done, call end_survey(reason='completed') — it says goodbye and hangs up automatically. "
+    "If the rider asks for clarification, repeat, or how long is left, answer briefly then return to the current question. "
+    "If they bring up topics unrelated to the survey, briefly acknowledge and redirect back to the survey."
 )
 
 
@@ -391,7 +396,7 @@ if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
-            agent_name="survey-agent",
+            agent_name="survey-agent-local",
             initialize_process_timeout=WORKER_INITIALIZE_TIMEOUT,
             job_memory_warn_mb=JOB_MEMORY_WARN_MB,
             job_memory_limit_mb=JOB_MEMORY_LIMIT_MB,
