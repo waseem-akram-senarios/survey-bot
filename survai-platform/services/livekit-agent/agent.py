@@ -495,7 +495,7 @@ if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
-            agent_name="survey-agent-local",
+            agent_name="survey-agent",
             initialize_process_timeout=WORKER_INITIALIZE_TIMEOUT,
             job_memory_warn_mb=JOB_MEMORY_WARN_MB,
             job_memory_limit_mb=JOB_MEMORY_LIMIT_MB,
