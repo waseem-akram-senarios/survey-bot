@@ -339,14 +339,16 @@ async def api_store_transcript(
     full_transcript: str,
     call_duration_seconds: int = 0,
     call_status: str = "completed",
+    audio_url: str = "",
 ):
-    """Store a call transcript after the voice call ends."""
+    """Store a call transcript (and optional audio URL) after the voice call ends."""
     try:
         tid = store_transcript(
             survey_id=survey_id,
             full_transcript=full_transcript,
             call_duration_seconds=call_duration_seconds,
             call_status=call_status,
+            audio_url=audio_url or None,
         )
         return {"status": "stored", "transcript_id": tid}
     except Exception as e:

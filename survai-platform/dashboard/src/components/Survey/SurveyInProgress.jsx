@@ -12,6 +12,7 @@ import {
 import { useAlert } from "../../hooks/useAlert";
 import SurveyResultsDisplay from "./components/SurveyResultsDisplay";
 import SurveyMainInfoPanel from "./components/SurveyMainInfoPanel";
+import CallTranscriptPanel from "./components/CallTranscriptPanel";
 import DeleteSurveyDialog from "./components/DeleteSurveyDialog";
 import SendSurveyDialog from "./components/SendSurveyDialog";
 import { useSurvey } from "../../hooks/Surveys/useSurvey";
@@ -215,14 +216,17 @@ const SurveyInProgress = () => {
           }),
         }}
       >
-        {/* Left Side - Survey Results */}
-        <SurveyResultsDisplay 
-          questions={questions} 
-          allowFlowInteraction={true}
-          surveyId={surveyInfo.surveyId}
-          onExportSuccess={() => showSuccess("Survey responses exported successfully.")}
-          onExportError={(err) => showError(err?.message || "Export failed. Please try again.")}
-        />
+        {/* Left Side - Survey Results + Call Transcript */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <CallTranscriptPanel surveyId={surveyInfo.surveyId} />
+          <SurveyResultsDisplay 
+            questions={questions} 
+            allowFlowInteraction={true}
+            surveyId={surveyInfo.surveyId}
+            onExportSuccess={() => showSuccess("Survey responses exported successfully.")}
+            onExportError={(err) => showError(err?.message || "Export failed. Please try again.")}
+          />
+        </Box>
 
         {/* Right Side - Main Information */}
         <SurveyMainInfoPanel

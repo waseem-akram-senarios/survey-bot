@@ -26,7 +26,6 @@ from livekit.agents import (
     AutoSubscribe,
     RoomInputOptions,
 )
-from livekit.agents.voice.room_io import RoomOptions, AudioInputOptions
 from livekit.agents.voice import AgentSession
 from livekit.plugins import deepgram, openai, silero, elevenlabs, noise_cancellation
 
@@ -67,6 +66,7 @@ from tools.survey_tools import create_survey_tools
 from utils.logging import get_logger, setup_survey_logging, cleanup_survey_logging
 from utils.metrics_logger import log_pipeline_metrics
 from utils.storage import create_empty_response_dict
+from utils.recording import start_call_recording, stop_call_recording
 
 logger = get_logger()
 VOICE_SERVICE_URL = os.getenv("VOICE_SERVICE_URL", "http://voice-service:8017")
@@ -152,6 +152,12 @@ async def entrypoint(ctx: JobContext):
 
     log_filename, log_handler = setup_survey_logging(ctx.room.name, caller_number)
     call_start_time = datetime.now()
+
+    recording_handle = await start_call_recording(
+        room_name=ctx.room.name,
+        survey_id=survey_id or ctx.room.name,
+        lk_api=ctx.api,
+    )
 
     platform_recipient = metadata.get("recipient_name", "")
     platform_org = metadata.get("organization_name", "")
@@ -242,6 +248,7 @@ async def entrypoint(ctx: JobContext):
         rider_email=rider_email,
         rider_name=rider_first_name,
         questions_metadata=questions_list,
+        language_mode=call_language,
     )
 
     # Build agents based on call language mode
@@ -309,31 +316,86 @@ async def entrypoint(ctx: JobContext):
     tts_model = TTS_MODEL_ES if call_language == "es" else TTS_MODEL
     tts_voice = TTS_VOICE_ID_ES if call_language == "es" else TTS_VOICE_ID
 
+    # Nova-3 uses keyterm prompting; Nova-2 and older use keywords
+    stt_kw: dict = {
+        "model": STT_MODEL,
+        "language": stt_language,
+        "detect_language": stt_detect_language,
+        "endpointing_ms": STT_ENDPOINTING_MS,
+    }
+    if (STT_MODEL or "").strip().lower().startswith("nova-3"):
+        stt_kw["keyterm"] = [
+            "Yes", "No", "Yeah", "Yep", "Nope",
+            "Sí", "Bueno",
+        ]
+    else:
+        stt_kw["keywords"] = [
+            "Yes:2", "No:2", "Yeah:2", "Yep:2", "Nope:2",
+            "Sí:2", "No:2", "Bueno:1",
+        ]
+
     session = AgentSession[SurveyCallData](
         userdata=call_data,
-        stt=deepgram.STT(
-            model=STT_MODEL,
-            language=stt_language
-        ),
+        stt=deepgram.STT(**stt_kw),
         llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
         tts=elevenlabs.TTS(
                 voice_id=tts_voice,
                 model=tts_model,
                 apply_text_normalization="on"
             ),
-        vad=silero.VAD.load(),
+        vad=silero.VAD.load(
+            min_silence_duration=VAD_MIN_SILENCE_DURATION,
+            min_speech_duration=VAD_MIN_SPEECH_DURATION,
+            activation_threshold=VAD_ACTIVATION_THRESHOLD,
+        ),
         preemptive_generation=PREEMPTIVE_GENERATION,
         resume_false_interruption=RESUME_FALSE_INTERRUPTION,
         false_interruption_timeout=FALSE_INTERRUPTION_TIMEOUT,
         max_tool_steps=MAX_TOOL_STEPS,
     )
 
+    survey_responses["_conversation_log"] = []
+
     @session.on("user_input_transcribed")
     def _on_user_input(ev) -> None:
         transcript = getattr(ev, "transcript", None) or str(ev)
         is_final = getattr(ev, "is_final", True)
         if is_final and transcript.strip():
-            logger.info(f"[USER] {transcript.strip()[:400]}")
+            text = transcript.strip()[:400]
+            logger.info(f"[USER] {text}")
+            survey_responses["_conversation_log"].append({
+                "role": "user",
+                "text": text,
+                "ts": datetime.now().isoformat(),
+            })
+
+    @session.on("conversation_item_added")
+    def _on_conversation_item(ev) -> None:
+        try:
+            msg = getattr(ev, "item", None)
+            if msg is None:
+                return
+            role = getattr(msg, "role", None)
+            if role != "assistant":
+                return
+            text = ""
+            content = getattr(msg, "content", None)
+            if hasattr(msg, "text_content"):
+                tc = getattr(msg, "text_content", None)
+                text = (tc() if callable(tc) else tc) or ""
+            elif isinstance(content, str):
+                text = content
+            elif isinstance(content, list):
+                text = " ".join(str(c) for c in content if c)
+            if text.strip():
+                logger.info(f"[AGENT] {text.strip()[:400]}")
+                survey_responses["_conversation_log"].append({
+                    "role": "agent",
+                    "text": text.strip()[:400],
+                    "ts": datetime.now().isoformat(),
+                })
+        except Exception as e:
+            logger.warning("[conversation_item_added] %s", e, exc_info=False)
 
     @session.on("metrics_collected")
     def _on_metrics(ev) -> None:
@@ -363,12 +425,12 @@ async def entrypoint(ctx: JobContext):
             room=ctx.room,
             agent=call_data.agents["greeter"],
             room_input_options=RoomInputOptions(
-                text_enabled=True,
                 noise_cancellation=noise_cancellation.BVCTelephony(),
-                close_on_disconnect=False,
             ),
         )
     finally:
+        audio_url = await stop_call_recording(recording_handle, ctx.api)
+
         if survey_id and not survey_responses.get("_finalized"):
             reason = survey_responses.get("end_reason") or "disconnected"
             answered = len(survey_responses.get("answers", {}))
@@ -387,6 +449,39 @@ async def entrypoint(ctx: JobContext):
                 })
             except Exception as e:
                 logger.warning(f"Failed to finalize survey on exit: {e}")
+
+            convo_log = survey_responses.get("_conversation_log", [])
+            transcript_lines = []
+            if convo_log:
+                for entry in convo_log:
+                    role_label = "AGENT" if entry["role"] == "agent" else "CALLER"
+                    transcript_lines.append(
+                        f'[{entry["ts"]}] {role_label}: {entry["text"]}'
+                    )
+                answers_section = []
+                for qid, ans in survey_responses.get("answers", {}).items():
+                    answers_section.append(f"  Q[{qid}]: {ans}")
+                if answers_section:
+                    transcript_lines.append("\n--- RECORDED ANSWERS ---")
+                    transcript_lines.extend(answers_section)
+            else:
+                for qid, ans in survey_responses.get("answers", {}).items():
+                    transcript_lines.append(f"Q[{qid}]: {ans}")
+
+            if transcript_lines:
+                store_params = {
+                    "survey_id": survey_id,
+                    "full_transcript": "\n".join(transcript_lines),
+                    "call_duration_seconds": str(int(call_duration)),
+                    "call_status": reason,
+                }
+                if audio_url:
+                    store_params["audio_url"] = audio_url
+                try:
+                    await _voice_service_post("store-transcript", store_params)
+                except Exception as e:
+                    logger.warning(f"Failed to store transcript on exit: {e}")
+
             try:
                 from utils.storage import save_survey_responses
                 save_survey_responses(caller_number, survey_responses, call_duration)
