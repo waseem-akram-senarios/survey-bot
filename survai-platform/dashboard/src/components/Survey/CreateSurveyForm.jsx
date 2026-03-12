@@ -38,7 +38,7 @@ const CreateSurveyForm = () => {
   const [phone, setPhone] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [recipientBiodata, setRecipientBiodata] = useState("");
-  const [languageMode, setLanguageMode] = useState("bilingual");
+  const [languageMode, setLanguageMode] = useState("en");
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Load templates on component mount and handle pre-selected template
@@ -84,7 +84,7 @@ const CreateSurveyForm = () => {
         tenantId: user?.tenantId || "",
         phone: phone.trim(),
         biodata: recipientBiodata.trim(),
-        bilingual: languageMode === "bilingual",
+        bilingual: false,
         languageMode: languageMode,
       };
       
@@ -456,12 +456,6 @@ const CreateSurveyForm = () => {
                   backgroundColor: "#F8F9FA",
                 }}
               >
-                <MenuItem value="bilingual" sx={{ fontFamily: "Poppins, sans-serif" }}>
-                  <Box>
-                    <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "14px" }}>Bilingual (English & Spanish)</Typography>
-                    <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "11px", color: "#7D7D7D" }}>AI will ask the recipient to choose their preferred language</Typography>
-                  </Box>
-                </MenuItem>
                 <MenuItem value="en" sx={{ fontFamily: "Poppins, sans-serif" }}>
                   <Box>
                     <Typography sx={{ fontFamily: "Poppins, sans-serif", fontSize: "14px" }}>English Only</Typography>

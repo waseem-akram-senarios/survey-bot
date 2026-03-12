@@ -219,7 +219,11 @@ async def make_call(
     if language not in ("en", "es", "bilingual"):
         language = "bilingual"
 
-    company_name = template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves")
+    # Caller ID / display: must be "IT Curves" (with s), not "IT Curve"
+    company_name = (template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves") or "").strip()
+    if company_name == "IT Curve":
+        company_name = "IT Curves"
+    company_name = company_name or "IT Curves"
     callback_url = os.getenv("SURVEY_SUBMIT_URL", "http://survey-service:8020/api/answers/qna_phone")
 
     rider_first_name = _extract_rider_first_name(rider_name)

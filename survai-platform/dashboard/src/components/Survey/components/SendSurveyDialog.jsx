@@ -36,8 +36,8 @@ const SendSurveyDialog = ({
   const [phone, setPhone] = useState("");
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
-  const [emailLanguage, setEmailLanguage] = useState("bilingual");
-  const [phoneLanguage, setPhoneLanguage] = useState("bilingual");
+  const [emailLanguage, setEmailLanguage] = useState("en");
+  const [phoneLanguage, setPhoneLanguage] = useState("en");
   const [voiceProvider, setVoiceProvider] = useState("livekit");
 
   const surveyLink = `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyId}`;
@@ -163,8 +163,8 @@ const SendSurveyDialog = ({
       setPhoneError("");
       setEmailTouched(false);
       setPhoneTouched(false);
-      setEmailLanguage("bilingual");
-      setPhoneLanguage("bilingual");
+      setEmailLanguage("en");
+      setPhoneLanguage("en");
       setVoiceProvider("livekit");
       onClose();
     }
@@ -304,7 +304,6 @@ const SendSurveyDialog = ({
                     fontSize: "14px",
                   }}
                 >
-                  <MenuItem value="bilingual" sx={{ fontFamily: "Poppins, sans-serif" }}>Bilingual (English & Spanish)</MenuItem>
                   <MenuItem value="en" sx={{ fontFamily: "Poppins, sans-serif" }}>English Only</MenuItem>
                   <MenuItem value="es" sx={{ fontFamily: "Poppins, sans-serif" }}>Spanish Only</MenuItem>
                 </Select>
@@ -388,7 +387,6 @@ const SendSurveyDialog = ({
                     fontSize: "14px",
                   }}
                 >
-                  <MenuItem value="bilingual" sx={{ fontFamily: "Poppins, sans-serif" }}>Bilingual (ask caller to choose)</MenuItem>
                   <MenuItem value="en" sx={{ fontFamily: "Poppins, sans-serif" }}>English Only</MenuItem>
                   <MenuItem value="es" sx={{ fontFamily: "Poppins, sans-serif" }}>Spanish Only</MenuItem>
                 </Select>

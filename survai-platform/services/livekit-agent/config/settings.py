@@ -11,7 +11,9 @@ load_dotenv()
 # ===========================================
 # ORGANIZATION SETTINGS
 # ===========================================
-ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME", "IT Curves")
+# Caller ID / display name: must be "IT Curves" (with s) — normalize if mis-set as "IT Curve"
+_def = (os.getenv("ORGANIZATION_NAME") or "IT Curves").strip()
+ORGANIZATION_NAME = "IT Curves" if _def == "IT Curve" else (_def or "IT Curves")
 
 # ===========================================
 # DEFAULT RIDER (fallback when not found in DB)

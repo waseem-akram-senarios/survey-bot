@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# Survey Bot Service Verification Script
-# This script checks the health of all microservices and provides E2E test shortcuts.
+# Survey Bot Service Verification Script (LOCAL only)
+# This script checks Docker and API health on THIS machine (localhost:8080).
+# It does NOT connect to the remote server.
+# To connect to the remote server (54.86.65.150): ./connect-to-survey-server.sh
 
 GATEWAY_URL="http://localhost:8080"
 E2E_DIR="./survai-platform/e2e-tests"
