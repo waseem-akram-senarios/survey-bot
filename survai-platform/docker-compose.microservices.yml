@@ -249,6 +249,7 @@ services:
       - LIVEKIT_URL=${LIVEKIT_URL}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - AGENT_NAME=${AGENT_NAME}
     depends_on:
       postgres:
         condition: service_healthy
@@ -355,6 +356,7 @@ services:
       - STT_ENDPOINTING_MS=${STT_ENDPOINTING_MS:-300}
       - LLM_MODEL=${LLM_MODEL:-gpt-4.1-mini}
       - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.1}
+      - LLM_TEMPERATURE_ES=${LLM_TEMPERATURE_ES:-0.4}
       - TTS_MODEL=${TTS_MODEL:-eleven_flash_v2_5}
       - TTS_MODEL_ES=${TTS_MODEL_ES:-eleven_multilingual_v2}
       - ELEVENLABS_VOICE_ID_ES=${ELEVENLABS_VOICE_ID_ES:-${ELEVENLABS_VOICE_ID:-cgSgspJ2msm6clMCkdW9}}
@@ -371,6 +373,7 @@ services:
       - S3_BUCKET=${S3_BUCKET:-}
       - S3_REGION=${S3_REGION:-us-east-1}
       - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - AGENT_NAME=${AGENT_NAME}
     volumes:
       - livekit-agent-logs:/app/survey_logs
       - livekit-agent-responses:/app/survey_responses

@@ -38,6 +38,7 @@ STT_ENDPOINTING_MS = int(os.getenv("STT_ENDPOINTING_MS", "300"))
 # Large Language Model (OpenAI)
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4.1-mini")
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
+LLM_TEMPERATURE_ES = float(os.getenv("LLM_TEMPERATURE_ES", "0.4"))
 
 # Text-to-Speech
 TTS_MODEL = os.getenv("TTS_MODEL", "eleven_flash_v2_5")
@@ -89,3 +90,7 @@ WORKER_INITIALIZE_TIMEOUT = 600.0
 JOB_MEMORY_WARN_MB = 1200
 JOB_MEMORY_LIMIT_MB = 1500
 
+INACTIVITY_TIMEOUT = int(os.getenv("INACTIVITY_TIMEOUT", "6"))
+MAX_INACTIVITY_REPROMPTS = int(os.getenv("MAX_INACTIVITY_REPROMPTS", "2"))
+
+AGENT_NAME = os.getenv("AGENT_NAME", "survey-agent")

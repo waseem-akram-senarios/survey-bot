@@ -52,6 +52,10 @@ from config.settings import (
     VAD_MIN_SILENCE_DURATION,
     VAD_MIN_SPEECH_DURATION,
     VAD_ACTIVATION_THRESHOLD,
+    AGENT_NAME,
+    INACTIVITY_TIMEOUT,
+    MAX_INACTIVITY_REPROMPTS,
+    LLM_TEMPERATURE_ES,
 )
 from agents import (
     SurveyCallData,
@@ -340,10 +344,12 @@ async def entrypoint(ctx: JobContext):
             "Sí:2", "No:2", "Bueno:1",
         ]
 
+    llm_temperature = LLM_TEMPERATURE_ES if call_language in ("es", "bilingual") else LLM_TEMPERATURE
+
     session = AgentSession[SurveyCallData](
         userdata=call_data,
         stt=deepgram.STT(**stt_kw),
-        llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
+        llm=openai.LLM(model=LLM_MODEL, temperature=llm_temperature, service_tier="priority"),
         tts=elevenlabs.TTS(
                 voice_id=tts_voice,
                 model=tts_model,
@@ -362,11 +368,82 @@ async def entrypoint(ctx: JobContext):
 
     survey_responses["_conversation_log"] = []
 
+    # ── Inactivity monitor ──────────────────────────────────────────────────
+    # After the agent finishes speaking and enters listening state, a countdown
+    # starts. If no user speech arrives within INACTIVITY_TIMEOUT seconds, the
+    # agent re-prompts. After MAX_INACTIVITY_REPROMPTS with no response the call
+    # is ended gracefully.
+    _inactivity_reprompt_count = 0
+    _inactivity_task: asyncio.Task = None
+
+    def _get_reprompt_text() -> tuple[str, str]:
+        """Return (reprompt_line, goodbye_line) in the active call language."""
+        lang = getattr(call_data, "detected_language", None) or call_language or "en"
+        if lang == "es":
+            return (
+                "¿Hola? ¿Sigue ahí?",
+                "Parece que perdimos la conexión. Muchas gracias por su tiempo. ¡Hasta luego!",
+            )
+        return (
+            "Hello? Are you still there?",
+            "It seems we've lost the connection. Thank you for your time. Goodbye!",
+        )
+
+    def _cancel_inactivity() -> None:
+        nonlocal _inactivity_task
+        if _inactivity_task and not _inactivity_task.done():
+            _inactivity_task.cancel()
+        _inactivity_task = None
+
+    def _start_inactivity() -> None:
+        nonlocal _inactivity_task
+        _cancel_inactivity()
+        _inactivity_task = asyncio.create_task(_inactivity_watchdog())
+
+    async def _inactivity_watchdog() -> None:
+        nonlocal _inactivity_reprompt_count
+        try:
+            await asyncio.sleep(INACTIVITY_TIMEOUT)
+        except asyncio.CancelledError:
+            return
+
+        if survey_responses.get("end_reason"):
+            return
+
+        _inactivity_reprompt_count += 1
+        reprompt, goodbye = _get_reprompt_text()
+
+        if _inactivity_reprompt_count > MAX_INACTIVITY_REPROMPTS:
+            logger.info(
+                f"[INACTIVITY] No response after {MAX_INACTIVITY_REPROMPTS} re-prompts — ending call"
+            )
+            survey_responses["end_reason"] = "not_available"
+            try:
+                await session.say(goodbye)
+                await asyncio.sleep(3)
+            except Exception:
+                pass
+            await hangup_call()
+            return
+
+        logger.info(
+            f"[INACTIVITY] Silence timeout — re-prompt "
+            f"{_inactivity_reprompt_count}/{MAX_INACTIVITY_REPROMPTS}: {reprompt}"
+        )
+        try:
+            await session.say(reprompt)
+        except Exception as e:
+            logger.warning(f"[INACTIVITY] Failed to speak re-prompt: {e}")
+
+    # ───────────────────────────────────────────────────────────────────────
+
     @session.on("user_input_transcribed")
     def _on_user_input(ev) -> None:
+        nonlocal _inactivity_reprompt_count
         transcript = getattr(ev, "transcript", None) or str(ev)
         is_final = getattr(ev, "is_final", True)
         if is_final and transcript.strip():
+            _inactivity_reprompt_count = 0  # reset on real user speech
             text = transcript.strip()[:400]
             logger.info(f"[USER] {text}")
             survey_responses["_conversation_log"].append({
@@ -410,15 +487,37 @@ async def entrypoint(ctx: JobContext):
     @session.on("agent_state_changed")
     def _on_agent_state(ev) -> None:
         logger.info("[STATE] %s → %s", ev.old_state, ev.new_state)
+        new = ev.new_state
+        if new == "listening":
+            _start_inactivity()
+        elif new in ("thinking", "speaking", "initializing"):
+            _cancel_inactivity()
 
     time_limit_minutes = metadata.get("time_limit_minutes", 8)
 
     async def _time_limit_watchdog():
-        """Enforce call time limit — gracefully end call if exceeded."""
+        """Enforce call time limit — speak a farewell then disconnect."""
         await asyncio.sleep(time_limit_minutes * 60)
         if not survey_responses.get("end_reason"):
-            logger.warning(f"Time limit reached ({time_limit_minutes}m) — disconnecting")
+            logger.warning(f"Time limit reached ({time_limit_minutes}m) — saying farewell and disconnecting")
             survey_responses["end_reason"] = "time_limit"
+            try:
+                lang = getattr(call_data, "detected_language", None) or call_language or "en"
+                if lang == "es":
+                    farewell = (
+                        "Hemos llegado al límite de tiempo de la encuesta. "
+                        "¡Muchas gracias por su tiempo y que tenga un excelente día! ¡Adiós!"
+                    )
+                else:
+                    farewell = (
+                        "We've reached the end of our survey time. "
+                        "Thank you so much for your time — have a wonderful day! Goodbye!"
+                    )
+                speech_handle = session.say(farewell)
+                await speech_handle.wait_for_playout()
+                await asyncio.sleep(2.0)
+            except Exception as e:
+                logger.warning(f"[TIME_LIMIT] Farewell failed: {e}")
             try:
                 await hangup_call()
             except Exception:
@@ -501,7 +600,7 @@ if __name__ == "__main__":
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
-            agent_name="survey-agent",
+            agent_name=AGENT_NAME,
             initialize_process_timeout=WORKER_INITIALIZE_TIMEOUT,
             job_memory_warn_mb=JOB_MEMORY_WARN_MB,
             job_memory_limit_mb=JOB_MEMORY_LIMIT_MB,
