@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   Box,
   Typography,
@@ -31,11 +33,11 @@ import {
   TrendingUp,
   Plus
 } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
 
 const SidebarNew = ({ isOpen, onClose, isMobile = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth();
   
   const [expandedSections, setExpandedSections] = useState({
     templates: false,
@@ -134,14 +136,14 @@ const SidebarNew = ({ isOpen, onClose, isMobile = false }) => {
               fontWeight: 600
             }}
           >
-            AD
+            {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
           </Avatar>
           <Box>
             <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1f2937' }}>
-              Admin User
+              {user?.username || 'User'}
             </Typography>
             <Typography variant="caption" sx={{ color: '#6b7280' }}>
-              admin@survai.com
+              {user?.orgName || 'Organization'}
             </Typography>
           </Box>
         </Box>
@@ -266,7 +268,7 @@ const SidebarNew = ({ isOpen, onClose, isMobile = false }) => {
         <Divider sx={{ mx: 3, my: 2 }} />
         
         <Button
-          onClick={() => console.log('Logout clicked')}
+          onClick={() => { logout(); navigate('/login'); if (isMobile) onClose(); }}
           sx={{
             width: '100%',
             justifyContent: 'flex-start',

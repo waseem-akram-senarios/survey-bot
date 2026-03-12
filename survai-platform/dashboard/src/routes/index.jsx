@@ -31,13 +31,17 @@ const routes = [
       element: <Navigate to="/dashboard" replace />
     },
     {
-      path: '/dashboard',
-      element: <DashboardNew />
-    },
-    {
       path: '/',
-      element: <MainLayout />,
+      element: (
+        <ProtectedRoute>
+          <MainLayout />
+        </ProtectedRoute>
+      ),
       children: [
+        {
+          path: 'dashboard',
+          element: <DashboardNew />
+        },
         {
           path: 'templates/manage',
           element: <Templates />

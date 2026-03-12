@@ -1,7 +1,7 @@
 // Survey API Utilities
 // Working survey creation and management functions
 
-const API_BASE_URL = 'http://localhost:8080/pg/api';
+const API_BASE_URL = '/api';
 
 export const surveyAPI = {
   // Get all surveys
