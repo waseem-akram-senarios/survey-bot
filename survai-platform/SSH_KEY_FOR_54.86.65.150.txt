@@ -1,0 +1,20 @@
+# Add this key on 54.86.65.150 so THIS machine can SSH and deploy
+
+If you added a key from a different machine, the server will only accept that one.
+To allow THIS machine (Cursor / this Linux) to deploy, add this line to the server:
+
+  ubuntu@54.86.65.150:  ~/.ssh/authorized_keys
+
+Line to append (id_ed25519 - waseem@aidevlab.com):
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC24qSXO1n87m6ACx7rOiNo53oEkEK9pxaCZRRMy/n8a waseem@aidevlab.com
+
+On server (from a session that already works):
+  mkdir -p ~/.ssh
+  echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC24qSXO1n87m6ACx7rOiNo53oEkEK9pxaCZRRMy/n8a waseem@aidevlab.com' >> ~/.ssh/authorized_keys
+  chmod 700 ~/.ssh
+  chmod 600 ~/.ssh/authorized_keys
+
+Then from this machine:
+  ssh survey-server "echo OK"
+
+(.ssh/config already has Host survey-server → 54.86.65.150, user ubuntu)

@@ -10,7 +10,15 @@ import {
   DialogContentText,
   DialogActions,
   Button,
+  TextField,
+  InputAdornment,
+  Select,
+  MenuItem,
+  FormControl,
+  Typography,
 } from "@mui/material";
+import { Add, BarChart } from "@mui/icons-material";
+import SearchIcon from "../../assets/Search.svg";
 import SearchBar from "../sharedTableComponents/SearchBar";
 import MobileTableCard from "./components/MobileTableCard";
 import DesktopTable from "./components/DesktopTable";
@@ -20,8 +28,19 @@ import { useSurvey } from "../../hooks/Surveys/useSurvey";
 import SurveyService from "../../services/Surveys/surveyService";
 import SendSurveyDialog from "../Survey/components/SendSurveyDialog";
 
-const DashboardTable = ({ tableData = [], onRowClick, onDataChange, onEditSurvey, onCloneSurvey }) => {  
+const DashboardTable = ({
+  tableData = [],
+  onRowClick,
+  onDataChange,
+  onEditSurvey,
+  onCloneSurvey,
+  emptyStateTitle,
+  emptyStateDescription,
+  emptyStateButtonLabel,
+  onEmptyStateAction,
+}) => {
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [orderBy, setOrderBy] = useState("LaunchDate");
   const [order, setOrder] = useState("desc");
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -157,9 +176,17 @@ const DashboardTable = ({ tableData = [], onRowClick, onDataChange, onEditSurvey
   };
 
   // Data processing
-  const filteredData = filterData(tableData, search);
+  let filteredData = filterData(tableData, search);
+  if (statusFilter === "active") {
+    filteredData = filteredData.filter((item) => item.Status !== "Completed");
+  } else if (statusFilter === "completed") {
+    filteredData = filteredData.filter((item) => item.Status === "Completed");
+  }
   const sortedData = sortData(filteredData, orderBy, order);
   const paginatedData = paginateData(sortedData, page, rowsPerPage);
+
+  const showEmptyState = emptyStateTitle && !tableLoading && tableData.length === 0;
+  const useRiderVoiceSearch = Boolean(emptyStateTitle);
 
   return (
     <Box
@@ -169,47 +196,172 @@ const DashboardTable = ({ tableData = [], onRowClick, onDataChange, onEditSurvey
         borderRadius: "20px",
       }}
     >
-      <SearchBar
-        title="Active Surveys"
-        searchValue={search}
-        onSearchChange={setSearch}
-        placeholder="Search survey"
-      />
-
-      {isMobile ? (
-        <Box>
-          {paginatedData.map((item) => (
-            <MobileTableCard
-              key={item.SurveyId}
-              item={item}
-              onItemClick={handleRowClick}
-              onSendEmail={handleSendEmail}
-              onSendPhone={handleSendPhone}
-            />
-          ))}
+      {useRiderVoiceSearch ? (
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            gap: 2,
+            alignItems: isMobile ? "stretch" : "center",
+            mb: 2,
+          }}
+        >
+          <TextField
+            size="small"
+            placeholder="Search surveys..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <img src={SearchIcon} alt="Search" style={{ width: 18, height: 18 }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              flex: 1,
+              maxWidth: useRiderVoiceSearch && !isMobile ? 320 : "none",
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "12px",
+                height: "40px",
+                backgroundColor: "#fff",
+                fontSize: "14px",
+                border: "1px solid #E0E0E0",
+                "& fieldset": { border: "none" },
+              },
+            }}
+          />
+          <FormControl size="small" sx={{ minWidth: isMobile ? "100%" : 160 }}>
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              displayEmpty
+              sx={{
+                borderRadius: "12px",
+                height: "40px",
+                fontSize: "14px",
+                fontFamily: "Poppins, sans-serif",
+              }}
+            >
+              <MenuItem value="all">All Statuses</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="completed">Completed</MenuItem>
+            </Select>
+          </FormControl>
         </Box>
       ) : (
-        <DesktopTable
-          data={paginatedData}
-          onItemClick={handleRowClick}
-          orderBy={orderBy}
-          order={order}
-          onSort={handleSort}
-          onSendEmail={handleSendEmail}
-          onSendPhone={handleSendPhone}
-          onDeleteSurvey={handleDeleteSurvey}
-          onEditSurvey={onEditSurvey}
-          onCloneSurvey={onCloneSurvey}
+        <SearchBar
+          title="Active Surveys"
+          searchValue={search}
+          onSearchChange={setSearch}
+          placeholder="Search survey"
         />
       )}
 
-      <TablePagination
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={setRowsPerPage}
-        page={page}
-        onPageChange={setPage}
-        totalItems={sortedData.length}
-      />
+      {showEmptyState ? (
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            py: 8,
+            px: 2,
+          }}
+        >
+          <BarChart
+            sx={{
+              fontSize: 80,
+              color: "#7B61FF",
+              mb: 2,
+              opacity: 0.9,
+            }}
+          />
+          <Typography
+            sx={{
+              fontFamily: "Poppins, sans-serif",
+              fontWeight: 600,
+              fontSize: "22px",
+              color: "#1E1E1E",
+              mb: 1,
+              textAlign: "center",
+            }}
+          >
+            {emptyStateTitle}
+          </Typography>
+          <Typography
+            sx={{
+              fontFamily: "Poppins, sans-serif",
+              fontWeight: 400,
+              fontSize: "14px",
+              color: "#7D7D7D",
+              mb: 3,
+              textAlign: "center",
+              maxWidth: 360,
+            }}
+          >
+            {emptyStateDescription}
+          </Typography>
+          {onEmptyStateAction && (
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={onEmptyStateAction}
+              sx={{
+                backgroundColor: "#7B61FF",
+                color: "white",
+                textTransform: "none",
+                borderRadius: "12px",
+                fontFamily: "Poppins, sans-serif",
+                fontSize: "15px",
+                fontWeight: 500,
+                px: 3,
+                py: 1.5,
+                "&:hover": { backgroundColor: "#6A52E0" },
+              }}
+            >
+              {emptyStateButtonLabel || "Create Survey"}
+            </Button>
+          )}
+        </Box>
+      ) : (
+        <>
+          {isMobile ? (
+            <Box>
+              {paginatedData.map((item) => (
+                <MobileTableCard
+                  key={item.SurveyId}
+                  item={item}
+                  onItemClick={handleRowClick}
+                  onSendEmail={handleSendEmail}
+                  onSendPhone={handleSendPhone}
+                />
+              ))}
+            </Box>
+          ) : (
+            <DesktopTable
+              data={paginatedData}
+              onItemClick={handleRowClick}
+              orderBy={orderBy}
+              order={order}
+              onSort={handleSort}
+              onSendEmail={handleSendEmail}
+              onSendPhone={handleSendPhone}
+              onDeleteSurvey={handleDeleteSurvey}
+              onEditSurvey={onEditSurvey}
+              onCloneSurvey={onCloneSurvey}
+            />
+          )}
+
+          <TablePagination
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={setRowsPerPage}
+            page={page}
+            onPageChange={setPage}
+            totalItems={sortedData.length}
+          />
+        </>
+      )}
 
       {/* Send Survey Dialog */}
       <SendSurveyDialog

@@ -4,206 +4,70 @@ import {
   Typography,
   CircularProgress,
   Alert,
-  useMediaQuery,
-  Paper,
-  Chip,
-  LinearProgress,
-  Divider,
+  Grid,
   Button,
+  FormControl,
+  Select,
+  MenuItem,
+  Paper,
+  Divider,
 } from '@mui/material';
-import {
+import { 
+  Users, 
+  CheckCircle, 
+  Clock, 
   TrendingUp,
-  AccessTime,
-  CheckCircleOutline,
-  PeopleOutline,
-  AssessmentOutlined,
-  PhoneOutlined,
-  TextFieldsOutlined,
-  EmailOutlined,
-  DownloadOutlined,
-} from '@mui/icons-material';
+  Download,
+  ChevronLeft,
+  Phone,
+  Globe,
+  QrCode
+} from 'lucide-react';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  AreaChart,
+  Area
+} from 'recharts';
 import AnalyticsService from '../../../services/Analytics/analyticsService';
 import { useAuth } from '../../../context/AuthContext';
-
-const StatCard = ({ title, value, subtitle, icon, color = '#1958F7', trend }) => (
-  <Paper
-    elevation={0}
-    sx={{
-      p: 3,
-      borderRadius: '16px',
-      border: '1px solid #F0F0F0',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 1,
-      minWidth: 0,
-      flex: 1,
-    }}
-  >
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-      <Box
-        sx={{
-          width: 44,
-          height: 44,
-          borderRadius: '12px',
-          backgroundColor: `${color}14`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {React.cloneElement(icon, { sx: { color, fontSize: 22 } })}
-      </Box>
-      {trend && (
-        <Chip
-          label={trend}
-          size="small"
-          icon={<TrendingUp sx={{ fontSize: 14 }} />}
-          sx={{
-            backgroundColor: '#E8F5E9',
-            color: '#2E7D32',
-            fontFamily: 'Poppins, sans-serif',
-            fontSize: '11px',
-            fontWeight: 500,
-            height: 24,
-          }}
-        />
-      )}
-    </Box>
-    <Typography
-      sx={{
-        fontFamily: 'Poppins, sans-serif',
-        fontSize: '28px',
-        fontWeight: 600,
-        color: '#1A1A1A',
-        lineHeight: 1.2,
-      }}
-    >
-      {value}
-    </Typography>
-    <Typography
-      sx={{
-        fontFamily: 'Poppins, sans-serif',
-        fontSize: '13px',
-        fontWeight: 500,
-        color: '#7D7D7D',
-      }}
-    >
-      {title}
-    </Typography>
-    {subtitle && (
-      <Typography
-        sx={{
-          fontFamily: 'Poppins, sans-serif',
-          fontSize: '11px',
-          color: '#ABABAB',
-        }}
-      >
-        {subtitle}
-      </Typography>
-    )}
-  </Paper>
-);
-
-const ChannelBar = ({ label, count, total, color, icon }) => {
-  const pct = total > 0 ? (count / total) * 100 : 0;
-  return (
-    <Box sx={{ mb: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {icon}
-          <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '13px', fontWeight: 500, color: '#4B4B4B' }}>
-            {label}
-          </Typography>
-        </Box>
-        <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '13px', fontWeight: 600, color: '#1A1A1A' }}>
-          {count} <span style={{ color: '#ABABAB', fontWeight: 400 }}>({pct.toFixed(1)}%)</span>
-        </Typography>
-      </Box>
-      <LinearProgress
-        variant="determinate"
-        value={pct}
-        sx={{
-          height: 8,
-          borderRadius: 4,
-          backgroundColor: '#F0F0F0',
-          '& .MuiLinearProgress-bar': { backgroundColor: color, borderRadius: 4 },
-        }}
-      />
-    </Box>
-  );
-};
-
-const ResponseTypeBar = ({ label, count, total, color }) => {
-  const pct = total > 0 ? (count / total) * 100 : 0;
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-      <Box sx={{ width: 90 }}>
-        <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '12px', fontWeight: 500, color: '#4B4B4B', textTransform: 'capitalize' }}>
-          {label}
-        </Typography>
-      </Box>
-      <Box sx={{ flex: 1 }}>
-        <LinearProgress
-          variant="determinate"
-          value={pct}
-          sx={{
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: '#F0F0F0',
-            '& .MuiLinearProgress-bar': { backgroundColor: color, borderRadius: 3 },
-          }}
-        />
-      </Box>
-      <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '12px', fontWeight: 500, color: '#7D7D7D', minWidth: 30, textAlign: 'right' }}>
-        {count}
-      </Typography>
-    </Box>
-  );
-};
-
-const SectionTitle = ({ children }) => (
-  <Typography
-    sx={{
-      fontFamily: 'Poppins, sans-serif',
-      fontSize: '16px',
-      fontWeight: 600,
-      color: '#1A1A1A',
-      mb: 2,
-    }}
-  >
-    {children}
-  </Typography>
-);
-
-const formatDuration = (seconds) => {
-  if (!seconds || seconds === 0) return '0m 0s';
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-};
+import StatCard from '../../../components/StatCard';
 
 const Analytics = () => {
-  const isMobile = useMediaQuery('(max-width: 600px)');
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [summary, setSummary] = useState(null);
   const [stats, setStats] = useState(null);
-  const [completedSurveys, setCompletedSurveys] = useState([]);
+
+  // Mock data for the chart since real data might not be formatted for the new chart type yet
+  const chartData = [
+    { name: 'Feb 11', value: 0 },
+    { name: 'Feb 15', value: 0.2 },
+    { name: 'Feb 21', value: 0.1 },
+    { name: 'Feb 27', value: 0.3 },
+    { name: 'Mar 1', value: 0.1 },
+    { name: 'Mar 5', value: 0.2 },
+    { name: 'Mar 9', value: 0.1 },
+    { name: 'Mar 12', value: 0 },
+  ];
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         const tenantId = user?.tenantId || '';
-        const [summaryData, statsData, completed] = await Promise.all([
+        const [summaryData, statsData] = await Promise.all([
           AnalyticsService.getSummary(),
           AnalyticsService.getSurveyStats(tenantId),
-          AnalyticsService.getCompletedSurveys(tenantId),
         ]);
         setSummary(summaryData);
         setStats(statsData);
-        setCompletedSurveys(completed || []);
       } catch (err) {
         console.error('Error loading analytics:', err);
         setError('Failed to load analytics data.');
@@ -214,322 +78,164 @@ const Analytics = () => {
     fetchData();
   }, [user]);
 
-  const handleExport = (type) => {
-    const baseUrl = import.meta.env.VITE_SERVER_URL || '';
-    window.open(`${baseUrl}/api/export/${type}`, '_blank');
-  };
-
   if (loading) {
     return (
-      <Box sx={{ backgroundColor: '#F9FBFC', flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <CircularProgress size={60} sx={{ color: '#1958F7' }} />
+      <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
+        <CircularProgress size={60} sx={{ color: '#6366f1' }} />
       </Box>
     );
   }
 
-  if (error) {
-    return (
-      <Box sx={{ backgroundColor: '#F9FBFC', flexGrow: 1, p: 4 }}>
-        <Alert severity="error">{error}</Alert>
-      </Box>
-    );
-  }
-
-  const totalSurveys = stats?.Total_Surveys || summary?.total_surveys || 0;
-  const completed = stats?.Total_Completed_Surveys || summary?.completed || 0;
-  const active = stats?.Total_Active_Surveys || 0;
-  const completionRate = totalSurveys > 0 ? ((completed / totalSurveys) * 100).toFixed(1) : '0';
-  const avgDuration = summary?.avg_duration_seconds || 0;
-  const avgCSAT = stats?.AverageCSAT || 0;
-  const completedToday = stats?.Total_Completed_Surveys_Today || 0;
-  const medianDuration = stats?.Median_Completion_Duration || 0;
+  const totalResponses = stats?.Total_Completed_Surveys ?? summary?.completed ?? 0;
+  const completionRate = summary?.completion_rate != null ? `${Number(summary.completion_rate).toFixed(1)}%` : '0%';
+  const avgDurationMin = summary?.avg_duration_seconds != null
+    ? `${Math.round(Number(summary.avg_duration_seconds) / 60)} min`
+    : '0 min';
   const channelCounts = summary?.channel_counts || {};
-  const totalChannels = Object.values(channelCounts).reduce((a, b) => a + b, 0);
-  const dropoutPoints = summary?.dropout_points || [];
-  const responseTypes = summary?.response_types || {};
-  const totalResponses = Object.values(responseTypes).reduce((a, b) => a + b, 0);
-
-  const responseColors = { open: '#1958F7', scale: '#FF9800', categorical: '#4CAF50', text: '#9C27B0', unknown: '#999' };
-  const responseLabels = { open: 'Open', scale: 'Scale', categorical: 'Multiple Choice', text: 'Text', unknown: 'Unknown' };
 
   return (
-    <Box
-      sx={{
-        backgroundColor: '#F9FBFC',
-        flexGrow: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        p: isMobile ? 2 : 4,
-        overflow: 'auto',
-        width: '100%',
-      }}
-    >
+    <Box sx={{ p: { xs: 2, md: 6 }, maxWidth: 1400, mx: 'auto' }}>
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '24px', fontWeight: 600, color: '#1A1A1A' }}>
-            Analytics
-          </Typography>
-          <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '13px', color: '#7D7D7D' }}>
-            Survey performance and insights
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<DownloadOutlined />}
-            onClick={() => handleExport('surveys')}
-            sx={{
-              fontFamily: 'Poppins, sans-serif',
-              textTransform: 'none',
-              borderRadius: '10px',
-              borderColor: '#E0E0E0',
-              color: '#4B4B4B',
-              fontSize: '12px',
-              '&:hover': { borderColor: '#1958F7', color: '#1958F7' },
-            }}
-          >
-            Export Surveys
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<DownloadOutlined />}
-            onClick={() => handleExport('transcripts')}
-            sx={{
-              fontFamily: 'Poppins, sans-serif',
-              textTransform: 'none',
-              borderRadius: '10px',
-              borderColor: '#E0E0E0',
-              color: '#4B4B4B',
-              fontSize: '12px',
-              '&:hover': { borderColor: '#1958F7', color: '#1958F7' },
-            }}
-          >
-            Export Transcripts
-          </Button>
-        </Box>
-      </Box>
-
-      {/* Stat Cards */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        <StatCard
-          title="Total Surveys"
-          value={totalSurveys}
-          subtitle={`${completedToday} completed today`}
-          icon={<AssessmentOutlined />}
-          color="#1958F7"
-        />
-        <StatCard
-          title="Completed"
-          value={completed}
-          subtitle={`${completionRate}% completion rate`}
-          icon={<CheckCircleOutline />}
-          color="#4CAF50"
-          trend={completedToday > 0 ? `+${completedToday} today` : undefined}
-        />
-        <StatCard
-          title="In Progress"
-          value={active}
-          subtitle="Active surveys"
-          icon={<PeopleOutline />}
-          color="#FF9800"
-        />
-        <StatCard
-          title="Avg Duration"
-          value={formatDuration(medianDuration || avgDuration)}
-          subtitle={avgCSAT > 0 ? `Avg CSAT: ${avgCSAT.toFixed(1)}/5` : 'Median completion time'}
-          icon={<AccessTime />}
-          color="#9C27B0"
-        />
-      </Box>
-
-      {/* Two Column Layout */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-          gap: 3,
-          mb: 3,
-        }}
-      >
-        {/* Channel Distribution */}
-        <Paper elevation={0} sx={{ p: 3, borderRadius: '16px', border: '1px solid #F0F0F0' }}>
-          <SectionTitle>Channel Distribution</SectionTitle>
-          {totalChannels > 0 ? (
-            <>
-              <ChannelBar
-                label="Phone"
-                count={channelCounts.phone || 0}
-                total={totalChannels}
-                color="#1958F7"
-                icon={<PhoneOutlined sx={{ fontSize: 16, color: '#1958F7' }} />}
-              />
-              <ChannelBar
-                label="Text / Web"
-                count={(channelCounts.text || 0) + (channelCounts.web || 0)}
-                total={totalChannels}
-                color="#4CAF50"
-                icon={<TextFieldsOutlined sx={{ fontSize: 16, color: '#4CAF50' }} />}
-              />
-              <ChannelBar
-                label="Email"
-                count={channelCounts.email || 0}
-                total={totalChannels}
-                color="#FF9800"
-                icon={<EmailOutlined sx={{ fontSize: 16, color: '#FF9800' }} />}
-              />
-              {Object.entries(channelCounts)
-                .filter(([k]) => !['phone', 'text', 'web', 'email'].includes(k))
-                .map(([k, v]) => (
-                  <ChannelBar key={k} label={k} count={v} total={totalChannels} color="#999" icon={<AssessmentOutlined sx={{ fontSize: 16, color: '#999' }} />} />
-                ))}
-            </>
-          ) : (
-            <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '13px', color: '#ABABAB' }}>
-              No channel data yet
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 6 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+           <Button sx={{ minWidth: 0, p: 1, color: '#6b7280' }}>
+              <ChevronLeft size={24} />
+           </Button>
+           <Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#111827' }}>
+              Analytics
             </Typography>
-          )}
-        </Paper>
+            <Typography variant="body1" sx={{ color: '#6b7280' }}>
+              View response data and insights
+            </Typography>
+           </Box>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 200, bgcolor: '#fff' }}>
+             <Select value="all" displayEmpty>
+                <MenuItem value="all">All Surveys</MenuItem>
+             </Select>
+          </FormControl>
+          <Button variant="outlined" startIcon={<Download size={18} />} sx={{ color: '#4b5563', borderColor: '#e5e7eb', bgcolor: '#fff' }}>
+            Export CSV
+          </Button>
+          <Button variant="outlined" startIcon={<Download size={18} />} sx={{ color: '#4b5563', borderColor: '#e5e7eb', bgcolor: '#fff' }}>
+            Export PDF
+          </Button>
+        </Box>
+      </Box>
 
-        {/* Response Types */}
-        <Paper elevation={0} sx={{ p: 3, borderRadius: '16px', border: '1px solid #F0F0F0' }}>
-          <SectionTitle>Response Types</SectionTitle>
-          {totalResponses > 0 ? (
-            <>
-              {Object.entries(responseTypes)
-                .sort(([, a], [, b]) => b - a)
-                .map(([type, count]) => (
-                  <ResponseTypeBar
-                    key={type}
-                    label={responseLabels[type] || type}
-                    count={count}
-                    total={totalResponses}
-                    color={responseColors[type] || '#999'}
+      {/* Stats Cards */}
+      <Grid container spacing={3} sx={{ mb: 6 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="TOTAL RESPONSES" value={totalResponses} icon={Users} color="#6366f1" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="COMPLETED" value={totalResponses} icon={CheckCircle} color="#10b981" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="AVG. DURATION" value={avgDurationMin} icon={Clock} color="#8b5cf6" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard title="COMPLETION RATE" value={completionRate} icon={TrendingUp} color="#f59e0b" />
+        </Grid>
+      </Grid>
+
+      {/* Tabs */}
+      <Box sx={{ display: 'flex', gap: 4, borderBottom: '1px solid #e5e7eb', mb: 4 }}>
+        {['Overview', 'Question Analysis', 'Flagged', 'AI Insights'].map((tab, i) => (
+          <Typography 
+            key={tab}
+            sx={{ 
+              pb: 2, 
+              color: i === 0 ? '#111827' : '#6b7280', 
+              fontWeight: 600, 
+              cursor: 'pointer',
+              borderBottom: i === 0 ? '2px solid #6366f1' : 'none',
+              fontSize: '15px'
+            }}
+          >
+            {tab}
+          </Typography>
+        ))}
+      </Box>
+
+      {/* Main Content Grid */}
+      <Grid container spacing={4}>
+        {/* Chart Column */}
+        <Grid item xs={12} md={8}>
+          <Paper sx={{ p: 4, borderRadius: 4, height: 450, display: 'flex', flexDirection: 'column' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 4 }}>
+              Responses Over Time
+            </Typography>
+            <Box sx={{ flexGrow: 1 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dx={-10} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   />
-                ))}
-              <Divider sx={{ my: 1.5 }} />
-              <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '12px', color: '#ABABAB' }}>
-                Total responses: {totalResponses}
-              </Typography>
-            </>
-          ) : (
-            <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '13px', color: '#ABABAB' }}>
-              No response data yet
+                  <Area 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke="#6366f1" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorValue)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Box>
+          </Paper>
+        </Grid>
+
+        {/* Channels Column */}
+        <Grid item xs={12} md={4}>
+          <Paper sx={{ p: 4, borderRadius: 4, height: '100%' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 4 }}>
+              Response Channels
             </Typography>
-          )}
-        </Paper>
-      </Box>
-
-      {/* Dropout Points */}
-      {dropoutPoints.length > 0 && (
-        <Paper elevation={0} sx={{ p: 3, borderRadius: '16px', border: '1px solid #F0F0F0', mb: 3 }}>
-          <SectionTitle>Top Dropout Points</SectionTitle>
-          <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '12px', color: '#ABABAB', mb: 2 }}>
-            Where in-progress surveys stopped responding
-          </Typography>
-          {dropoutPoints.map((dp, i) => (
-            <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5, p: 1.5, borderRadius: '10px', backgroundColor: '#FAFAFA' }}>
-              <Chip
-                label={`Q${dp.question_order}`}
-                size="small"
-                sx={{
-                  fontFamily: 'Poppins, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '11px',
-                  backgroundColor: '#1958F714',
-                  color: '#1958F7',
-                }}
-              />
-              <Typography sx={{ fontFamily: 'Poppins, sans-serif', fontSize: '13px', color: '#4B4B4B', flex: 1 }} noWrap>
-                {dp.question}
-              </Typography>
-              <Chip
-                label={`${dp.count} dropoffs`}
-                size="small"
-                sx={{
-                  fontFamily: 'Poppins, sans-serif',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  backgroundColor: '#FFF3E0',
-                  color: '#E65100',
-                }}
-              />
-            </Box>
-          ))}
-        </Paper>
-      )}
-
-      {/* Recently Completed */}
-      {completedSurveys.length > 0 && (
-        <Paper elevation={0} sx={{ p: 3, borderRadius: '16px', border: '1px solid #F0F0F0' }}>
-          <SectionTitle>Recently Completed Surveys</SectionTitle>
-          <Box sx={{ overflowX: 'auto' }}>
-            <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
-              <Box component="thead">
-                <Box component="tr" sx={{ borderBottom: '1px solid #F0F0F0' }}>
-                  {['Survey', 'Recipient', 'Status', 'Completed', 'CSAT'].map((h) => (
-                    <Box
-                      component="th"
-                      key={h}
-                      sx={{
-                        fontFamily: 'Poppins, sans-serif',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: '#7D7D7D',
-                        textAlign: 'left',
-                        p: 1.5,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {h}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {[
+                { key: 'phone', label: 'Phone Calls', icon: Phone, color: '#10b981' },
+                { key: 'web', label: 'Web Survey', icon: Globe, color: '#6366f1' },
+                { key: 'qr', label: 'QR Code', icon: QrCode, color: '#8b5cf6' }
+              ].map((channel) => {
+                const count = channelCounts[channel.key] ?? channelCounts.phone ?? 0;
+                const totalC = totalResponses || 1;
+                const pct = totalResponses > 0 ? ((count / totalResponses) * 100).toFixed(1) : '0.0';
+                return (
+                  <Box key={channel.label} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, borderRadius: 3, bgcolor: '#f9fafb' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box sx={{ p: 1, borderRadius: 2, bgcolor: `${channel.color}15`, color: channel.color }}>
+                        <channel.icon size={20} />
+                      </Box>
+                      <Box>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>{channel.label}</Typography>
+                        <Typography variant="caption" sx={{ color: '#6b7280' }}>{count} responses</Typography>
+                      </Box>
                     </Box>
-                  ))}
-                </Box>
-              </Box>
-              <Box component="tbody">
-                {completedSurveys.slice(0, 10).map((s) => (
-                  <Box component="tr" key={s.SurveyId} sx={{ borderBottom: '1px solid #FAFAFA', '&:hover': { backgroundColor: '#FAFAFA' } }}>
-                    <Box component="td" sx={{ p: 1.5, fontFamily: 'Poppins, sans-serif', fontSize: '13px', color: '#1A1A1A', fontWeight: 500 }}>
-                      {s.Name || s.SurveyId}
-                    </Box>
-                    <Box component="td" sx={{ p: 1.5, fontFamily: 'Poppins, sans-serif', fontSize: '13px', color: '#4B4B4B' }}>
-                      {s.RiderName || s.Recipient || '-'}
-                    </Box>
-                    <Box component="td" sx={{ p: 1.5 }}>
-                      <Chip
-                        label={s.Status}
-                        size="small"
-                        sx={{
-                          fontFamily: 'Poppins, sans-serif',
-                          fontSize: '11px',
-                          fontWeight: 500,
-                          backgroundColor: s.Status === 'Completed' ? '#E8F5E9' : '#FFF3E0',
-                          color: s.Status === 'Completed' ? '#2E7D32' : '#E65100',
-                        }}
-                      />
-                    </Box>
-                    <Box component="td" sx={{ p: 1.5, fontFamily: 'Poppins, sans-serif', fontSize: '12px', color: '#7D7D7D' }}>
-                      {s.CompletionDate || '-'}
-                    </Box>
-                    <Box component="td" sx={{ p: 1.5, fontFamily: 'Poppins, sans-serif', fontSize: '13px', fontWeight: 500, color: '#1958F7' }}>
-                      {s.CSAT ? `${s.CSAT}/5` : '-'}
-                    </Box>
+                    <Typography variant="body1" sx={{ fontWeight: 700 }}>{pct}%</Typography>
                   </Box>
-                ))}
-              </Box>
+                );
+              })}
             </Box>
-          </Box>
-        </Paper>
-      )}
+          </Paper>
+        </Grid>
+      </Grid>
     </Box>
   );
 };

@@ -1,5 +1,10 @@
+// Base URL for API (empty = same origin, e.g. gateway at :8080)
+const API_BASE = import.meta.env.VITE_SERVER_URL ?? '';
+// Base URL for survey links (empty = same origin, e.g. /survey/id)
+export const RECIPIENT_BASE = import.meta.env.VITE_RECIPIENT_URL ?? '';
+
 class ApiLinks {
-    static API_BASE_URL = import.meta.env.VITE_SERVER_URL;
+    static API_BASE_URL = API_BASE;
 
     //Templates
     static TEMPLATE_STATS = `/api/templates/stat`;

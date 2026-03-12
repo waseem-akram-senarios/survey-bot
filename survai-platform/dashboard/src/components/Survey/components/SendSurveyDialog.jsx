@@ -18,6 +18,7 @@ import AddIcon from '../../../assets/Add.svg';
 import EmailIcon from '../../../assets/Email.svg';
 import PhoneIcon from "../../../assets/Phone.svg";
 import SendIcon from '../../../assets/Send.svg';
+import { RECIPIENT_BASE } from '../../../network/apiLinks';
 
 const SendSurveyDialog = ({
   open,
@@ -40,7 +41,7 @@ const SendSurveyDialog = ({
   const [phoneLanguage, setPhoneLanguage] = useState("en");
   const [voiceProvider, setVoiceProvider] = useState("livekit");
 
-  const surveyLink = `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyId}`;
+  const surveyLink = `${RECIPIENT_BASE}/survey/${surveyId}`;
 
   const [emailTouched, setEmailTouched] = useState(false);
   const [phoneTouched, setPhoneTouched] = useState(false);

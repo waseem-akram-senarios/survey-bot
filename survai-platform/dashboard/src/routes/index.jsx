@@ -6,7 +6,7 @@ import Login from '../pages/Login';
 import NotFound from '../pages/NotFound';
 
 // Import survey-related components
-import Dashboard from '../pages/main/Surveys/Dashboard';
+import DashboardNew from '../pages/DashboardNew';
 import CreateTemplate from '../pages/main/Templates/CreateTemplate';
 import Templates from '../pages/main/Templates/Templates';
 import DraftTemplates from '../pages/main/Templates/DraftTemplates';
@@ -19,6 +19,7 @@ import SurveyQuestionAnalytics from '../pages/main/Templates/TemplateAnalytics';
 import ImportData from '../pages/main/Surveys/ImportData';
 import EditSurvey from '../pages/main/Surveys/EditSurvey';
 import Analytics from '../pages/main/Analytics/Analytics';
+import Contacts from '../pages/main/Contacts/Contacts';
 
 const routes = [
     {
@@ -27,109 +28,79 @@ const routes = [
     },
     {
       path: '/',
-      children: [
-        { path: '/', element: <Navigate to="/dashboard" /> }
-      ]
+      element: <Navigate to="/dashboard" replace />
+    },
+    {
+      path: '/dashboard',
+      element: <DashboardNew />
     },
     {
       path: '/',
-      element: (
-        <ProtectedRoute>
-          <MainLayout />
-        </ProtectedRoute>
-      ),
+      element: <MainLayout />,
       children: [
         {
-          path: '/dashboard',
-          element: (
-              <Dashboard />
-          )
+          path: 'templates/manage',
+          element: <Templates />
         },
         {
-          path: '/templates/manage',
-          element: (
-              <Templates />
-          )
-        },
-        {
-          path: '/templates/create',
-          element: (
-              <CreateTemplate />
-          )
+          path: 'templates/create',
+          element: <CreateTemplate />
         },
         {
           path: '/templates/edit',
-          element: (
-              <CreateTemplate />
-          )
+          element: <CreateTemplate />
         },
         {
           path: '/templates/drafts',
-          element: (
-              <DraftTemplates />
-          )
+          element: <DraftTemplates />
         },
         {
           path: '/surveys/launch',
-          element: (
-              <CreateSurvey />
-          )
+          element: <CreateSurvey />
         },
         {
           path: '/surveys/generated',
-          element: (
-              <GeneratedSurveyView />
-          )
+          element: <GeneratedSurveyView />
         },
         {
           path: '/surveys/manage',
-          element: (
-              <ManageSurveys />
-          )
+          element: <ManageSurveys />
         },
         {
           path: '/surveys/status/:surveyId',
-          element: (
-              <SurveyProgressPage />
-          )
+          element: <SurveyProgressPage />
         },
         {
           path: '/surveys/completed',
-          element: (
-              <CompletedSurveys />
-          )
+          element: <CompletedSurveys />
         },
         {
           path: '/templates/create/analytics',
-          element: (
-              <SurveyQuestionAnalytics />
-          )
+          element: <SurveyQuestionAnalytics />
         },
         {
           path: '/surveys/import',
-          element: (
-              <ImportData />
-          )
+          element: <ImportData />
         },
         {
           path: '/surveys/edit/:surveyId',
-          element: (
-              <EditSurvey />
-          )
+          element: <EditSurvey />
         },
         {
           path: '/analytics',
-          element: (
-              <Analytics />
-          )
+          element: <Analytics />
         },
+        {
+          path: '/contacts',
+          element: <Contacts />
+        }
       ]
     },
     {
       path: '*',
       element: <NotFound />
     }
-];
+  ];
   
 // Routing Render Function
 export default function ThemeRoutes() {

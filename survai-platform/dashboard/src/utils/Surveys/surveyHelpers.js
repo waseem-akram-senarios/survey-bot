@@ -1,3 +1,5 @@
+import { RECIPIENT_BASE } from '../../network/apiLinks';
+
 // Updated transformApiQuestionsToComponentFormat function for surveys
 export const transformApiQuestionsToComponentFormat = (apiQuestions) => {
   // Handle both direct array format and wrapped format with QuestionswithAns
@@ -244,7 +246,7 @@ export const validateSurveyForm = (selectedTemplate, recipientName, riderName, r
 };
 
 export const getSurveyLink = (surveyId) => {
-  return `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyId}`;
+  return `${RECIPIENT_BASE}/survey/${surveyId}`;
 };
 
 export const getStatusStyle = (status) => {

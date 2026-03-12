@@ -1,28 +1,28 @@
-import { Box, useMediaQuery } from '@mui/material';
+import React from 'react';
+import { Box } from '@mui/material';
 import { Outlet } from 'react-router-dom';
-import Sidebar from '../components/Sidebar';
-import Header from '../components/Header';
+import TopBar from '../components/TopBar';
+
+const TOP_BAR_HEIGHT = 72;
 
 const MainLayout = () => {
-  const isMobile = useMediaQuery('(max-width: 600px)');
-  
   return (
-    <Box sx={{ backgroundColor: '#F9FBFC', display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: '100vh' }}>
-      {isMobile ? <Header /> : <Sidebar />}
-            
-      <Box 
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
+      <TopBar />
+      <Box
+        component="main"
         sx={{
-          backgroundColor: '#F9FBFC', 
-          flexGrow: 1, 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center',
+          flex: 1,
+          overflowY: 'auto',
+          pt: `${TOP_BAR_HEIGHT}px`,
+          bgcolor: 'background.default',
+          width: '100%',
         }}
       >
         <Outlet />
       </Box>
     </Box>
-  )
+  );
 };
 
 export default MainLayout;

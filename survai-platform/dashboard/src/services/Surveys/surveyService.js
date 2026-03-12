@@ -1,5 +1,5 @@
 import ApiBaseHelper from '../../network/apiBaseHelper';
-import ApiLinks from '../../network/apiLinks';
+import ApiLinks, { RECIPIENT_BASE } from '../../network/apiLinks';
 import { transformApiQuestionsToComponentFormat, transformComponentQuestionsToApiFormat } from '../../utils/Surveys/surveyHelpers';
 
 function getApiErrorMessage(error, fallback) {
@@ -28,7 +28,7 @@ class SurveyService {
         RideId: surveyData.rideId,
         TenantId: surveyData.tenantId,
         Phone: (surveyData.phone || "").replace(/\s+/g, ""),
-        URL: `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyData.surveyId}`,
+        URL: `${RECIPIENT_BASE}/survey/${surveyData.surveyId}`,
         Bilingual: surveyData.bilingual ?? false,
       });
 
@@ -57,7 +57,7 @@ class SurveyService {
       
       const response = await ApiBaseHelper.post(ApiLinks.SURVEY_CREATE, apiPayload);
       
-      const surveyLink = `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyData.surveyId}`;
+      const surveyLink = `${RECIPIENT_BASE}/survey/${surveyData.surveyId}`;
       
       return {
         success: true,
@@ -119,7 +119,7 @@ class SurveyService {
   static async sendSurveyByEmail(surveyId, email, language = "en") {
     try {
       const response = await ApiBaseHelper.post(ApiLinks.SURVEY_SEND_EMAIL, {
-        SurveyURL: `${import.meta.env.VITE_RECIPIENT_URL}/survey/${surveyId}`,
+        SurveyURL: `${RECIPIENT_BASE}/survey/${surveyId}`,
         EmailTo: email,
         Language: language,
       });
@@ -160,7 +160,7 @@ class SurveyService {
         RideId: originalSurvey.RideId || "",
         TenantId: originalSurvey.TenantId || "",
         Phone: originalSurvey.Phone || "",
-        URL: `${import.meta.env.VITE_RECIPIENT_URL}/survey/${newSurveyId}`,
+        URL: `${RECIPIENT_BASE}/survey/${newSurveyId}`,
       });
 
       return {

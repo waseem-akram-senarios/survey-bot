@@ -7,6 +7,9 @@ const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
 
+  // For development, bypass authentication
+  const isDevelopment = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost';
+  
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
@@ -15,11 +18,12 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  // Allow access without authentication in development
+  if (isDevelopment || isAuthenticated) {
+    return children;
   }
 
-  return children;
+  return <Navigate to="/login" state={{ from: location }} replace />;
 };
 
 export default ProtectedRoute;

@@ -9,17 +9,36 @@ import {
 } from "@mui/material";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
+import PhoneInTalkIcon from "@mui/icons-material/PhoneInTalk";
+import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
+import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import Add from "@mui/icons-material/Add";
 import User from "../assets/User.png";
 import { useNavigate } from "react-router-dom";
 
 const Cards = ({
   headerTitle = "Dashboard",
+  variant = "default",
   statsData = {},
   loading = false,
   error = null,
 }) => {
   const getCardsData = () => {
+    if (variant === "riderVoice") {
+      const avgCsat = statsData.AverageCSAT != null ? statsData.AverageCSAT.toFixed(1) : "N/A";
+      const totalCalls = statsData.Total_Surveys ?? 0;
+      const completed = statsData.Total_Completed_Surveys ?? 0;
+      const completionPct = totalCalls > 0 ? ((completed / totalCalls) * 100).toFixed(0) : "N/A";
+      const totalResponses = completed ?? 0;
+      return [
+        { title: "AVG. SATISFACTION", value: avgCsat, subtitle: null, icon: StarBorderIcon, iconColor: "#FFB74D" },
+        { title: "CALL COMPLETION", value: totalCalls > 0 ? `${completionPct}%` : "N/A", subtitle: null, icon: PhoneInTalkIcon, iconColor: "#81C784" },
+        { title: "CALLS THIS WEEK", value: (statsData.Total_Surveys ?? 0)?.toString() || "0", subtitle: `(${statsData.Total_Completed_Surveys_Today ?? 0} today)`, icon: PhoneInTalkIcon, iconColor: "#64B5F6" },
+        { title: "FLAGGED RESPONSES", value: "0", subtitle: "None pending", icon: FlagOutlinedIcon, iconColor: "#81C784" },
+        { title: "RESPONSE CHANNELS", value: totalResponses.toString(), subtitle: "total responses", subSubtitle: totalResponses === 0 ? "No responses yet" : null, icon: BarChartOutlinedIcon, iconColor: "#B39DDB" },
+      ];
+    }
     if (headerTitle === "Dashboard") {
       return [
         {
@@ -136,61 +155,66 @@ const Cards = ({
   const isMobile = useMediaQuery("(max-width: 600px)");
   const isSmallMobile = useMediaQuery("(max-width: 400px)");
 
+  const isRiderVoice = variant === "riderVoice";
+
   return (
     <Box
       sx={{
-        py: isMobile ? 2 : 4,
+        py: isMobile ? 2 : 0,
+        pb: isRiderVoice ? 3 : (isMobile ? 2 : 4),
       }}
     >
-      {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 4,
-        }}
-      >
-        <Typography
+      {/* Header - hide for riderVoice (title is on page) */}
+      {!isRiderVoice && (
+        <Box
           sx={{
-            fontFamily: "Poppins, sans-serif",
-            fontWeight: 500,
-            fontSize: isMobile ? "20px" : "28px",
-            lineHeight: "100%",
-            mb: 1,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 4,
           }}
         >
-          {headerTitle}
-        </Typography>
+          <Typography
+            sx={{
+              fontFamily: "Poppins, sans-serif",
+              fontWeight: 500,
+              fontSize: isMobile ? "20px" : "28px",
+              lineHeight: "100%",
+              mb: 1,
+            }}
+          >
+            {headerTitle}
+          </Typography>
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          {headerTitle === "Manage Templates" && (
-            <Button
-              variant="contained"
-              onClick={() => navigate('/templates/create')}
-              startIcon={<Add />}
-              sx={{
-                width: isMobile ? "170px" : "220px",
-                height: "48px",
-                background: "linear-gradient(180deg, #1958F7 0%, #3D69D9 100%)",
-                color: "white",
-                textTransform: "none",
-                borderRadius: "15px",
-                py: 1.5,
-                fontFamily: "Poppins, sans-serif",
-                fontSize: isMobile ? "12px" : "14px",
-                fontWeight: 400,
-                "&:hover": {
-                  backgroundColor: "#1565c0",
-                },
-              }}
-            >
-              Create Template
-            </Button>
-          )}
-          {headerTitle === "Dashboard" && <img src={User} alt="user" />}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            {headerTitle === "Manage Templates" && (
+              <Button
+                variant="contained"
+                onClick={() => navigate('/templates/create')}
+                startIcon={<Add />}
+                sx={{
+                  width: isMobile ? "170px" : "220px",
+                  height: "48px",
+                  background: "linear-gradient(180deg, #1958F7 0%, #3D69D9 100%)",
+                  color: "white",
+                  textTransform: "none",
+                  borderRadius: "15px",
+                  py: 1.5,
+                  fontFamily: "Poppins, sans-serif",
+                  fontSize: isMobile ? "12px" : "14px",
+                  fontWeight: 400,
+                  "&:hover": {
+                    backgroundColor: "#1565c0",
+                  },
+                }}
+              >
+                Create Template
+              </Button>
+            )}
+            {headerTitle === "Dashboard" && !isRiderVoice && <img src={User} alt="user" />}
+          </Box>
         </Box>
-      </Box>
+      )}
 
       {/* Stats Cards */}
       <Box
@@ -198,8 +222,8 @@ const Cards = ({
           display: "flex",
           flexWrap: "wrap",
           justifyContent: isMobile ? "center" : "start",
-          gap: isMobile ? 1 : 3,
-          minHeight: "150px",
+          gap: isMobile ? 1.5 : 2,
+          minHeight: isRiderVoice ? "100px" : "150px",
         }}
       >
         {/* Loading State */}
@@ -234,9 +258,82 @@ const Cards = ({
           </Box>
         )}
 
-        {/* Data State */}
+        {/* Rider Voice style cards: white bg, subtle border, colored icons */}
+        {!loading && !error && isRiderVoice && displayData.map((stat, index) => {
+          const Icon = stat.icon;
+          const iconColor = stat.iconColor || "#9E9E9E";
+          return (
+            <Box
+              key={index}
+              sx={{
+                flex: isMobile ? "1 1 140px" : "1 1 180px",
+                minWidth: isMobile ? 140 : 180,
+                maxWidth: isMobile ? "none" : 240,
+                minHeight: "100px",
+                borderRadius: "12px",
+                backgroundColor: "#fff",
+                border: "1px solid #E8E8E8",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                px: 2,
+                py: 2,
+                boxSizing: "border-box",
+              }}
+            >
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <Typography
+                  sx={{
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: 500,
+                    fontSize: "11px",
+                    lineHeight: "14px",
+                    color: "#7D7D7D",
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {stat.title}
+                </Typography>
+                {Icon && <Icon sx={{ fontSize: 22, color: iconColor }} />}
+              </Box>
+              <Typography
+                sx={{
+                  fontFamily: "Poppins, sans-serif",
+                  fontWeight: 600,
+                  fontSize: "22px",
+                  lineHeight: "28px",
+                  color: "#1E1E1E",
+                }}
+              >
+                {stat.value}
+              </Typography>
+              {(stat.subtitle || stat.subSubtitle) && (
+                <Typography
+                  sx={{
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: 400,
+                    fontSize: "12px",
+                    color: "#7D7D7D",
+                  }}
+                >
+                  {stat.subtitle}
+                  {stat.subSubtitle && (
+                    <>
+                      <br />
+                      {stat.subSubtitle}
+                    </>
+                  )}
+                </Typography>
+              )}
+            </Box>
+          );
+        })}
+
+        {/* Default style cards */}
         {!loading &&
           !error &&
+          !isRiderVoice &&
           displayData.map((stat, index) => (
             <Box
               key={index}
