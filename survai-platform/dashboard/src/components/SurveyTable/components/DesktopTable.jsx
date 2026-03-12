@@ -20,6 +20,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import { truncateText, formatDate } from '../../../utils/Surveys/surveyTableHelpers';
+import { getSurveyLink } from '../../../utils/Surveys/surveyHelpers';
 import SendSurveyButton from '../../../assets/SendSurvey.svg';
 
 const DesktopTable = ({ 
@@ -122,39 +123,24 @@ const DesktopTable = ({
               <TableCell>{item.Name}</TableCell>
               <TableCell>{formatDate(item.LaunchDate)}</TableCell>
               <TableCell>
-                {item.URL ? (
-                  <a
-                    href={item.URL.startsWith("http") ? item.URL : `https://${item.URL}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      color: item.Status === "Completed" ? "#D32F2F" : "#1958F7",
-                      textDecoration: "underline",
-                      cursor: "pointer",
-                      fontFamily: "Poppins, sans-serif",
-                      fontWeight: 400,
-                      fontSize: "14px",
-                      lineHeight: "100%",
-                      display: "inline-block",
-                    }}
-                  >
-                    {truncateText(item.URL, 40)}
-                  </a>
-                ) : (
-                  <Typography
-                    sx={{
-                      color: "#9A9EA5",
-                      fontStyle: "italic",
-                      fontFamily: "Poppins, sans-serif",
-                      fontWeight: 400,
-                      fontSize: "14px",
-                      lineHeight: "100%",
-                    }}
-                  >
-                    No URL
-                  </Typography>
-                )}
+                <a
+                  href={getSurveyLink(item.SurveyId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    color: item.Status === "Completed" ? "#D32F2F" : "#1958F7",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                    fontFamily: "Poppins, sans-serif",
+                    fontWeight: 400,
+                    fontSize: "14px",
+                    lineHeight: "100%",
+                    display: "inline-block",
+                  }}
+                >
+                  {truncateText(getSurveyLink(item.SurveyId), 40)}
+                </a>
               </TableCell>
               <TableCell>{truncateText(item.Recipient, 25)}</TableCell>
               <TableCell>

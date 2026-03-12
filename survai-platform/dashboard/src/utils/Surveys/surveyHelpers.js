@@ -246,7 +246,8 @@ export const validateSurveyForm = (selectedTemplate, recipientName, riderName, r
 };
 
 export const getSurveyLink = (surveyId) => {
-  return `${RECIPIENT_BASE}/survey/${surveyId}`;
+  const base = RECIPIENT_BASE || window.location.origin;
+  return `${base}/survey/${surveyId}`;
 };
 
 export const getStatusStyle = (status) => {
