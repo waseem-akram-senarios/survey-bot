@@ -53,6 +53,9 @@ from config.settings import (
     VAD_MIN_SPEECH_DURATION,
     VAD_ACTIVATION_THRESHOLD,
     AGENT_NAME,
+    INACTIVITY_TIMEOUT,
+    MAX_INACTIVITY_REPROMPTS,
+    LLM_TEMPERATURE_ES,
 )
 from agents import (
     SurveyCallData,
@@ -341,10 +344,12 @@ async def entrypoint(ctx: JobContext):
             "Sí:2", "No:2", "Bueno:1",
         ]
 
+    llm_temperature = LLM_TEMPERATURE_ES if call_language in ("es", "bilingual") else LLM_TEMPERATURE
+
     session = AgentSession[SurveyCallData](
         userdata=call_data,
         stt=deepgram.STT(**stt_kw),
-        llm=openai.LLM(model=LLM_MODEL, temperature=LLM_TEMPERATURE, service_tier="priority"),
+        llm=openai.LLM(model=LLM_MODEL, temperature=llm_temperature, service_tier="priority"),
         tts=elevenlabs.TTS(
                 voice_id=tts_voice,
                 model=tts_model,
@@ -368,9 +373,6 @@ async def entrypoint(ctx: JobContext):
     # starts. If no user speech arrives within INACTIVITY_TIMEOUT seconds, the
     # agent re-prompts. After MAX_INACTIVITY_REPROMPTS with no response the call
     # is ended gracefully.
-    INACTIVITY_TIMEOUT = 5        # seconds of silence before re-prompt
-    MAX_INACTIVITY_REPROMPTS = 2   # re-prompts before hanging up
-
     _inactivity_reprompt_count = 0
     _inactivity_task: asyncio.Task = None
 
@@ -494,11 +496,28 @@ async def entrypoint(ctx: JobContext):
     time_limit_minutes = metadata.get("time_limit_minutes", 8)
 
     async def _time_limit_watchdog():
-        """Enforce call time limit — gracefully end call if exceeded."""
+        """Enforce call time limit — speak a farewell then disconnect."""
         await asyncio.sleep(time_limit_minutes * 60)
         if not survey_responses.get("end_reason"):
-            logger.warning(f"Time limit reached ({time_limit_minutes}m) — disconnecting")
+            logger.warning(f"Time limit reached ({time_limit_minutes}m) — saying farewell and disconnecting")
             survey_responses["end_reason"] = "time_limit"
+            try:
+                lang = getattr(call_data, "detected_language", None) or call_language or "en"
+                if lang == "es":
+                    farewell = (
+                        "Hemos llegado al límite de tiempo de la encuesta. "
+                        "¡Muchas gracias por su tiempo y que tenga un excelente día! ¡Adiós!"
+                    )
+                else:
+                    farewell = (
+                        "We've reached the end of our survey time. "
+                        "Thank you so much for your time — have a wonderful day! Goodbye!"
+                    )
+                speech_handle = session.say(farewell)
+                await speech_handle.wait_for_playout()
+                await asyncio.sleep(2.0)
+            except Exception as e:
+                logger.warning(f"[TIME_LIMIT] Farewell failed: {e}")
             try:
                 await hangup_call()
             except Exception:

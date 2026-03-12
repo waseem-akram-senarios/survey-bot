@@ -8,6 +8,7 @@ Survey function tools for the full call lifecycle:
 
 import asyncio
 import os
+import re
 from datetime import datetime
 from typing import Callable, List, Optional
 
@@ -70,6 +71,10 @@ def create_survey_tools(
     for q in (questions_metadata or []):
         _qmeta[q.get("id", "")] = q
 
+    # Tracks the question the LLM is expected to record next.
+    # Stored as a single-element list so closures can mutate it.
+    _current_expected_qid: List[Optional[str]] = [question_ids[0] if question_ids else None]
+
     def _next_question_text(next_id: str, lang: str) -> str:
         if lang == "es" and qmap_es:
             return qmap_es.get(next_id, "") or qmap.get(next_id, "")
@@ -100,7 +105,57 @@ def create_survey_tools(
                 survey_responses["answers"][qid] = "__skipped__"
                 logger.info(f"[SKIP] {qid} — conditional not met")
                 continue
+            _current_expected_qid[0] = qid
             return qid
+        _current_expected_qid[0] = None
+        return None
+
+    def _validate_answer(question_id: str, answer: str) -> Optional[str]:
+        """
+        Validate the answer against the question's criteria and allowed values.
+        Returns None if valid, or a rejection string instructing the LLM to re-ask.
+        """
+        meta = _qmeta.get(question_id, {})
+        criteria = meta.get("criteria", "open")
+
+        if criteria == "scale":
+            scale_max = int(meta.get("scales") or 5)
+            nums = re.findall(r"\b(\d+(?:\.\d+)?)\b", answer)
+            if not nums:
+                return (
+                    f"INVALID: The caller did not give a number. "
+                    f"Re-ask the question and tell them: 'Please give me a number between 1 and {scale_max}.'"
+                )
+            value = float(nums[-1])
+            if not (1 <= value <= scale_max):
+                return (
+                    f"INVALID: {value} is outside the allowed range. "
+                    f"Tell the caller: 'The scale goes from 1 to {scale_max} — which number would you give?' "
+                    f"Wait for a number between 1 and {scale_max}."
+                )
+
+        elif criteria == "categorical":
+            categories = meta.get("categories", [])
+            if isinstance(categories, str):
+                try:
+                    categories = __import__("json").loads(categories)
+                except Exception:
+                    categories = []
+            if categories:
+                answer_lower = answer.lower().strip()
+                matched = any(
+                    cat.lower().strip() in answer_lower or answer_lower in cat.lower().strip()
+                    for cat in categories
+                )
+                if not matched:
+                    opts = [c for c in categories if c.lower() != "none of the above"]
+                    opts_str = ", ".join(opts) if opts else ", ".join(categories)
+                    return (
+                        f"INVALID: The answer does not match any listed option. "
+                        f"Read the options aloud again: '{opts_str}.' "
+                        f"Ask the caller to choose one of these options."
+                    )
+
         return None
 
     def _format_next_instruction(next_id: str, lang: str) -> str:
@@ -192,6 +247,21 @@ def create_survey_tools(
         lang = getattr(context.userdata, "detected_language", "en")
         lang_reminder = " Respond ONLY in Spanish." if lang == "es" else ""
 
+        expected_qid = _current_expected_qid[0]
+        if (
+            expected_qid
+            and question_id != expected_qid
+            and expected_qid not in survey_responses.get("answers", {})
+        ):
+            expected_text = _next_question_text(expected_qid, lang)
+            logger.warning(
+                f"[ORDER] LLM tried to record {question_id!r} but expected {expected_qid!r} — correcting"
+            )
+            return (
+                f"WRONG QUESTION: You must record the answer for (id:{expected_qid}) first. "
+                f"Re-ask verbatim: \"{expected_text}\"{lang_reminder}"
+            )
+
         if question_id in survey_responses["answers"]:
             done = list(survey_responses["answers"].keys())
             if question_ids:
@@ -203,6 +273,11 @@ def create_survey_tools(
                 else:
                     return f"All questions answered. Call end_survey(\"completed\") now.{lang_reminder}"
             return f"Already recorded. Continue.{lang_reminder}"
+
+        validation_error = _validate_answer(question_id, answer)
+        if validation_error:
+            logger.info(f"[VALIDATE] {question_id} rejected: {answer[:80]!r} → {validation_error[:80]}")
+            return validation_error
 
         survey_responses["answers"][question_id] = answer
         done = list(survey_responses["answers"].keys())
