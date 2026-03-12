@@ -51,7 +51,14 @@ const Contacts = () => {
     : null;
 
   return (
-    <Box sx={{ p: { xs: 2, md: 6 }, maxWidth: 1400, mx: 'auto' }}>
+    <Box sx={{
+      p: { xs: 3, md: 4 },
+      maxWidth: 1400,
+      mx: 'auto',
+      width: '100%',
+      minHeight: '100%',
+      background: 'linear-gradient(180deg, rgba(249, 250, 251, 0.98) 0%, rgba(243, 244, 246, 0.95) 100%)',
+    }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 6, flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -59,10 +66,10 @@ const Contacts = () => {
             <ChevronLeft size={24} />
           </IconButton>
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#111827' }}>
+            <Typography variant="h3" sx={{ fontWeight: 800, color: 'var(--color-gray-900)', mb: 1, fontSize: { xs: '2rem', md: '2.5rem' } }}>
               Contact Lists
             </Typography>
-            <Typography variant="body1" sx={{ color: '#6b7280' }}>
+            <Typography variant="h6" sx={{ color: 'var(--color-gray-600)', fontWeight: 400 }}>
               Manage contacts for phone surveys
             </Typography>
           </Box>

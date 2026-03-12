@@ -94,7 +94,14 @@ const Analytics = () => {
   const channelCounts = summary?.channel_counts || {};
 
   return (
-    <Box sx={{ p: { xs: 2, md: 6 }, maxWidth: 1400, mx: 'auto' }}>
+    <Box sx={{
+      p: { xs: 3, md: 4 },
+      maxWidth: 1400,
+      mx: 'auto',
+      width: '100%',
+      minHeight: '100%',
+      background: 'linear-gradient(180deg, rgba(249, 250, 251, 0.98) 0%, rgba(243, 244, 246, 0.95) 100%)',
+    }}>
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
           {error}
@@ -107,10 +114,10 @@ const Analytics = () => {
               <ChevronLeft size={24} />
            </Button>
            <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#111827' }}>
+            <Typography variant="h3" sx={{ fontWeight: 800, color: 'var(--color-gray-900)', mb: 1, fontSize: { xs: '2rem', md: '2.5rem' } }}>
               Analytics
             </Typography>
-            <Typography variant="body1" sx={{ color: '#6b7280' }}>
+            <Typography variant="h6" sx={{ color: 'var(--color-gray-600)', fontWeight: 400 }}>
               View response data and insights
             </Typography>
            </Box>

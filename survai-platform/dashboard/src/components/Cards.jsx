@@ -175,12 +175,12 @@ const Cards = ({
           }}
         >
           <Typography
+            variant="h3"
             sx={{
-              fontFamily: "Poppins, sans-serif",
-              fontWeight: 500,
-              fontSize: isMobile ? "20px" : "28px",
-              lineHeight: "100%",
+              fontWeight: 800,
+              color: 'var(--color-gray-900)',
               mb: 1,
+              fontSize: { xs: '2rem', md: '2.5rem' },
             }}
           >
             {headerTitle}
