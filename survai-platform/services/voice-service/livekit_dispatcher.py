@@ -13,6 +13,8 @@ from livekit import api
 
 logger = logging.getLogger(__name__)
 
+AGENT_NAME = os.getenv("AGENT_NAME", "survey-agent")
+
 
 def _get_livekit_api() -> api.LiveKitAPI:
     return api.LiveKitAPI(
@@ -59,7 +61,7 @@ async def dispatch_livekit_call(
     try:
         dispatch = await lk_api.agent_dispatch.create_dispatch(
             api.CreateAgentDispatchRequest(
-                agent_name="survey-agent",
+                agent_name=AGENT_NAME,
                 room=room_name,
                 metadata=metadata,
             )
