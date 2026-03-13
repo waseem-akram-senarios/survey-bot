@@ -492,7 +492,7 @@ async def generate_survey(survey_data: SurveyCreateP):
         req_company = getattr(survey_data, "CompanyName", None) or ""
         if not req_company:
             try:
-                tpl_rows = sql_execute("SELECT company_name FROM templates WHERE name = :tn", {"tn": survey_data.Name})
+                tpl_rows = sql_execute("SELECT company_name FROM templates WHERE name = :tn", {"tn": survey_data.template_name})
                 if tpl_rows and tpl_rows[0].get("company_name"):
                     req_company = tpl_rows[0]["company_name"]
             except Exception:
@@ -503,7 +503,7 @@ async def generate_survey(survey_data: SurveyCreateP):
             VALUES (:id, :template_name, :url, :biodata, :status, :name, :recipient, :launch_date, :rider_name, :ride_id, :tenant_id, :phone, :bilingual, :company_name)""",
             {
                 "id": survey_data.SurveyId,
-                "template_name": survey_data.Name,
+                "template_name": survey_data.template_name,
                 "url": survey_data.URL,
                 "biodata": survey_data.Biodata,
                 "status": "In-Progress",
@@ -519,7 +519,7 @@ async def generate_survey(survey_data: SurveyCreateP):
             },
         )
 
-        template_response = await get_template_questions(survey_data.Name)
+        template_response = await get_template_questions(survey_data.template_name)
         template_questions = template_response.get("Questions", [])
 
         if isinstance(template_questions, dict):
