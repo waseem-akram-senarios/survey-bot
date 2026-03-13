@@ -108,26 +108,29 @@ const Analytics = () => {
     
     fetchData();
     
-    // Set up real-time updates every 15 seconds
+    // Set up real-time updates every 30 seconds (less frequent)
     const interval = setInterval(async () => {
       try {
         const tenantId = user?.tenantId || '';
-        const updates = await AnalyticsService.getRealTimeUpdates(tenantId, lastUpdate);
         
-        // Update only changed data
-        if (updates.summary) setSummary(updates.summary);
-        if (updates.allSurveys && realTimeData) {
-          setRealTimeData(prev => ({ ...prev, allSurveys: updates.allSurveys, lastUpdated: updates.lastUpdated }));
+        // Only fetch summary and allSurveys for updates (faster)
+        const summary = await AnalyticsService.getSummary();
+        const allSurveys = await AnalyticsService.getAllSurveys(tenantId);
+        
+        setSummary(summary);
+        if (realTimeData) {
+          setRealTimeData(prev => ({ ...prev, allSurveys, lastUpdated: new Date().toISOString() }));
         }
-        setLastUpdate(updates.lastUpdated);
+        setLastUpdate(new Date().toISOString());
         
       } catch (err) {
         console.error('Error fetching real-time updates:', err);
+        // Don't set error state for update failures, just log it
       }
-    }, 15000); // 15 seconds for more responsive updates
+    }, 30000); // 30 seconds for more stable updates
     
     return () => clearInterval(interval);
-  }, [user, lastUpdate]);
+  }, [user]);
 
   if (loading) {
     return (

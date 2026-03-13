@@ -151,38 +151,45 @@ class AnalyticsService {
     try {
       const params = tenantId ? { params: { tenant_id: tenantId } } : {};
       
-      // Fetch all data in parallel for real-time updates
-      const [
-        summary,
-        surveyStats,
-        allSurveys,
-        inProgressSurveys,
-        completedSurveys,
-        templateStats,
-        templates,
-        dashboardData
-      ] = await Promise.all([
-        this.getSummary(),
-        this.getSurveyStats(tenantId),
-        this.getAllSurveys(tenantId),
-        this.getInProgressSurveys(tenantId),
-        this.getCompletedSurveys(tenantId),
-        this.getTemplateStats(tenantId),
-        this.getAllTemplates(),
-        this.getDashboardData(tenantId)
-      ]);
+      // Fetch critical data first, then optional data
+      try {
+        const summary = await this.getSummary();
+        const surveyStats = await this.getSurveyStats(tenantId);
+        const allSurveys = await this.getAllSurveys(tenantId);
+        const dashboardData = await this.getDashboardData(tenantId);
 
-      return {
-        summary,
-        surveyStats,
-        allSurveys,
-        inProgressSurveys,
-        completedSurveys,
-        templateStats,
-        templates,
-        dashboardData,
-        lastUpdated: new Date().toISOString()
-      };
+        // Return essential data first
+        const result = {
+          summary,
+          surveyStats,
+          allSurveys,
+          dashboardData,
+          lastUpdated: new Date().toISOString()
+        };
+
+        // Fetch optional data in background (don't wait for them)
+        Promise.all([
+          this.getInProgressSurveys(tenantId).catch(() => null),
+          this.getCompletedSurveys(tenantId).catch(() => null),
+          this.getTemplateStats(tenantId).catch(() => null),
+          this.getAllTemplates().catch(() => null)
+        ]).then(([inProgressSurveys, completedSurveys, templateStats, templates]) => {
+          // Add optional data when available
+          Object.assign(result, {
+            inProgressSurveys,
+            completedSurveys,
+            templateStats,
+            templates
+          });
+        }).catch(err => {
+          console.warn('Some optional analytics data failed to load:', err);
+        });
+
+        return result;
+      } catch (error) {
+        console.error('Critical analytics data failed:', error);
+        throw error;
+      }
     } catch (error) {
       console.error('Error fetching real-time data:', error);
       throw error;
