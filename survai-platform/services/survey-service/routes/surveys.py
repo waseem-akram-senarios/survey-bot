@@ -277,7 +277,8 @@ async def get_survey_stats(tenant_id: Optional[str] = None):
                 COUNT(*) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE) AS completed_surveys_today,
                 COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed')), 0) AS durations_median,
                 COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE)), 0) AS durations_today_median,
-                COALESCE(ROUND(AVG(csat) FILTER (WHERE status = 'Completed')), 0) AS csat_avg
+                COALESCE(AVG(completion_duration) FILTER (WHERE status = 'Completed'), 0) AS durations_avg,
+                COALESCE(AVG(completion_duration) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE), 0) AS durations_today_avg
             FROM surveys
             WHERE tenant_id = :tid
         """, {"tid": tenant_id})
@@ -290,9 +291,11 @@ async def get_survey_stats(tenant_id: Optional[str] = None):
                 COUNT(*) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE) AS completed_surveys_today,
                 COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed')), 0) AS durations_median,
                 COALESCE(ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY completion_duration) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE)), 0) AS durations_today_median,
-                COALESCE(ROUND(AVG(csat) FILTER (WHERE status = 'Completed')), 0) AS csat_avg
+                COALESCE(AVG(completion_duration) FILTER (WHERE status = 'Completed'), 0) AS durations_avg,
+                COALESCE(AVG(completion_duration) FILTER (WHERE status = 'Completed' AND DATE(completion_date) = CURRENT_DATE), 0) AS durations_today_avg
             FROM surveys
         """, {})
+    
     if not rows:
         return SurveyStats(
             Total_Surveys=0, Total_Active_Surveys=0, Total_Completed_Surveys=0,
@@ -314,6 +317,22 @@ async def get_survey_stats(tenant_id: Optional[str] = None):
 @router.get("/surveys/canary")
 async def survey_canary():
     return {"version": "1.0.1", "status": "deployed", "feature": "incentive_tracking_fix"}
+
+
+@router.get("/surveys/dashboard")
+async def get_dashboard_data(tenant_id: Optional[str] = None):
+    """Dashboard data endpoint for analytics page."""
+    try:
+        # Return basic dashboard data - can be extended as needed
+        return {
+            "status": "success",
+            "message": "Dashboard data endpoint working",
+            "tenant_id": tenant_id,
+            "timestamp": get_current_time()
+        }
+    except Exception as e:
+        logger.error(f"Error fetching dashboard data: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/surveys", response_model=List[SurveyP])
