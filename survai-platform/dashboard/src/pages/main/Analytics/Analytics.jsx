@@ -42,28 +42,41 @@ const Analytics = () => {
   const [summary, setSummary] = useState(null);
   const [stats, setStats] = useState(null);
 
-  // Mock data for the chart - matching the image
-  const chartData = [
-    { name: 'Feb 11', value: 0.3 },
-    { name: 'Feb 21', value: 0.225 },
-    { name: 'Mar 1', value: 0.15 },
-    { name: 'Mar 12', value: 0.075 },
-  ];
-  // Add this dummy data near the top of the component (after channelData):
+  // Use real data from API
+  const totalResponses = summary?.total_surveys || 0;
+  const completedSurveys = summary?.completed || 0;
+  const avgDurationMin = summary?.avg_duration_seconds ? Math.round(summary.avg_duration_seconds / 60) + " min" : "0 min";
+  const completionRate = summary?.completion_rate ? summary.completion_rate.toFixed(1) + "%" : "0%";
 
-  const dropoutPoints = [
-    { q: 'Q7', question: 'What suggestion would you provide to Indrive?', dropoffs: 2 },
-    { q: 'Q7', question: "Is there anything else about your experience you'd like to share?", dropoffs: 2 },
-    { q: 'Q1', question: 'Which color do you like?', dropoffs: 1 },
-    { q: 'Q5', question: "Is there anything else about your experience you'd like to share?", dropoffs: 1 },
-    { q: 'Q3', question: 'How much you find our service useful?', dropoffs: 1 },
-  ];
+  // Channel data from API
+  const channelData = {
+    phone: { count: summary?.channel_counts?.phone || 0, percentage: summary?.channel_counts?.phone ? ((summary.channel_counts.phone / (summary.total_surveys || 1)) * 100).toFixed(1) : 0 },
+    web: { count: summary?.channel_counts?.web || 0, percentage: summary?.channel_counts?.web ? ((summary.channel_counts.web / (summary.total_surveys || 1)) * 100).toFixed(1) : 0 },
+    qr: { count: summary?.channel_counts?.qr || 0, percentage: summary?.channel_counts?.qr ? ((summary.channel_counts.qr / (summary.total_surveys || 1)) * 100).toFixed(1) : 0 }
+  };
 
-  const recentSurveys = [
-    { name: 'testing-survey-7', recipient: 'arslan', status: 'Completed', completed: '—', csat: '—' },
-    { name: 'MK Survey', recipient: 'Samantha Ferguson', status: 'Completed', completed: '2026-03-07 00:37:17', csat: '—' },
-    { name: 'umer test 1122', recipient: 'umer 11221', status: 'Completed', completed: '2026-03-09 11:40:50', csat: '—' },
-    { name: 'TEST1122wASEEM', recipient: 'waseem 11225', status: 'Completed', completed: '2026-03-09 10:31:09', csat: '—' },
+  // Real dropout points from API
+  const dropoutPoints = summary?.dropout_points?.map((point, index) => ({
+    q: `Q${index + 1}`,
+    question: point.question || 'Unknown question',
+    dropoffs: point.count || 0
+  })) || [];
+
+  // Real recent surveys from API
+  const recentSurveys = stats?.recent_surveys?.slice(0, 5).map(survey => ({
+    name: survey.name || survey.survey_id || 'Unknown',
+    recipient: survey.recipient || 'Unknown',
+    status: survey.status || 'Unknown',
+    completed: survey.completion_date || '—',
+    csat: survey.csat || '—'
+  })) || [];
+
+  // Real chart data from API (if available, otherwise use completion trend)
+  const chartData = stats?.completion_trend?.map(item => ({
+    name: item.date || 'Unknown',
+    value: item.completion_rate || 0
+  })) || [
+    { name: 'Today', value: (summary?.completion_rate || 0) / 100 },
   ];
 
   useEffect(() => {
@@ -94,18 +107,6 @@ const Analytics = () => {
       </Box>
     );
   }
-
-  // Use data from the image if API data is not available yet
-  const totalResponses = 85; // From image: 85 responses
-  const avgDurationMin = "1 min"; // From image: 1 min
-  const completionRate = "50.6%"; // From image: 50.6%
-
-  // Channel data from the image
-  const channelData = {
-    phone: { count: 85, percentage: 134.9 },
-    web: { count: 85, percentage: 134.9 },
-    qr: { count: 85, percentage: 134.9 }
-  };
 
   return (
     <Box sx={{
