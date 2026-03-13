@@ -479,9 +479,9 @@ async def generate_survey(survey_data: SurveyCreateP):
         if res:
             raise HTTPException(status_code=400, detail=f"Survey with ID {survey_data.SurveyId} already exists")
 
-        res = sql_execute("SELECT * FROM templates WHERE name = :template_name", {"template_name": survey_data.Name})
+        res = sql_execute("SELECT * FROM templates WHERE name = :template_name", {"template_name": survey_data.template_name})
         if not res:
-            raise HTTPException(status_code=404, detail=f"Template with Name {survey_data.Name} not found")
+            raise HTTPException(status_code=404, detail=f"Template with Name {survey_data.template_name} not found")
     except HTTPException:
         raise
     except Exception as e:

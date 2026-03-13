@@ -112,6 +112,7 @@ class SurveyBaseP(BaseModel):
 class SurveyCreateP(SurveyBaseP):
     URL: str
     Bilingual: bool = True
+    template_name: str
 
 
 class SurveyP(SurveyBaseP):
