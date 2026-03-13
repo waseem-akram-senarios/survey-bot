@@ -670,7 +670,7 @@ async def update_survey_status(survey_id: str, status_update: SurveyStatusUpdate
     if not rows:
         raise HTTPException(status_code=404, detail=f"Survey {survey_id} not found")
     if rows[0]["status"] == "Completed":
-        raise HTTPException(status_code=400, detail=f"Survey {survey_id} already completed")
+        return {"message": f"Survey {survey_id} already completed"}
 
     comp_date = str(get_current_time())[:19].replace("T", " ") if status_update.Status == "Completed" else None
     sql_execute(
