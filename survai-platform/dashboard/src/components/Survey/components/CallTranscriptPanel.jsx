@@ -15,6 +15,16 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import SurveyService from "../../../services/Surveys/surveyService";
 
+// Question mapping for MK Survey template
+const QUESTION_MAP = {
+  "0a4710ab-7bba-4fbe-9cf7-bfb062302dfa": "How would you rate your overall experience ?",
+  "3a548716-76cb-48c8-88a6-8a541ec8459c": "How satisfied are you with the timeliness of your rides?",
+  "29fa2e61-60ab-4b8a-a2cc-ed179c8f61a3": "How would you rate your experience with our drivers?",
+  "fc004f7e-31dc-4ac6-aa0d-3ef1c9ede923": "How likely are you to recommend this service to a friend or family member?",
+  "6182b958-0652-49e7-a982-ee12699ee500": "If you could change one thing about the service, what would it be?",
+  "fa135d51-6211-45f8-97dd-92d3c0e4d5da": "Is there anything else about your experience you'd like to share?"
+};
+
 const CallTranscriptPanel = ({ surveyId }) => {
   const [transcript, setTranscript] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -143,10 +153,112 @@ const CallTranscriptPanel = ({ surveyId }) => {
             conversationLines.map((line, i) => {
               const isAgent = line.includes("AGENT:");
               const isCaller = line.includes("CALLER:");
+              const isQuestion = line.startsWith("Q[") && "]: " in line;
               const tsMatch = line.match(/^\[([^\]]+)\]\s*/);
               const displayText = tsMatch ? line.slice(tsMatch[0].length) : line;
-              const roleText = isAgent ? displayText.replace(/^AGENT:\s*/, "") :
-                               isCaller ? displayText.replace(/^CALLER:\s*/, "") : displayText;
+              
+              let roleText = "";
+              let bubbleType = "default";
+              
+              if (isAgent) {
+                roleText = displayText.replace(/^AGENT:\s*/, "");
+                bubbleType = "agent";
+              } else if (isCaller) {
+                roleText = displayText.replace(/^CALLER:\s*/, "");
+                bubbleType = "caller";
+              } else if (isQuestion) {
+                // Parse question ID and answer
+                const qidEnd = displayText.indexOf("]: ");
+                if (qidEnd > 0) {
+                  const qid = displayText.substring(2, qidEnd);
+                  const answer = displayText.substring(qidEnd + 3);
+                  const questionText = QUESTION_MAP[qid] || `Unknown Question (${qid})`;
+                  
+                  return (
+                    <Box
+                      key={i}
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        mb: 2,
+                      }}
+                    >
+                      {/* Question */}
+                      <Box
+                        sx={{
+                          maxWidth: "85%",
+                          px: 1.8,
+                          py: 1,
+                          borderRadius: "12px 12px 12px 2px",
+                          bgcolor: "#fff3e0",
+                          border: "1px solid #ffcc80",
+                          mb: 0.5,
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#f57c00",
+                            mb: 0.3,
+                            fontFamily: "Poppins",
+                          }}
+                        >
+                          ❓ Question
+                        </Typography>
+                        <Typography sx={{ fontSize: 13, lineHeight: 1.5, color: "#333" }}>
+                          {questionText}
+                        </Typography>
+                      </Box>
+                      
+                      {/* Answer */}
+                      <Box
+                        sx={{
+                          maxWidth: "85%",
+                          px: 1.8,
+                          py: 1,
+                          borderRadius: "12px 12px 2px 12px",
+                          bgcolor: "#e8f5e8",
+                          border: "1px solid #a5d6a7",
+                          ml: 2,
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#2e7d32",
+                            mb: 0.3,
+                            fontFamily: "Poppins",
+                          }}
+                        >
+                          💬 Answer
+                        </Typography>
+                        <Typography sx={{ fontSize: 13, lineHeight: 1.5, color: "#333" }}>
+                          {answer}
+                        </Typography>
+                      </Box>
+                      
+                      {tsMatch && (
+                        <Typography variant="caption" sx={{ color: "#aaa", fontSize: 10, mt: 0.2, px: 0.5 }}>
+                          {new Date(tsMatch[1]).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        </Typography>
+                      )}
+                    </Box>
+                  );
+                }
+              }
+              
+              const bubbleColor = bubbleType === "agent" ? "#e8edf8" : 
+                                bubbleType === "caller" ? "#dcedc8" : "#f5f5f5";
+              const borderColor = bubbleType === "agent" ? "#c5d0e8" : 
+                                 bubbleType === "caller" ? "#c5e1a5" : "#e0e0e0";
+              const textColor = bubbleType === "agent" ? "#1958F7" : 
+                                bubbleType === "caller" ? "#388E3C" : "#666";
+              const align = bubbleType === "caller" ? "flex-end" : "flex-start";
+              const borderRadius = bubbleType === "agent" ? "12px 12px 12px 2px" : 
+                                   bubbleType === "caller" ? "12px 12px 2px 12px" : "12px";
 
               return (
                 <Box
@@ -154,7 +266,7 @@ const CallTranscriptPanel = ({ surveyId }) => {
                   sx={{
                     display: "flex",
                     flexDirection: "column",
-                    alignItems: isAgent ? "flex-start" : isCaller ? "flex-end" : "flex-start",
+                    alignItems: align,
                     mb: 1.2,
                   }}
                 >
@@ -163,21 +275,21 @@ const CallTranscriptPanel = ({ surveyId }) => {
                       maxWidth: "85%",
                       px: 1.8,
                       py: 1,
-                      borderRadius: isAgent ? "12px 12px 12px 2px" : "12px 12px 2px 12px",
-                      bgcolor: isAgent ? "#e8edf8" : isCaller ? "#dcedc8" : "#f5f5f5",
-                      border: `1px solid ${isAgent ? "#c5d0e8" : isCaller ? "#c5e1a5" : "#e0e0e0"}`,
+                      borderRadius: borderRadius,
+                      bgcolor: bubbleColor,
+                      border: `1px solid ${borderColor}`,
                     }}
                   >
                     <Typography
                       sx={{
                         fontSize: 11,
                         fontWeight: 700,
-                        color: isAgent ? "#1958F7" : isCaller ? "#388E3C" : "#666",
+                        color: textColor,
                         mb: 0.3,
                         fontFamily: "Poppins",
                       }}
                     >
-                      {isAgent ? "Agent" : isCaller ? "Caller" : ""}
+                      {bubbleType === "agent" ? "Agent" : bubbleType === "caller" ? "Caller" : ""}
                     </Typography>
                     <Typography sx={{ fontSize: 13, lineHeight: 1.5, color: "#333" }}>
                       {roleText}
