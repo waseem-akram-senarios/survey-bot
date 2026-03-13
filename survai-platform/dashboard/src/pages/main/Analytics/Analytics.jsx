@@ -41,6 +41,8 @@ const Analytics = () => {
   const [error, setError] = useState(null);
   const [summary, setSummary] = useState(null);
   const [stats, setStats] = useState(null);
+  const [realTimeData, setRealTimeData] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
 
   // Use real data from API
   const totalResponses = summary?.total_surveys || 0;
@@ -63,12 +65,14 @@ const Analytics = () => {
   })) || [];
 
   // Real recent surveys from API
-  const recentSurveys = stats?.recent_surveys?.slice(0, 5).map(survey => ({
-    name: survey.name || survey.survey_id || 'Unknown',
-    recipient: survey.recipient || 'Unknown',
-    status: survey.status || 'Unknown',
-    completed: survey.completion_date || '—',
-    csat: survey.csat || '—'
+  const recentSurveys = realTimeData?.allSurveys?.slice(0, 5).map(survey => ({
+    name: survey.Name || survey.SurveyId || 'Unknown',
+    recipient: survey.Recipient || 'Unknown',
+    status: survey.Status || 'Unknown',
+    completed: survey.CompletionDate || '—',
+    csat: '—', // CSAT data would need to be added to backend
+    phone: survey.Phone || '—',
+    launchDate: survey.LaunchDate || '—'
   })) || [];
 
   // Real chart data from API (if available, otherwise use completion trend)
@@ -84,12 +88,16 @@ const Analytics = () => {
       try {
         setLoading(true);
         const tenantId = user?.tenantId || '';
-        const [summaryData, statsData] = await Promise.all([
-          AnalyticsService.getSummary(),
-          AnalyticsService.getSurveyStats(tenantId),
-        ]);
-        setSummary(summaryData);
-        setStats(statsData);
+        
+        // Fetch comprehensive real-time data
+        const allData = await AnalyticsService.getAllRealTimeData(tenantId);
+        
+        // Set all data states
+        setSummary(allData.summary);
+        setStats(allData.surveyStats);
+        setRealTimeData(allData);
+        setLastUpdate(allData.lastUpdated);
+        
       } catch (err) {
         console.error('Error loading analytics:', err);
         setError('Failed to load analytics data.');
@@ -97,8 +105,29 @@ const Analytics = () => {
         setLoading(false);
       }
     };
+    
     fetchData();
-  }, [user]);
+    
+    // Set up real-time updates every 15 seconds
+    const interval = setInterval(async () => {
+      try {
+        const tenantId = user?.tenantId || '';
+        const updates = await AnalyticsService.getRealTimeUpdates(tenantId, lastUpdate);
+        
+        // Update only changed data
+        if (updates.summary) setSummary(updates.summary);
+        if (updates.allSurveys && realTimeData) {
+          setRealTimeData(prev => ({ ...prev, allSurveys: updates.allSurveys, lastUpdated: updates.lastUpdated }));
+        }
+        setLastUpdate(updates.lastUpdated);
+        
+      } catch (err) {
+        console.error('Error fetching real-time updates:', err);
+      }
+    }, 15000); // 15 seconds for more responsive updates
+    
+    return () => clearInterval(interval);
+  }, [user, lastUpdate]);
 
   if (loading) {
     return (
@@ -146,6 +175,11 @@ const Analytics = () => {
             <Typography variant="h6" sx={{ color: '#6b7280', fontWeight: 400 }}>
               View response data and insights
             </Typography>
+            {lastUpdate && (
+              <Typography variant="caption" sx={{ color: '#10b981', fontWeight: 500 }}>
+                ● Live • Last updated: {new Date(lastUpdate).toLocaleTimeString()}
+              </Typography>
+            )}
           </Box>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
@@ -343,13 +377,13 @@ const Analytics = () => {
       {/* Recently Completed Surveys */}
       <Paper sx={{ p: 4, borderRadius: 4, mt: 4 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>
-          Recently Completed Surveys
+          Recent Survey Activity (Live)
         </Typography>
         <Box sx={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                {['Survey', 'Recipient', 'Status', 'Completed', 'CSAT'].map((col) => (
+                {['Survey', 'Recipient', 'Status', 'Phone', 'Launched', 'Completed'].map((col) => (
                   <th key={col} style={{
                     textAlign: 'left', padding: '8px 12px',
                     color: '#6b7280', fontWeight: 600, fontSize: '13px',
@@ -372,17 +406,23 @@ const Analytics = () => {
                   <td style={{ padding: '14px 12px' }}>
                     <Box component="span" sx={{
                       px: 2, py: 0.5, borderRadius: 5,
-                      bgcolor: '#d1fae5', color: '#065f46',
+                      bgcolor: row.status === 'Completed' ? '#d1fae5' : 
+                               row.status === 'In-Progress' ? '#fef3c7' : '#f3f4f6',
+                      color: row.status === 'Completed' ? '#065f46' : 
+                             row.status === 'In-Progress' ? '#92400e' : '#6b7280',
                       fontSize: '13px', fontWeight: 600
                     }}>
                       {row.status}
                     </Box>
                   </td>
                   <td style={{ padding: '14px 12px', fontSize: '14px', color: '#6b7280' }}>
-                    {row.completed}
+                    {row.phone}
                   </td>
                   <td style={{ padding: '14px 12px', fontSize: '14px', color: '#6b7280' }}>
-                    {row.csat}
+                    {row.launchDate ? new Date(row.launchDate).toLocaleDateString() : '—'}
+                  </td>
+                  <td style={{ padding: '14px 12px', fontSize: '14px', color: '#6b7280' }}>
+                    {row.completed && row.completed !== '—' ? new Date(row.completed).toLocaleString() : '—'}
                   </td>
                 </tr>
               ))}
