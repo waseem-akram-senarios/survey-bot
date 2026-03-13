@@ -24,9 +24,16 @@ export const isQuestionPreAnswered = (question) => {
   };
   
   export const hasUnansweredQuestions = (questions) => {
-    const unansweredQuestions = questions.filter(q => !q.answer || q.answer.trim() === '');
-    return unansweredQuestions.length > 0;
-  };
+  if (!Array.isArray(questions)) return false;
+  const unansweredQuestions = questions.filter(q => {
+    // If it's a number (like 0), it's answered. If it's a string, trim and check.
+    const ans = q.answer;
+    if (ans === undefined || ans === null) return true;
+    const ansStr = ans.toString().trim();
+    return ansStr === "";
+  });
+  return unansweredQuestions.length > 0;
+};
   
   // Progress calculation helpers
   export const calculateProgress = (questions) => {

@@ -778,6 +778,16 @@ async def submit_survey(qna_data: SurveyQnAP):
             },
         )
 
+    # Update survey status to Completed after submission
+    sql_execute(
+        """UPDATE surveys SET status = :status, completion_date = :completion_date WHERE id = :survey_id""",
+        {
+            "survey_id": survey_id,
+            "status": "Completed",
+            "completion_date": str(get_current_time())[:19].replace("T", " "),
+        },
+    )
+
     return SurveyQnAP(SurveyId=survey_id, QuestionswithAns=[SurveyQuestionAnswerP(**q) for q in questions])
 
 
