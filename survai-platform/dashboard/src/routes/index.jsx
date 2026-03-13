@@ -6,7 +6,7 @@ import Login from '../pages/Login';
 import NotFound from '../pages/NotFound';
 
 // Import survey-related components
-import DashboardNew from '../pages/DashboardNew';
+import Dashboard from '../pages/main/Surveys/Dashboard';
 import CreateTemplate from '../pages/main/Templates/CreateTemplate';
 import Templates from '../pages/main/Templates/Templates';
 import DraftTemplates from '../pages/main/Templates/DraftTemplates';
@@ -40,7 +40,7 @@ const routes = [
       children: [
         {
           path: 'dashboard',
-          element: <DashboardNew />
+          element: <Dashboard />
         },
         {
           path: 'templates/manage',

@@ -241,13 +241,19 @@ def record_answer(survey_id: str, question_id: str, raw_answer: str) -> bool:
 
 
 def update_survey_status(survey_id: str, status: str = "Completed") -> bool:
+    """Update survey status and completion_date in DB. Uses explicit transaction so it always commits."""
     try:
         now = datetime.now(timezone.utc).isoformat()[:19].replace("T", " ")
-        sql_execute(
-            """UPDATE surveys SET status = :status, completion_date = :date
-               WHERE id = :survey_id""",
-            {"status": status, "date": now, "survey_id": survey_id},
-        )
+        engine = get_engine()
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """UPDATE surveys SET status = :status, completion_date = :date
+                       WHERE id = :survey_id"""
+                ),
+                {"status": status, "date": now, "survey_id": survey_id},
+            )
+        logger.info(f"Updated survey {survey_id} status to {status}")
         return True
     except Exception as e:
         logger.error(f"Failed to update survey status: {e}")

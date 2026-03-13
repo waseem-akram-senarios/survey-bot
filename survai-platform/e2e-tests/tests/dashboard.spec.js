@@ -16,11 +16,12 @@ test.describe('Dashboard Home', () => {
 
     const bodyText = await page.textContent('body');
     expect(bodyText).toBeTruthy();
-    // Rider Voice dashboard: Rider Voice, Transigo, metric cards; or legacy cards
+    // Rider Voice dashboard, legacy cards, or table-based dashboard
     const hasRiderVoice = bodyText.includes('Rider Voice') || bodyText.includes('Transigo');
     const hasLegacyCards = bodyText.includes('Created Templates') || bodyText.includes('Active Surveys');
     const hasMetricCards = bodyText.includes('AVG. SATISFACTION') || bodyText.includes('RESPONSE CHANNELS');
-    expect(hasRiderVoice || hasLegacyCards || hasMetricCards).toBeTruthy();
+    const hasTableOrActions = bodyText.includes('SURVEY NAME') || bodyText.includes('Quick Actions') || bodyText.includes('Create Survey') || bodyText.includes('Manage');
+    expect(hasRiderVoice || hasLegacyCards || hasMetricCards || hasTableOrActions).toBeTruthy();
   });
 
   test('dashboard has top bar navigation (Dashboard, Analytics, Contacts)', async ({ page }) => {
@@ -50,7 +51,13 @@ test.describe('Dashboard Home', () => {
     await page.waitForTimeout(2000);
 
     const bodyText = await page.textContent('body');
-    const hasTableOrEmpty = bodyText.includes('Active Surveys') || bodyText.includes('No surveys yet') || bodyText.includes('Search surveys');
+    const hasTableOrEmpty =
+      bodyText.includes('Active Surveys') ||
+      bodyText.includes('No surveys yet') ||
+      bodyText.includes('Search surveys') ||
+      bodyText.includes('SURVEY NAME') ||
+      bodyText.includes('Manage Surveys') ||
+      bodyText.includes('Quick Actions');
     expect(hasTableOrEmpty).toBeTruthy();
   });
 
@@ -62,9 +69,9 @@ test.describe('Dashboard Home', () => {
     const count = await tableHeaders.count();
     if (count >= 5) {
       const headers = await tableHeaders.allInnerTexts();
-      const joined = headers.join(',');
-      expect(joined).toContain('Name');
-      expect(joined).toContain('Status');
+      const joined = headers.join(',').toUpperCase();
+      expect(joined).toMatch(/NAME|SURVEY/);
+      expect(joined).toMatch(/STATUS/);
     }
     // If no table (empty state), test passes
   });
@@ -93,19 +100,21 @@ test.describe('Top bar navigation', () => {
     expect(bodyText && bodyText.length > 10).toBeTruthy();
   });
 
-  test('can navigate to Surveys/Contacts Manage page', async ({ page }) => {
+  test('can navigate to Contacts or Surveys Manage page', async ({ page }) => {
     await loginToDashboard(page);
 
-    try {
-      const contactsBtn = page.getByRole('button', { name: /Contacts/i }).first();
-      await contactsBtn.click({ timeout: 5000 });
+    // Try clicking Contacts nav – should go to /contacts
+    const contactsNav = page.getByRole('button', { name: /Contacts/i }).first();
+    if (await contactsNav.count() > 0) {
+      await contactsNav.click({ timeout: 5000 });
       await page.waitForLoadState('networkidle');
-      expect(page.url()).toContain('/surveys');
-    } catch {
-      await page.goto(`${BASE}/surveys/manage`);
-      await page.waitForLoadState('networkidle');
-      const bodyText = await page.textContent('body');
-      expect(bodyText && bodyText.length > 10).toBeTruthy();
+      expect(page.url()).toContain('/contacts');
+      return;
     }
+    // Fallback: go to surveys manage and check page loads
+    await page.goto(`${BASE}/surveys/manage`);
+    await page.waitForLoadState('networkidle');
+    const bodyText = await page.textContent('body');
+    expect(bodyText && bodyText.length > 10).toBeTruthy();
   });
 });

@@ -519,10 +519,19 @@ async def api_record_answer(survey_id: str, question_id: str, answer: str):
 @router.post("/complete-survey")
 async def api_complete_survey(survey_id: str, reason: str = "completed"):
     """Mark a voice survey as completed (or other status) in the database."""
-    # Check if survey has answers to determine completion status
-    answer_count = sql_execute("SELECT COUNT(*) as count FROM survey_response_items WHERE survey_id = :sid AND raw_answer IS NOT NULL", {"sid": survey_id})
-    has_answers = answer_count and answer_count[0]["count"] > 0
-    status = "Completed" if has_answers else "In-Progress"
+    # When call ended as "completed", always mark survey Completed so dashboard updates (root cause fix:
+    # answer_count can be 0 if record-answer had no rows to update or ID mismatch, leaving survey stuck In-Progress).
+    # For disconnect/abandon, only mark Completed if we have at least one answer.
+    reason_lower = (reason or "").strip().lower()
+    if reason_lower == "completed":
+        status = "Completed"
+    else:
+        answer_count = sql_execute(
+            "SELECT COUNT(*) as count FROM survey_response_items WHERE survey_id = :sid AND raw_answer IS NOT NULL",
+            {"sid": survey_id},
+        )
+        has_answers = answer_count and answer_count[0]["count"] > 0
+        status = "Completed" if has_answers else "In-Progress"
     ok = update_survey_status(survey_id, status)
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to update survey status")

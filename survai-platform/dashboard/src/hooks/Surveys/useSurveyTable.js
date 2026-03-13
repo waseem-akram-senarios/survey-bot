@@ -11,37 +11,71 @@ const useSurveyPageData = (statsDataFetcher, tableDataFetcher, tenantId) => {
   const [statsError, setStatsError] = useState(null);
   const [tableError, setTableError] = useState(null);
 
-  const fetchStatsData = async () => {
-    setStatsLoading(true);
-    setStatsError(null);
+  const fetchStatsData = async (silent = false) => {
+    if (!silent) {
+      setStatsLoading(true);
+      setStatsError(null);
+    }
     try {
       const data = await statsDataFetcher();
       setStatsData(data);
     } catch (err) {
-      console.error('Error fetching stats data:', err);
-      setStatsError(err.message);
+      if (!silent) {
+        console.error('Error fetching stats data:', err);
+        setStatsError(err.message);
+      }
     } finally {
-      setStatsLoading(false);
+      if (!silent) setStatsLoading(false);
     }
   };
 
-  const fetchTableData = async () => {
-    setTableLoading(true);
-    setTableError(null);
+  const fetchTableData = async (silent = false) => {
+    if (!silent) {
+      setTableLoading(true);
+      setTableError(null);
+    }
     try {
       const data = await tableDataFetcher();
       setTableData(transformSurveyData(data));
     } catch (err) {
-      console.error('Error fetching table data:', err);
-      setTableError(err.message);
+      if (!silent) {
+        console.error('Error fetching table data:', err);
+        setTableError(err.message);
+      }
     } finally {
-      setTableLoading(false);
+      if (!silent) setTableLoading(false);
     }
+  };
+
+  const refetchAll = (silent = false) => {
+    fetchStatsData(silent);
+    fetchTableData(silent);
   };
 
   useEffect(() => {
     fetchStatsData();
     fetchTableData();
+  }, [tenantId]);
+
+  // Refetch when user returns to the tab (e.g. after a call completes) so status updates appear
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refetchAll(true);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [tenantId]);
+
+  // Periodic refetch every 30s while tab is visible so completed calls show up without leaving the page
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refetchAll(true);
+      }
+    }, 30000);
+    return () => clearInterval(interval);
   }, [tenantId]);
 
   return {
@@ -54,6 +88,7 @@ const useSurveyPageData = (statsDataFetcher, tableDataFetcher, tenantId) => {
     globalLoading: statsLoading && tableLoading,
     refetchStats: fetchStatsData,
     refetchTable: fetchTableData,
+    refetchAll,
   };
 };
 

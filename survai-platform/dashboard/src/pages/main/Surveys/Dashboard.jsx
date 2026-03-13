@@ -22,10 +22,7 @@ import {
   Users,
   AlertCircle,
   BarChart3,
-  TrendingUp,
-  TrendingDown,
-  Calendar,
-  Clock
+  RefreshCw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import StatCard from '../../../components/StatCard';
@@ -45,6 +42,7 @@ const Dashboard = () => {
     tableError,
     refetchStats,
     refetchTable,
+    refetchAll,
   } = useDashboard();
 
   const loading = statsLoading || tableLoading;
@@ -88,23 +86,43 @@ const Dashboard = () => {
             Transigo — Survey Management Dashboard
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<Plus size={18} />}
-          onClick={() => navigate('/surveys/launch')}
-          sx={{
-            py: 1.5,
-            px: 3,
-            borderRadius: 'var(--radius-lg)',
-            background: 'var(--gradient-primary, linear-gradient(135deg, #7B61FF 0%, #5b21b6 100%))',
-            textTransform: 'none',
-            fontWeight: 600,
-            boxShadow: 'var(--shadow-button, 0 4px 14px rgba(123, 97, 255, 0.4))',
-            '&:hover': { transform: 'translateY(-2px)', boxShadow: 'var(--shadow-lg)' }
-          }}
-        >
-          + Create Survey
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshCw size={18} />}
+            onClick={() => refetchAll?.()}
+            disabled={loading}
+            sx={{
+              py: 1.5,
+              px: 2.5,
+              borderRadius: 'var(--radius-lg)',
+              borderColor: 'var(--color-gray-300)',
+              color: 'var(--color-gray-700)',
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': { borderColor: 'var(--color-primary-500)', color: 'var(--color-primary-600)', bgcolor: 'var(--color-primary-50)' }
+            }}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Plus size={18} />}
+            onClick={() => navigate('/surveys/launch')}
+            sx={{
+              py: 1.5,
+              px: 3,
+              borderRadius: 'var(--radius-lg)',
+              background: 'var(--gradient-primary, linear-gradient(135deg, #7B61FF 0%, #5b21b6 100%))',
+              textTransform: 'none',
+              fontWeight: 600,
+              boxShadow: 'var(--shadow-button, 0 4px 14px rgba(123, 97, 255, 0.4))',
+              '&:hover': { transform: 'translateY(-2px)', boxShadow: 'var(--shadow-lg)' }
+            }}
+          >
+            + Create Survey
+          </Button>
+        </Box>
       </Box>
 
       {/* Stats Grid - wired to API */}
