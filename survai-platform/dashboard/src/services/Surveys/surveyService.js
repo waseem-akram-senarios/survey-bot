@@ -24,6 +24,7 @@ class SurveyService {
         Biodata: surveyData.biodata,
         Recipient: surveyData.recipient,
         Name: surveyData.template,
+        template_name: surveyData.template,  // Add template_name field
         RiderName: surveyData.riderName,
         RideId: surveyData.rideId,
         TenantId: surveyData.tenantId,
