@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException
 
 from db import (
     get_survey_with_questions,
+    get_template_config,
     record_answer,
     store_transcript,
     get_transcript,
