@@ -211,6 +211,7 @@ async def entrypoint(ctx: JobContext):
     )
 
     survey_responses = create_empty_response_dict(rider_first_name, caller_number)
+    survey_responses["survey_id"] = survey_id
 
     async def hangup_call():
         logger.info("Hanging up — deleting room")
