@@ -16,14 +16,14 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from fastapi import APIRouter, HTTPException
 
 from db import (
-    async_execute,
-    sql_execute,
-    get_survey_with_questions,
-    get_template_config,
-    get_transcript,
+    get_active_surveys,
+    get_survey_questions,
+    record_answer,
+    release_call,
     store_transcript,
-    record_answer as db_record_answer,
-    update_survey_status,
+    get_transcript,
+    enhance_transcript,
+    sql_execute,
 )
 from prompt_builder import build_greeter_prompt, build_questions_prompt
 
