@@ -123,24 +123,28 @@ const DesktopTable = ({
               <TableCell>{item.Name}</TableCell>
               <TableCell>{formatDate(item.LaunchDate)}</TableCell>
               <TableCell>
-                <a
-                  href={getSurveyLink(item.SurveyId)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    color: item.Status === "Completed" ? "#D32F2F" : "#1958F7",
-                    textDecoration: "underline",
-                    cursor: "pointer",
-                    fontFamily: "Poppins, sans-serif",
-                    fontWeight: 400,
-                    fontSize: "14px",
-                    lineHeight: "100%",
-                    display: "inline-block",
-                  }}
-                >
-                  {truncateText(getSurveyLink(item.SurveyId), 40)}
-                </a>
+                {item.URL ? (
+                  <a
+                    href={item.URL.startsWith("http") ? item.URL : `https://${item.URL}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      color: item.Status === "Completed" ? "#D32F2F" : "#1958F7",
+                      textDecoration: "underline",
+                      cursor: "pointer",
+                      fontFamily: "Poppins, sans-serif",
+                      fontWeight: 400,
+                      fontSize: "14px",
+                      lineHeight: "100%",
+                      display: "inline-block",
+                    }}
+                  >
+                    {item.URL}
+                  </a>
+                ) : (
+                  <span style={{ color: "#999", fontStyle: "italic" }}>No URL available</span>
+                )}
               </TableCell>
               <TableCell>{truncateText(item.Recipient, 25)}</TableCell>
               <TableCell>

@@ -393,10 +393,10 @@ const DashboardNew = () => {
 
 
   const totalSurveys = statsData?.Total_Surveys ?? statsData?.totalSurveys ?? tableData?.length ?? 0;
-  const activeSurveys = statsData?.Total_Active_Surveys ?? statsData?.activeSurveys ?? 0;
+  const activeSurveys = statsData?.Active_Surveys ?? statsData?.activeSurveys ?? 0;
   const completedSurveys = statsData?.Total_Completed_Surveys ?? statsData?.completedSurveys ?? 0;
   const totalTemplates = statsData?.Total_Templates ?? statsData?.totalTemplates ?? 0;
-  const publishedTemplates = statsData?.Total_Published_Templates ?? statsData?.publishedTemplates ?? 0;
+  const publishedTemplates = statsData?.Published_Templates ?? statsData?.publishedTemplates ?? 0;
 
   const handleView = (id, s) => id && navigate(`/surveys/status/${id}`, { state: { surveyData: s } });
   const handleEdit = (id, s) => id && navigate(`/surveys/edit/${id}`, { state: { surveyData: s } });
