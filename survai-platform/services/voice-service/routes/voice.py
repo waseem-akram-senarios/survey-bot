@@ -240,6 +240,9 @@ async def make_call(
     except Exception as e:
         logger.warning(f"Failed to persist phone {normalized_phone} on survey {survey_id}: {e}")
 
+    # Check if survey is already being called to prevent duplicates
+    if survey_id in _active_surveys:
+        raise HTTPException(status_code=409, detail=f"Survey {survey_id} is already being called")
     await _reserve_call(normalized_phone, survey_id)
 
     survey_context = {
