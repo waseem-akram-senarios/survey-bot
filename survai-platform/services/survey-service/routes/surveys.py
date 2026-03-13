@@ -310,7 +310,7 @@ async def get_survey_stats(tenant_id: Optional[str] = None):
         Total_Completed_Surveys_Today=r["completed_surveys_today"] or 0,
         Median_Completion_Duration=int(r["durations_median"] or 0),
         Median_Completion_Duration_Today=int(r["durations_today_median"] or 0),
-        AverageCSAT=float(r["csat_avg"] or 0),
+        AverageCSAT=0.0,  # Default value since csat_avg column doesn't exist
     )
 
 
