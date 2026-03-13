@@ -19,6 +19,7 @@ from db import (
     get_survey_with_questions,
     get_template_config,
     record_answer,
+    update_survey_status,
     store_transcript,
     get_transcript,
     enhance_transcript,
@@ -622,7 +623,7 @@ async def send_email_fallback(
 @router.post("/record-answer")
 async def api_record_answer(survey_id: str, question_id: str, answer: str):
     """Record a single answer from the voice agent into the database."""
-    ok = db_record_answer(survey_id, question_id, answer)
+    ok = record_answer(survey_id, question_id, answer)
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to record answer")
     return {"status": "recorded", "survey_id": survey_id, "question_id": question_id}
