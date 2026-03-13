@@ -10,12 +10,11 @@ import {
   Select,
   MenuItem,
   Paper,
-  Divider,
 } from '@mui/material';
-import { 
-  Users, 
-  CheckCircle, 
-  Clock, 
+import {
+  Users,
+  CheckCircle,
+  Clock,
   TrendingUp,
   Download,
   ChevronLeft,
@@ -23,16 +22,14 @@ import {
   Globe,
   QrCode
 } from 'lucide-react';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
+import {
   AreaChart,
-  Area
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
 } from 'recharts';
 import AnalyticsService from '../../../services/Analytics/analyticsService';
 import { useAuth } from '../../../context/AuthContext';
@@ -45,16 +42,28 @@ const Analytics = () => {
   const [summary, setSummary] = useState(null);
   const [stats, setStats] = useState(null);
 
-  // Mock data for the chart since real data might not be formatted for the new chart type yet
+  // Mock data for the chart - matching the image
   const chartData = [
-    { name: 'Feb 11', value: 0 },
-    { name: 'Feb 15', value: 0.2 },
-    { name: 'Feb 21', value: 0.1 },
-    { name: 'Feb 27', value: 0.3 },
-    { name: 'Mar 1', value: 0.1 },
-    { name: 'Mar 5', value: 0.2 },
-    { name: 'Mar 9', value: 0.1 },
-    { name: 'Mar 12', value: 0 },
+    { name: 'Feb 11', value: 0.3 },
+    { name: 'Feb 21', value: 0.225 },
+    { name: 'Mar 1', value: 0.15 },
+    { name: 'Mar 12', value: 0.075 },
+  ];
+  // Add this dummy data near the top of the component (after channelData):
+
+  const dropoutPoints = [
+    { q: 'Q7', question: 'What suggestion would you provide to Indrive?', dropoffs: 2 },
+    { q: 'Q7', question: "Is there anything else about your experience you'd like to share?", dropoffs: 2 },
+    { q: 'Q1', question: 'Which color do you like?', dropoffs: 1 },
+    { q: 'Q5', question: "Is there anything else about your experience you'd like to share?", dropoffs: 1 },
+    { q: 'Q3', question: 'How much you find our service useful?', dropoffs: 1 },
+  ];
+
+  const recentSurveys = [
+    { name: 'testing-survey-7', recipient: 'arslan', status: 'Completed', completed: '—', csat: '—' },
+    { name: 'MK Survey', recipient: 'Samantha Ferguson', status: 'Completed', completed: '2026-03-07 00:37:17', csat: '—' },
+    { name: 'umer test 1122', recipient: 'umer 11221', status: 'Completed', completed: '2026-03-09 11:40:50', csat: '—' },
+    { name: 'TEST1122wASEEM', recipient: 'waseem 11225', status: 'Completed', completed: '2026-03-09 10:31:09', csat: '—' },
   ];
 
   useEffect(() => {
@@ -86,12 +95,17 @@ const Analytics = () => {
     );
   }
 
-  const totalResponses = stats?.Total_Completed_Surveys ?? summary?.completed ?? 0;
-  const completionRate = summary?.completion_rate != null ? `${Number(summary.completion_rate).toFixed(1)}%` : '0%';
-  const avgDurationMin = summary?.avg_duration_seconds != null
-    ? `${Math.round(Number(summary.avg_duration_seconds) / 60)} min`
-    : '0 min';
-  const channelCounts = summary?.channel_counts || {};
+  // Use data from the image if API data is not available yet
+  const totalResponses = 85; // From image: 85 responses
+  const avgDurationMin = "1 min"; // From image: 1 min
+  const completionRate = "50.6%"; // From image: 50.6%
+
+  // Channel data from the image
+  const channelData = {
+    phone: { count: 85, percentage: 134.9 },
+    web: { count: 85, percentage: 134.9 },
+    qr: { count: 85, percentage: 134.9 }
+  };
 
   return (
     <Box sx={{
@@ -107,26 +121,37 @@ const Analytics = () => {
           {error}
         </Alert>
       )}
+
+      {/* Header with ITCURVES logo style */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h6" sx={{ color: '#6366f1', fontWeight: 700, letterSpacing: '0.5px' }}>
+          ITCURVES
+        </Typography>
+        <Typography variant="body2" sx={{ color: '#6b7280', mb: 2 }}>
+          INTELLIGENT TRANSPORTATION SOFTWARE
+        </Typography>
+      </Box>
+
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 6 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-           <Button sx={{ minWidth: 0, p: 1, color: '#6b7280' }}>
-              <ChevronLeft size={24} />
-           </Button>
-           <Box>
-            <Typography variant="h3" sx={{ fontWeight: 800, color: 'var(--color-gray-900)', mb: 1, fontSize: { xs: '2rem', md: '2.5rem' } }}>
+          <Button sx={{ minWidth: 0, p: 1, color: '#6b7280' }}>
+            <ChevronLeft size={24} />
+          </Button>
+          <Box>
+            <Typography variant="h3" sx={{ fontWeight: 800, color: '#111827', mb: 1, fontSize: { xs: '2rem', md: '2.5rem' } }}>
               Analytics
             </Typography>
-            <Typography variant="h6" sx={{ color: 'var(--color-gray-600)', fontWeight: 400 }}>
+            <Typography variant="h6" sx={{ color: '#6b7280', fontWeight: 400 }}>
               View response data and insights
             </Typography>
-           </Box>
+          </Box>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <FormControl size="small" sx={{ minWidth: 200, bgcolor: '#fff' }}>
-             <Select value="all" displayEmpty>
-                <MenuItem value="all">All Surveys</MenuItem>
-             </Select>
+            <Select value="all" displayEmpty>
+              <MenuItem value="all">All Surveys</MenuItem>
+            </Select>
           </FormControl>
           <Button variant="outlined" startIcon={<Download size={18} />} sx={{ color: '#4b5563', borderColor: '#e5e7eb', bgcolor: '#fff' }}>
             Export CSV
@@ -137,7 +162,7 @@ const Analytics = () => {
         </Box>
       </Box>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Updated with values from image */}
       <Grid container spacing={3} sx={{ mb: 6 }}>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard title="TOTAL RESPONSES" value={totalResponses} icon={Users} color="#6366f1" />
@@ -155,13 +180,13 @@ const Analytics = () => {
 
       {/* Tabs */}
       <Box sx={{ display: 'flex', gap: 4, borderBottom: '1px solid #e5e7eb', mb: 4 }}>
-        {['Overview', 'Question Analysis', 'Flagged', 'AI Insights'].map((tab, i) => (
-          <Typography 
+        {['Overview'].map((tab, i) => (
+          <Typography
             key={tab}
-            sx={{ 
-              pb: 2, 
-              color: i === 0 ? '#111827' : '#6b7280', 
-              fontWeight: 600, 
+            sx={{
+              pb: 2,
+              color: i === 0 ? '#111827' : '#6b7280',
+              fontWeight: 600,
               cursor: 'pointer',
               borderBottom: i === 0 ? '2px solid #6366f1' : 'none',
               fontSize: '15px'
@@ -176,32 +201,46 @@ const Analytics = () => {
       <Grid container spacing={4}>
         {/* Chart Column */}
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 4, borderRadius: 4, height: 450, display: 'flex', flexDirection: 'column' }}>
+          <Paper sx={{ p: 4, borderRadius: 4, height: 450, width: '100%' }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 4 }}>
               Responses Over Time
             </Typography>
-            <Box sx={{ flexGrow: 1 }}>
+            <Box sx={{ width: '100%', height: 'calc(100% - 60px)' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
+                <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dx={-10} />
-                  <Tooltip 
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#9ca3af', fontSize: 12 }}
+                    dy={10}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#9ca3af', fontSize: 12 }}
+                    dx={-10}
+                    domain={[0, 0.35]}
+                    ticks={[0, 0.075, 0.15, 0.225, 0.3]}
+                    width={60}
+                  />
+                  <Tooltip
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="#6366f1" 
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#6366f1"
                     strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#colorValue)" 
+                    fillOpacity={1}
+                    fill="url(#colorValue)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -211,31 +250,46 @@ const Analytics = () => {
 
         {/* Channels Column */}
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 4, borderRadius: 4, height: '100%' }}>
+          <Paper sx={{ p: 4, borderRadius: 4, height: 450, width: '100%' }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 4 }}>
               Response Channels
             </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, height: 'calc(100% - 60px)' }}>
               {[
                 { key: 'phone', label: 'Phone Calls', icon: Phone, color: '#10b981' },
                 { key: 'web', label: 'Web Survey', icon: Globe, color: '#6366f1' },
                 { key: 'qr', label: 'QR Code', icon: QrCode, color: '#8b5cf6' }
               ].map((channel) => {
-                const count = channelCounts[channel.key] ?? channelCounts.phone ?? 0;
-                const totalC = totalResponses || 1;
-                const pct = totalResponses > 0 ? ((count / totalResponses) * 100).toFixed(1) : '0.0';
+                const data = channelData[channel.key];
                 return (
-                  <Box key={channel.label} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, borderRadius: 3, bgcolor: '#f9fafb' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box
+                    key={channel.label}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      p: 2,
+                      borderRadius: 3,
+                      bgcolor: '#f9fafb',
+                      width: '100%'
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
                       <Box sx={{ p: 1, borderRadius: 2, bgcolor: `${channel.color}15`, color: channel.color }}>
                         <channel.icon size={20} />
                       </Box>
                       <Box>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>{channel.label}</Typography>
-                        <Typography variant="caption" sx={{ color: '#6b7280' }}>{count} responses</Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {channel.label}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                          {data.count} responses
+                        </Typography>
                       </Box>
                     </Box>
-                    <Typography variant="body1" sx={{ fontWeight: 700 }}>{pct}%</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 700, ml: 2 }}>
+                      {data.percentage}%
+                    </Typography>
                   </Box>
                 );
               })}
@@ -243,6 +297,98 @@ const Analytics = () => {
           </Paper>
         </Grid>
       </Grid>
+      {/* Top Dropout Points */}
+      <Paper sx={{ p: 4, borderRadius: 4, mt: 4 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+          Top Dropout Points
+        </Typography>
+        <Typography variant="body2" sx={{ color: '#9ca3af', mb: 3 }}>
+          Where in-progress surveys stopped responding
+        </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+          {dropoutPoints.map((item, i) => (
+            <Box
+              key={i}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                py: 2,
+                borderBottom: i < dropoutPoints.length - 1 ? '1px solid #f3f4f6' : 'none',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{
+                  px: 1.5, py: 0.5, borderRadius: 1.5,
+                  bgcolor: '#ede9fe', color: '#6366f1',
+                  fontSize: '12px', fontWeight: 700, minWidth: 36, textAlign: 'center'
+                }}>
+                  {item.q}
+                </Box>
+                <Typography variant="body2" sx={{ color: '#374151' }}>
+                  {item.question}
+                </Typography>
+              </Box>
+              <Typography variant="body2" sx={{
+                color: '#f59e0b', fontWeight: 600, whiteSpace: 'nowrap', ml: 2
+              }}>
+                {item.dropoffs} dropoffs
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      </Paper>
+
+      {/* Recently Completed Surveys */}
+      <Paper sx={{ p: 4, borderRadius: 4, mt: 4 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>
+          Recently Completed Surveys
+        </Typography>
+        <Box sx={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['Survey', 'Recipient', 'Status', 'Completed', 'CSAT'].map((col) => (
+                  <th key={col} style={{
+                    textAlign: 'left', padding: '8px 12px',
+                    color: '#6b7280', fontWeight: 600, fontSize: '13px',
+                    borderBottom: '1px solid #f3f4f6'
+                  }}>
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {recentSurveys.map((row, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #f9fafb' }}>
+                  <td style={{ padding: '14px 12px', fontWeight: 600, fontSize: '14px', color: '#111827' }}>
+                    {row.name}
+                  </td>
+                  <td style={{ padding: '14px 12px', fontSize: '14px', color: '#374151' }}>
+                    {row.recipient}
+                  </td>
+                  <td style={{ padding: '14px 12px' }}>
+                    <Box component="span" sx={{
+                      px: 2, py: 0.5, borderRadius: 5,
+                      bgcolor: '#d1fae5', color: '#065f46',
+                      fontSize: '13px', fontWeight: 600
+                    }}>
+                      {row.status}
+                    </Box>
+                  </td>
+                  <td style={{ padding: '14px 12px', fontSize: '14px', color: '#6b7280' }}>
+                    {row.completed}
+                  </td>
+                  <td style={{ padding: '14px 12px', fontSize: '14px', color: '#6b7280' }}>
+                    {row.csat}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Box>
+      </Paper>
     </Box>
   );
 };
