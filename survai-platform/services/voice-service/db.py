@@ -215,6 +215,112 @@ def store_transcript(
     return transcript_id
 
 
+def enhance_transcript(transcript: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Enhance transcript with better formatting, conversation parsing, and translation support.
+    """
+    full_transcript = transcript.get("full_transcript", "")
+    
+    # Initialize result
+    enhanced = {
+        "formatted_transcript": full_transcript,
+        "conversation_log": [],
+        "agent_responses": [],
+        "user_responses": [],
+        "survey_answers": [],
+        "language_detected": "en",
+        "translation_available": False
+    }
+    
+    # Parse conversation log if present
+    lines = full_transcript.split('\n')
+    conversation_lines = []
+    survey_answers = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Check if it's a conversation entry with timestamp
+        if '[' in line and '] ' in line and ('AGENT:' in line or 'CALLER:' in line):
+            try:
+                timestamp_end = line.find('] ')
+                timestamp = line[:timestamp_end + 1]
+                role_part = line[timestamp_end + 1:]
+                
+                if 'AGENT:' in role_part:
+                    role = 'agent'
+                    text = role_part.replace('AGENT: ', '').strip()
+                elif 'CALLER:' in role_part:
+                    role = 'user'
+                    text = role_part.replace('CALLER: ', '').strip()
+                else:
+                    continue
+                
+                conversation_entry = {
+                    "timestamp": timestamp,
+                    "role": role,
+                    "text": text
+                }
+                conversation_lines.append(conversation_entry)
+                enhanced["conversation_log"].append(conversation_entry)
+                
+                if role == 'agent':
+                    enhanced["agent_responses"].append(text)
+                else:
+                    enhanced["user_responses"].append(text)
+                    
+            except Exception:
+                pass
+        
+        # Check if it's a survey answer
+        elif line.startswith('Q[') and ']: ' in line:
+            try:
+                qid_end = line.find(']: ')
+                qid = line[2:qid_end]
+                answer = line[qid_end + 3:]
+                
+                survey_answer = {
+                    "question_id": qid,
+                    "answer": answer
+                }
+                survey_answers.append(survey_answer)
+                enhanced["survey_answers"].append(survey_answer)
+                
+            except Exception:
+                pass
+    
+    # Detect language (simple heuristic)
+    spanish_keywords = ['hola', 'gracias', 'por favor', 'buenos', 'días', 'noches', 'cómo', 'está', 'estás']
+    text_sample = ' '.join(enhanced["user_responses"][:5]).lower()
+    if any(keyword in text_sample for keyword in spanish_keywords):
+        enhanced["language_detected"] = "es"
+        enhanced["translation_available"] = True
+    
+    # Rebuild formatted transcript with better structure
+    if conversation_lines:
+        formatted_lines = []
+        formatted_lines.append("=== CALL TRANSCRIPT ===")
+        formatted_lines.append(f"Survey ID: {transcript.get('survey_id')}")
+        formatted_lines.append(f"Duration: {transcript.get('call_duration_seconds', 0)} seconds")
+        formatted_lines.append(f"Language: {enhanced['language_detected']}")
+        formatted_lines.append("")
+        
+        for entry in conversation_lines:
+            formatted_lines.append(f"{entry['timestamp']} {entry['role'].upper()}: {entry['text']}")
+        
+        if survey_answers:
+            formatted_lines.append("")
+            formatted_lines.append("=== SURVEY ANSWERS ===")
+            for answer in survey_answers:
+                formatted_lines.append(f"Q[{answer['question_id']}]: {answer['answer']}")
+        
+        enhanced["formatted_transcript"] = '\n'.join(formatted_lines)
+    
+    return enhanced
+
+
 def get_transcript(survey_id: str) -> Optional[Dict[str, Any]]:
     transcripts = sql_execute(
         """SELECT * FROM call_transcripts

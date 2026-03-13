@@ -329,16 +329,125 @@ async def make_call(
         raise HTTPException(status_code=500, detail=f"LiveKit call failed: {str(e)}")
 
 
-@router.get("/transcript/{survey_id}")
-async def get_survey_transcript(survey_id: str):
-    """Get the stored transcript for a survey."""
+@router.get("/transcript/{survey_id}/translate")
+async def translate_transcript(survey_id: str, target_language: str = "en"):
+    """Translate transcript to target language (currently supports Spanish to English)."""
     transcript = get_transcript(survey_id)
     if not transcript:
         raise HTTPException(
             status_code=404,
-            detail=f"No transcript found for survey {survey_id}",
+            detail=f"No transcript found for survey {survey_id}"
         )
-    return transcript
+    
+    enhanced = enhance_transcript(transcript)
+    
+    # Only support Spanish to English for now
+    if enhanced["language_detected"] != "es" or target_language != "en":
+        return {
+            "translated": False,
+            "message": "Translation only supported from Spanish to English",
+            "original_transcript": enhanced["formatted_transcript"]
+        }
+    
+    try:
+        # Simple translation for common Spanish phrases
+        translations = {
+            "hola": "hello",
+            "gracias": "thank you", 
+            "por favor": "please",
+            "buenos días": "good morning",
+            "buenas tardes": "good afternoon",
+            "buenas noches": "good night",
+            "cómo está": "how are you",
+            "está bien": "it's good",
+            "muy bien": "very good",
+            "sí": "yes",
+            "no": "no",
+            "adiós": "goodbye",
+            "hasta luego": "see you later"
+        }
+        
+        original_text = enhanced["formatted_transcript"]
+        translated_text = original_text.lower()
+        
+        for spanish, english in translations.items():
+            translated_text = translated_text.replace(spanish, english)
+        
+        return {
+            "translated": True,
+            "original_language": "es",
+            "target_language": target_language,
+            "original_transcript": enhanced["formatted_transcript"],
+            "translated_transcript": translated_text,
+            "conversation_log": enhanced["conversation_log"],
+            "agent_responses": enhanced["agent_responses"],
+            "user_responses": enhanced["user_responses"],
+            "survey_answers": enhanced["survey_answers"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Translation failed: {e}")
+        return {
+            "translated": False,
+            "message": "Translation failed",
+            "original_transcript": enhanced["formatted_transcript"]
+        }
+
+
+@router.get("/transcripts")
+async def list_all_transcripts(limit: int = 50, offset: int = 0):
+    """List all available transcripts with pagination."""
+    try:
+        transcripts = sql_execute(
+            """SELECT survey_id, call_status, call_duration_seconds, call_started_at, channel
+               FROM call_transcripts 
+               ORDER BY call_started_at DESC 
+               LIMIT :limit OFFSET :offset""",
+            {"limit": limit, "offset": offset}
+        )
+        
+        return {
+            "transcripts": transcripts,
+            "total_count": len(transcripts),
+            "limit": limit,
+            "offset": offset
+        }
+    except Exception as e:
+        logger.error(f"Failed to list transcripts: {e}")
+        raise HTTPException(status_code=500, detail="Failed to list transcripts")
+
+
+@router.get("/transcript/{survey_id}")
+async def get_survey_transcript(survey_id: str):
+    """Get the stored transcript for a survey with enhanced formatting."""
+    transcript = get_transcript(survey_id)
+    if not transcript:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No transcript found for survey {survey_id}"
+        )
+    
+    # Enhanced transcript processing
+    enhanced_transcript = enhance_transcript(transcript)
+    
+    return {
+        "transcript_id": transcript["id"],
+        "survey_id": transcript["survey_id"],
+        "full_transcript": enhanced_transcript["formatted_transcript"],
+        "conversation_log": enhanced_transcript.get("conversation_log", []),
+        "agent_responses": enhanced_transcript.get("agent_responses", []),
+        "user_responses": enhanced_transcript.get("user_responses", []),
+        "survey_answers": enhanced_transcript.get("survey_answers", []),
+        "call_duration_seconds": transcript["call_duration_seconds"],
+        "call_started_at": transcript["call_started_at"],
+        "call_ended_at": transcript["call_ended_at"],
+        "call_status": transcript["call_status"],
+        "call_attempts": transcript["call_attempts"],
+        "channel": transcript["channel"],
+        "audio_url": transcript.get("audio_url"),
+        "language_detected": enhanced_transcript.get("language_detected", "en"),
+        "translation_available": enhanced_transcript.get("translation_available", False)
+    }
 
 
 @router.post("/store-transcript")
