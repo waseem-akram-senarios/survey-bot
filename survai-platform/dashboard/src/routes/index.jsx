@@ -14,6 +14,7 @@ import DraftTemplates from '../pages/main/Templates/DraftTemplates';
 import ManageSurveys from '../pages/main/Surveys/ManageSurveys';
 import CompletedSurveys from '../pages/main/Surveys/CompletedSurveys';
 import CreateSurvey from '../pages/main/Surveys/CreateSurveyModern';
+import SurveyBuilder from '../pages/main/Surveys/SurveyBuilder/SurveyBuilder';
 import GeneratedSurveyView from '../pages/main/Surveys/GeneratedSurveyView';
 import SurveyProgressPage from '../pages/main/Surveys/SurveyProgressPage';
 import SurveyQuestionAnalytics from '../pages/main/Templates/TemplateAnalytics';
@@ -66,6 +67,10 @@ const routes = [
         {
           path: '/surveys/launch',
           element: <CreateSurvey />
+        },
+        {
+          path: '/surveys/builder',
+          element: <SurveyBuilder />
         },
         {
           path: '/surveys/generated',

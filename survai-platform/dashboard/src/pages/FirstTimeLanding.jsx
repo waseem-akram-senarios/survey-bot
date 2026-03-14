@@ -65,7 +65,7 @@ const FirstTimeLanding = () => {
   ];
 
   const quickActions = [
-    { icon: Plus, label: 'Create Survey', color: '#1958F7', route: '/surveys/launch' },
+    { icon: Plus, label: 'Create Survey', color: '#1958F7', route: '/surveys/builder' },
     { icon: PhoneCall, label: 'Make Call', color: '#10B981', route: '/surveys/call' },
     { icon: BarChart3, label: 'View Analytics', color: '#F59E0B', route: '/analytics' },
     { icon: Users, label: 'Manage Users', color: '#8B5CF6', route: '/users' },
