@@ -108,7 +108,7 @@ const Dashboard = () => {
           <Button
             variant="contained"
             startIcon={<Plus size={18} />}
-            onClick={() => navigate('/surveys/launch')}
+            onClick={() => navigate('/surveys/builder')}
             sx={{
               py: 1.5,
               px: 3,
@@ -198,7 +198,7 @@ const Dashboard = () => {
                   <Button
                     variant="contained"
                     startIcon={<Plus size={18} />}
-                    onClick={() => navigate('/surveys/launch')}
+                    onClick={() => navigate('/surveys/builder')}
                     sx={{
                       width: '100%',
                       py: 2,
@@ -392,7 +392,7 @@ const Dashboard = () => {
             <Button
               variant="contained"
               startIcon={<Plus size={20} />}
-              onClick={() => navigate('/surveys/launch')}
+              onClick={() => navigate('/surveys/builder')}
               sx={{
                 py: 2,
                 px: 4,

@@ -117,4 +117,16 @@ test.describe('Top bar navigation', () => {
     const bodyText = await page.textContent('body');
     expect(bodyText && bodyText.length > 10).toBeTruthy();
   });
+
+  test('Create Survey builder loads and shows Questions tab', async ({ page }) => {
+    await loginToDashboard(page);
+    await page.goto(`${BASE}/surveys/builder`);
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(1500);
+
+    await expect(page.getByRole('heading', { name: /Create Survey/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Add a question/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: /Save Survey/i })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('tab', { name: /Questions/i })).toBeVisible({ timeout: 5000 });
+  });
 });
