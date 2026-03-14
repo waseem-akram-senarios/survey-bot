@@ -29,6 +29,16 @@ const routes = [
       element: <Login />
     },
     {
+      path: '/surveys/builder',
+      element: (
+        <ProtectedRoute>
+          <MainLayout>
+            <SurveyBuilder />
+          </MainLayout>
+        </ProtectedRoute>
+      )
+    },
+    {
       path: '/',
       element: <Navigate to="/welcome" replace />
     },
