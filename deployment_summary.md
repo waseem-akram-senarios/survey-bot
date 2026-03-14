@@ -1,4 +1,16 @@
-# 🚀 Survey Bot Deployment Summary
+Q[0a4710ab-7bba-4fbe-9cf7-bfb062302dfa]: 3
+
+Q[3a548716-76cb-48c8-88a6-8a541ec8459c]: 3
+
+Q[29fa2e61-60ab-4b8a-a2cc-ed179c8f61a3]: 3
+
+Q[fc004f7e-31dc-4ac6-aa0d-3ef1c9ede923]: Extremely likely
+
+Q[030447e4-41ea-4350-aa77-ef628d0eb614]: All of them
+
+Q[6182b958-0652-49e7-a982-ee12699ee500]: Nothing, I don't want to change anything
+
+Q[fa135d51-6211-45f8-97dd-92d3c0e4d5da]: No, I don't want to share anything# 🚀 Survey Bot Deployment Summary
 
 ## 📅 Deployment Date: March 13, 2026
 
