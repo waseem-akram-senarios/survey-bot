@@ -4,8 +4,6 @@ import {
   Typography,
   TextField,
 } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 
 const DateQuestion = ({ question, preview = false, questionNumber, onUpdateQuestion }) => {
   if (preview) {
