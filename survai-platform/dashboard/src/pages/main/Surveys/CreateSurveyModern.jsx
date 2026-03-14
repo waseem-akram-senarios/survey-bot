@@ -29,7 +29,7 @@ import {
   Phone,
   Email,
   Description,
-  Template,
+  Article,
   Launch,
   Save,
   Send,
@@ -431,7 +431,7 @@ const CreateSurveyModern = () => {
           <Card sx={{ borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
             <CardContent sx={{ p: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                <Template sx={{ mr: 1, color: '#1958F7' }} />
+                <Article sx={{ mr: 1, color: '#1958F7' }} />
                 <Typography variant="h6" sx={{ fontWeight: 600, color: '#1F2937' }}>
                   Choose Template
                 </Typography>
