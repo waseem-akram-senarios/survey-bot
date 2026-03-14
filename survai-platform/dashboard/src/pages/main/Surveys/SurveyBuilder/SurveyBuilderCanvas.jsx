@@ -15,7 +15,7 @@ import {
   DragIndicator,
   Delete,
   Edit,
-  Copy,
+  ContentCopy,
   Visibility,
   VisibilityOff,
   ArrowUpward,
@@ -369,7 +369,7 @@ const SurveyBuilderCanvas = ({
                             }}
                             sx={{ mr: 0.5 }}
                           >
-                            <Copy />
+                            <ContentCopy />
                           </IconButton>
                         </Tooltip>
                         
