@@ -46,7 +46,7 @@ const routes = [
         },
         {
           path: 'dashboard',
-          element: <Dashboard />
+          element: <CreateSurveyBuilder />
         },
         {
           path: 'templates/manage',

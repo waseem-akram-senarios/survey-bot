@@ -6,7 +6,7 @@ Run UI and API tests against the SurvAI platform.
 
 ```bash
 npm install
-npx playwright install chromium   # first time only
+npx playwright install chromium   # first time only (or: npm run install:browsers)
 npm test
 ```
 
