@@ -23,8 +23,6 @@ import logo from '../assets/logo.png';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/templates/manage', label: 'Templates', icon: FileText },
-  { path: '/surveys/manage', label: 'Surveys', icon: ClipboardList },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/contacts', label: 'Contacts', icon: Users },
 ];

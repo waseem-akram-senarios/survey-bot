@@ -155,22 +155,9 @@ const Analytics = () => {
         </Alert>
       )}
 
-      {/* Header with ITCURVES logo style */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h6" sx={{ color: '#6366f1', fontWeight: 700, letterSpacing: '0.5px' }}>
-          ITCURVES
-        </Typography>
-        <Typography variant="body2" sx={{ color: '#6b7280', mb: 2 }}>
-          INTELLIGENT TRANSPORTATION SOFTWARE
-        </Typography>
-      </Box>
-
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 6 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button sx={{ minWidth: 0, p: 1, color: '#6b7280' }}>
-            <ChevronLeft size={24} />
-          </Button>
           <Box>
             <Typography variant="h3" sx={{ fontWeight: 800, color: '#111827', mb: 1, fontSize: { xs: '2rem', md: '2.5rem' } }}>
               Analytics
@@ -191,10 +178,10 @@ const Analytics = () => {
               <MenuItem value="all">All Surveys</MenuItem>
             </Select>
           </FormControl>
-          <Button variant="outlined" startIcon={<Download size={18} />} sx={{ color: '#4b5563', borderColor: '#e5e7eb', bgcolor: '#fff' }}>
+          <Button variant="outlined" startIcon={<Download size={18} />} sx={{ color: '#4b5563', borderColor: '#e5e7eb', bgcolor: '#fff', textTransform: 'none' }}>
             Export CSV
           </Button>
-          <Button variant="outlined" startIcon={<Download size={18} />} sx={{ color: '#4b5563', borderColor: '#e5e7eb', bgcolor: '#fff' }}>
+          <Button variant="outlined" startIcon={<Download size={18} />} sx={{ color: '#4b5563', borderColor: '#e5e7eb', bgcolor: '#fff', textTransform: 'none' }}>
             Export PDF
           </Button>
         </Box>
@@ -206,7 +193,7 @@ const Analytics = () => {
           <StatCard title="TOTAL RESPONSES" value={totalResponses} icon={Users} color="#6366f1" />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatCard title="COMPLETED" value={totalResponses} icon={CheckCircle} color="#10b981" />
+          <StatCard title="COMPLETED" value={completedSurveys} icon={CheckCircle} color="#10b981" />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard title="AVG. DURATION" value={avgDurationMin} icon={Clock} color="#8b5cf6" />
@@ -218,13 +205,13 @@ const Analytics = () => {
 
       {/* Tabs */}
       <Box sx={{ display: 'flex', gap: 4, borderBottom: '1px solid #e5e7eb', mb: 4 }}>
-        {['Overview'].map((tab, i) => (
+        {['Overview', 'Question Analysis', 'Flagged', 'AI Insights'].map((tab, i) => (
           <Typography
             key={tab}
             sx={{
               pb: 2,
               color: i === 0 ? '#111827' : '#6b7280',
-              fontWeight: 600,
+              fontWeight: i === 0 ? 600 : 500,
               cursor: 'pointer',
               borderBottom: i === 0 ? '2px solid #6366f1' : 'none',
               fontSize: '15px'
