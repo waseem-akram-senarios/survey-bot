@@ -115,7 +115,7 @@ const SurveyInProgress = () => {
   const handleSendEmailConfirm = async (email, language) => {
     try {
       const emailLang = language || "en";
-      const result = await sendSurveyByEmail(
+      await sendSurveyByEmail(
         selectedSurvey.SurveyId, 
         email, 
         emailLang
@@ -133,7 +133,7 @@ const SurveyInProgress = () => {
 
   const handleSendPhoneConfirm = async (phone, provider = "livekit", language = "en") => {
     try {
-      const result = await sendSurveyBySMS(
+      await sendSurveyBySMS(
         selectedSurvey.SurveyId, 
         phone, 
         provider,

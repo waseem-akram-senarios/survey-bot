@@ -6,7 +6,7 @@ const ChildQuestionSection = ({
   onSelectedOptionChange,
   childQuestions
 }) => {
-  const getChildQuestionsSummary = () => {
+  const _getChildQuestionsSummary = () => {
     const filledOptions = parentOptions.filter(opt => opt.trim() !== '');
     return filledOptions.map(option => {
       const count = childQuestions[option]?.length || 0;

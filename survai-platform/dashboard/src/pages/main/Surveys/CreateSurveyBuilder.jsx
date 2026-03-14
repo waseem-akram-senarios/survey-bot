@@ -28,7 +28,6 @@ import {
   createRatingQuestion,
   createOpenQuestion,
   createFlowQuestion,
-  generateUUID,
 } from '../../../utils/Templates/templateHelpers';
 
 const QUESTION_TYPE_BUTTONS = [

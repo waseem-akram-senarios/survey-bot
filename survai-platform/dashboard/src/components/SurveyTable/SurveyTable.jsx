@@ -30,6 +30,7 @@ import SendSurveyDialog from "../Survey/components/SendSurveyDialog";
 
 const DashboardTable = ({
   tableData = [],
+  loading: tableLoading = false,
   onRowClick,
   onDataChange,
   onEditSurvey,

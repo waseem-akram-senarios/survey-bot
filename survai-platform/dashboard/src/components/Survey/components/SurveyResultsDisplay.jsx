@@ -4,7 +4,7 @@ import QuestionRenderer from "../../QuestionRenderer";
 import { exportSurveyResponses } from "../../../utils/exportHelper";
 import { useAuth } from "../../../context/AuthContext";
 
-const SurveyResultsDisplay = ({ questions, rawApiQuestions = [], allowFlowInteraction = true, surveyId, onExportSuccess, onExportError }) => {
+const SurveyResultsDisplay = ({ questions, rawApiQuestions: _rawApiQuestions = [], allowFlowInteraction = true, surveyId, onExportSuccess, onExportError }) => {
   const isMobile = useMediaQuery("(max-width: 600px)");
   const { user } = useAuth();
   const tenantId = user?.tenantId ?? null;

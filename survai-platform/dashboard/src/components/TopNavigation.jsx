@@ -18,7 +18,7 @@ import {
   User,
   LogOut,
   HelpCircle,
-  Menu
+  Menu as MenuIcon
 } from 'lucide-react';
 
 const TopNavigation = ({ onSidebarToggle, sidebarOpen }) => {
@@ -69,7 +69,7 @@ const TopNavigation = ({ onSidebarToggle, sidebarOpen }) => {
             }
           }}
         >
-          <Menu size={24} />
+          <MenuIcon size={24} />
         </IconButton>
 
         {/* Search Bar */}

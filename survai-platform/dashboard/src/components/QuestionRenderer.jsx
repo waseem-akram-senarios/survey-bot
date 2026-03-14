@@ -22,7 +22,7 @@ const QuestionRenderer = ({
   onAutofillToggle,
   hideDelete = false,
   hideEdit = false,
-  readOnly = false,
+  readOnly: _readOnly = false,
   showAutofillToggle = false,
   hideChildQuestions = false,
 }) => {

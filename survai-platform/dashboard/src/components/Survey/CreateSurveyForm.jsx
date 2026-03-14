@@ -27,7 +27,7 @@ const CreateSurveyForm = () => {
   const { user } = useAuth();
 
   // Survey and template hooks
-  const { generateSurvey, launchSurvey, sendSurveyByEmail, isGenerating, isLaunching, generateSurveyId, validateSurveyForm } = useSurvey();
+  const { generateSurvey, launchSurvey, sendSurveyByEmail, isGenerating, isLaunching: _isLaunching, generateSurveyId, validateSurveyForm } = useSurvey();
   const { availableTemplates, isLoadingTemplates, fetchTemplates } = useTemplates();
 
   // Form state

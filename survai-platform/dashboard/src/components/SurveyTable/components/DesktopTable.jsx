@@ -20,7 +20,6 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import { truncateText, formatDate } from '../../../utils/Surveys/surveyTableHelpers';
-import { getSurveyLink } from '../../../utils/Surveys/surveyHelpers';
 import SendSurveyButton from '../../../assets/SendSurvey.svg';
 
 const DesktopTable = ({ 

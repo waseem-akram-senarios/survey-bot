@@ -12,7 +12,7 @@ const TemplateTable = ({ tableData: initialTableData, refreshTable, setNavigatio
   } = useTemplateTableOperations();
 
   const navigate = useNavigate();
-  const [isNavigating, setIsNavigating] = useState(false);
+  const [_isNavigating, setIsNavigating] = useState(false);
 
   const columns = [
     { id: "id", label: "ID", sortable: true },

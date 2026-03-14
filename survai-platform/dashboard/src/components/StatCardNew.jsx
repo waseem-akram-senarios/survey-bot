@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, Typography, Box, Avatar } from '@mui/material';
 
-const StatCardNew = ({ title, value, subValue, icon: Icon, color, trend, gradient }) => {
+const StatCardNew = ({ title, value, subValue, icon: _Icon, color, trend, gradient }) => {
   // Default gradients for each color
   const defaultGradients = {
     '#f59e0b': 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',

@@ -48,7 +48,7 @@ const SendSurveyDialog = ({
 
   const validateEmail = (value) => {
     if (!value.trim()) return "Email is required";
-    const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(value)) return "Please enter a valid email (e.g. name@example.com)";
     return "";
   };
@@ -148,7 +148,7 @@ const SendSurveyDialog = ({
         }
       }
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+    } catch {
       window.prompt("Copy this link:", surveyLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

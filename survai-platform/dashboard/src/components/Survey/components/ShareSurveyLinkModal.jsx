@@ -42,7 +42,7 @@ const ShareSurveyLinkModal = ({ open, onClose, surveyLink = "https://survey.ai/s
         }
       }
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+    } catch {
       window.prompt("Copy this link:", surveyLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
