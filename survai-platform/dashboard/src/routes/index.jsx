@@ -4,6 +4,7 @@ import MainLayout from '../layout/MainLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
 import Login from '../pages/Login';
 import NotFound from '../pages/NotFound';
+import FirstTimeLanding from '../pages/FirstTimeLanding';
 
 // Import survey-related components
 import Dashboard from '../pages/main/Surveys/Dashboard';
@@ -28,7 +29,7 @@ const routes = [
     },
     {
       path: '/',
-      element: <Navigate to="/dashboard" replace />
+      element: <Navigate to="/welcome" replace />
     },
     {
       path: '/',
@@ -38,6 +39,10 @@ const routes = [
         </ProtectedRoute>
       ),
       children: [
+        {
+          path: 'welcome',
+          element: <FirstTimeLanding />
+        },
         {
           path: 'dashboard',
           element: <Dashboard />
