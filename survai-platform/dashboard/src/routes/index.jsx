@@ -1,4 +1,4 @@
-import { useRoutes, Navigate } from 'react-router-dom';
+import { useRoutes, Navigate, useLocation } from 'react-router-dom';
 
 import MainLayout from '../layout/MainLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -25,7 +25,7 @@ import SurveyQuestionAnalytics from '../pages/main/Templates/TemplateAnalytics';
 import ImportData from '../pages/main/Surveys/ImportData';
 import EditSurvey from '../pages/main/Surveys/EditSurvey';
 import Analytics from '../pages/main/Analytics/Analytics';
-import Contacts from '../pages/main/Contacts/Contacts';
+import RouteDebug from '../pages/main/Surveys/RouteDebug';
 
 const routes = [
     {
@@ -110,7 +110,11 @@ const routes = [
         },
         {
           path: 'contacts',
-          element: <Contacts />
+          element: <RouteDebug />
+        },
+        {
+          path: '*',
+          element: <RouteDebug />
         }
       ]
     },
