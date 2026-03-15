@@ -32,6 +32,10 @@ When the dashboard is served from the **same host** as the gateway (e.g. at `htt
 - Open the dashboard, go to **Surveys** → **Survey library** (or **Templates**). If the list loads, the API is reachable.
 - Create a survey from **+ Create Survey** → add questions → **Save Survey**. If you see “Survey saved successfully” and redirect to the library, the full create flow (template + questions + link) is working.
 
+### Test backend-only (no frontend)
+
+Run: `cd survai-platform && python3 scripts/test_backend_create_survey.py http://54.86.65.150:8080` (or `http://localhost:8080`). If all three steps return OK, you can create a survey from the backend; the frontend at `/surveys/builder` uses the same API.
+
 ---
 
 ## Test: Can you launch a survey from the new UI?

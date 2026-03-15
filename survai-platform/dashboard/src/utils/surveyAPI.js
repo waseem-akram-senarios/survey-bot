@@ -1,10 +1,11 @@
 // Survey API Utilities
 // Working survey creation and management functions
 // Uses same API base as rest of app (proxy in dev, or VITE_SERVER_URL in prod)
-import ApiLinks from '../network/apiLinks';
+import ApiLinks, { RECIPIENT_BASE } from '../network/apiLinks';
 
 const getApiBase = () => ApiLinks.API_BASE_URL || '';
 const API_BASE_URL = getApiBase() ? `${getApiBase().replace(/\/$/, '')}/api` : '/api';
+const getSurveyBaseUrl = () => RECIPIENT_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080');
 
 export const surveyAPI = {
   // Get all surveys
@@ -56,7 +57,7 @@ export const surveyAPI = {
         RiderName: surveyData.riderName || 'Default Rider',
         RideId: surveyData.rideId || `RIDE_${Date.now()}`,
         TenantId: surveyData.tenantId || 'itcurves',
-        URL: surveyData.url || 'http://localhost:8080',
+        URL: surveyData.url || getSurveyBaseUrl(),
         Biodata: surveyData.biodata || 'Survey created via dashboard',
         Phone: surveyData.phone || '+15551234567',
         Bilingual: surveyData.bilingual !== undefined ? surveyData.bilingual : true

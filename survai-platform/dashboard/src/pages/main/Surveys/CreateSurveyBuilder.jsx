@@ -208,8 +208,8 @@ export default function CreateSurveyBuilder() {
         </Tabs>
       </Box>
 
-      {/* Content */}
-      <Box sx={{ maxWidth: 900, mx: 'auto', px: { xs: 2, md: 3 }, pt: 3 }}>
+      {/* Content - ensure inputs are interactive (no pointer-events block) */}
+      <Box className="survey-builder-content" sx={{ maxWidth: 900, mx: 'auto', px: { xs: 2, md: 3 }, pt: 3, position: 'relative', zIndex: 0 }}>
         {activeTab === 'questions' && (
           <Stack spacing={3}>
             <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
@@ -224,6 +224,9 @@ export default function CreateSurveyBuilder() {
                   value={surveyTitle}
                   onChange={(e) => setSurveyTitle(e.target.value)}
                   size="small"
+                  autoComplete="off"
+                  inputProps={{ 'aria-label': 'Survey title' }}
+                  InputProps={{ style: { pointerEvents: 'auto' }, readOnly: false }}
                 />
                 <TextField
                   fullWidth
@@ -232,6 +235,9 @@ export default function CreateSurveyBuilder() {
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                   size="small"
+                  autoComplete="off"
+                  inputProps={{ 'aria-label': 'Client or Agency name' }}
+                  InputProps={{ style: { pointerEvents: 'auto' }, readOnly: false }}
                 />
                 <TextField
                   fullWidth
@@ -242,6 +248,9 @@ export default function CreateSurveyBuilder() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   size="small"
+                  autoComplete="off"
+                  inputProps={{ 'aria-label': 'Description' }}
+                  InputProps={{ style: { pointerEvents: 'auto' }, readOnly: false }}
                 />
               </Stack>
             </Paper>

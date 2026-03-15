@@ -191,3 +191,15 @@ button:focus-visible {
   transform: scale(1.05);
   transition: transform 0.2s ease;
 }
+
+/* Survey builder: ensure form inputs are always typeable (fixes overlay/theme issues) */
+.survey-builder-content input,
+.survey-builder-content textarea {
+  pointer-events: auto !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+.survey-builder-content .MuiInputBase-input {
+  pointer-events: auto !important;
+  user-select: text !important;
+}
