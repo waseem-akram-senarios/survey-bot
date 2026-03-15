@@ -57,55 +57,55 @@ const routes = [
           element: <CreateTemplate />
         },
         {
-          path: '/templates/edit',
+          path: 'templates/edit',
           element: <CreateTemplate />
         },
         {
-          path: '/templates/drafts',
+          path: 'templates/drafts',
           element: <DraftTemplates />
         },
         {
-          path: '/surveys/launch',
+          path: 'surveys/launch',
           element: <CreateSurvey />
         },
         {
-          path: '/surveys/builder',
+          path: 'surveys/builder',
           element: <SurveyBuilderDebug />
         },
         {
-          path: '/surveys/generated',
+          path: 'surveys/generated',
           element: <GeneratedSurveyView />
         },
         {
-          path: '/surveys/manage',
+          path: 'surveys/manage',
           element: <ManageSurveys />
         },
         {
-          path: '/surveys/status/:surveyId',
+          path: 'surveys/status/:surveyId',
           element: <SurveyProgressPage />
         },
         {
-          path: '/surveys/completed',
+          path: 'surveys/completed',
           element: <CompletedSurveys />
         },
         {
-          path: '/templates/create/analytics',
+          path: 'templates/create/analytics',
           element: <SurveyQuestionAnalytics />
         },
         {
-          path: '/surveys/import',
+          path: 'surveys/import',
           element: <ImportData />
         },
         {
-          path: '/surveys/edit/:surveyId',
+          path: 'surveys/edit/:surveyId',
           element: <EditSurvey />
         },
         {
-          path: '/analytics',
+          path: 'analytics',
           element: <Analytics />
         },
         {
-          path: '/contacts',
+          path: 'contacts',
           element: <Contacts />
         }
       ]
