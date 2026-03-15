@@ -71,3 +71,10 @@ body {
   min-height: 100vh;
   background-color: #fff;
 }
+
+/* Survey builder: keep inputs and textareas always editable (fixes typing on server) */
+.survey-builder-content input,
+.survey-builder-content textarea {
+  pointer-events: auto !important;
+  user-select: text !important;
+}
