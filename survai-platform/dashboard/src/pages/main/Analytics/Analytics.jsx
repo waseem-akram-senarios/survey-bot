@@ -52,9 +52,9 @@ const Analytics = () => {
 
   // Channel data from API
   const channelData = {
-    phone: { count: summary?.channel_counts?.phone || 0, percentage: summary?.channel_counts?.phone ? ((summary.channel_counts.phone / (summary.total_surveys || 1)) * 100).toFixed(1) : 0 },
-    web: { count: summary?.channel_counts?.web || 0, percentage: summary?.channel_counts?.web ? ((summary.channel_counts.web / (summary.total_surveys || 1)) * 100).toFixed(1) : 0 },
-    qr: { count: summary?.channel_counts?.qr || 0, percentage: summary?.channel_counts?.qr ? ((summary.channel_counts.qr / (summary.total_surveys || 1)) * 100).toFixed(1) : 0 }
+    phone: { count: summary?.channel_counts?.phone || 0, percentage: summary?.channel_counts?.phone ? ((summary.channel_counts.phone / Math.max(summary.total_surveys || 1, summary.channel_counts.phone)) * 100).toFixed(1) : 0 },
+    web: { count: summary?.channel_counts?.web || 0, percentage: summary?.channel_counts?.web ? ((summary.channel_counts.web / Math.max(summary.total_surveys || 1, summary.channel_counts.web)) * 100).toFixed(1) : 0 },
+    qr: { count: summary?.channel_counts?.qr || 0, percentage: summary?.channel_counts?.qr ? ((summary.channel_counts.qr / Math.max(summary.total_surveys || 1, summary.channel_counts.qr)) * 100).toFixed(1) : 0 }
   };
 
   // Real dropout points from API

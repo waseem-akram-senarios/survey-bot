@@ -156,7 +156,7 @@ class AnalyticsService {
         const summary = await this.getSummary();
         const surveyStats = await this.getSurveyStats(tenantId);
         const allSurveys = await this.getAllSurveys(tenantId);
-        const dashboardData = await this.getDashboardData(tenantId);
+        const dashboardData = await this.getDashboardData(tenantId).catch(() => null);
 
         // Return essential data first
         const result = {
