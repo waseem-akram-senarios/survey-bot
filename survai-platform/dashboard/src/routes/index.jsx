@@ -69,7 +69,7 @@ const routes = [
           element: <CreateSurvey />
         },
         {
-          path: 'surveys/builder',
+          path: '/surveys/builder',
           element: <SurveyBuilderDebug />
         },
         {
