@@ -15,6 +15,10 @@ import ManageSurveys from '../pages/main/Surveys/ManageSurveys';
 import CompletedSurveys from '../pages/main/Surveys/CompletedSurveys';
 import CreateSurvey from '../pages/main/Surveys/CreateSurveyModern';
 import SurveyBuilderAdvanced from '../pages/main/Surveys/SurveyBuilder/SurveyBuilderAdvanced';
+
+// Debug: Check if components are loaded
+console.log('CreateSurveyModern component:', CreateSurvey);
+console.log('SurveyBuilderAdvanced component:', SurveyBuilderAdvanced);
 import GeneratedSurveyView from '../pages/main/Surveys/GeneratedSurveyView';
 import SurveyProgressPage from '../pages/main/Surveys/SurveyProgressPage';
 import SurveyQuestionAnalytics from '../pages/main/Templates/TemplateAnalytics';

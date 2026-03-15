@@ -51,6 +51,7 @@ import ApiBaseHelper from '../../../../network/apiBaseHelper';
 import ApiLinks, { RECIPIENT_BASE } from '../../../../network/apiLinks';
 import { useTemplateAPI } from '../../../../hooks/Templates/useTemplates';
 import { useSurvey } from '../../../../hooks/Surveys/useSurvey';
+import { generateUUID } from '../../../../utils/Templates/templateHelpers';
 
 const QUESTION_TYPES = [
   { 
@@ -268,7 +269,7 @@ const SurveyBuilderAdvanced = () => {
           
           return {
             id: q.id,
-            queId: null,
+            queId: generateUUID(),
             isSaved: false,
             question: q.text || `Question ${i + 1}`,
             type: type,
