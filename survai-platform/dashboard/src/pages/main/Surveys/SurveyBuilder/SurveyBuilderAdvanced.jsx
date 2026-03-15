@@ -49,6 +49,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../../context/AuthContext';
 import ApiBaseHelper from '../../../../network/apiBaseHelper';
 import ApiLinks, { RECIPIENT_BASE } from '../../../../network/apiLinks';
+import { useTemplateAPI } from '../../../../hooks/Templates/useTemplates';
+import { useSurvey } from '../../../../hooks/Surveys/useSurvey';
 
 const QUESTION_TYPES = [
   { 
@@ -108,6 +110,8 @@ const QUESTION_TYPES = [
 const SurveyBuilderAdvanced = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { createTemplate, saveMultipleQuestions, updateTemplateStatus } = useTemplateAPI();
+  const { generateSurvey, launchSurvey } = useSurvey();
   
   // Survey state
   const [surveyTitle, setSurveyTitle] = useState('Untitled Survey');
@@ -245,24 +249,57 @@ const SurveyBuilderAdvanced = () => {
     
     setSaving(true);
     try {
+      // 1. Create Template
+      const templateRes = await createTemplate(surveyTitle);
+      
+      // 2. Save Questions to Template
+      if (questions.length > 0) {
+        const formattedQuestions = questions.map((q, i) => {
+          let type = 'category';
+          if (q.type === 'open_ended' || q.type === 'date_time' || q.type === 'route_stop') type = 'open';
+          if (q.type === 'rating_scale' || q.type === 'nps') type = 'rating';
+          
+          let options = q.options || [];
+          if (q.type === 'yes_no') options = ['Yes', 'No'];
+          
+          let maxRange = null;
+          if (q.type === 'rating_scale') maxRange = 5;
+          if (q.type === 'nps') maxRange = 10;
+          
+          return {
+            id: q.id,
+            queId: null,
+            isSaved: false,
+            question: q.text || `Question ${i + 1}`,
+            type: type,
+            options: options,
+            maxRange: maxRange,
+            autofill: 'No'
+          };
+        });
+        
+        await saveMultipleQuestions(surveyTitle, formattedQuestions);
+      }
+
+      // 3. Generate Survey from Template
       const surveyId = crypto.randomUUID();
       const surveyData = {
-        SurveyId: surveyId,
-        Name: surveyTitle,
-        Description: surveyDescription,
-        Status: 'Draft',
-        Questions: questions.map((q, i) => ({
-          questionText: q.text || `Question ${i + 1}`,
-          questionType: q.type,
-          options: q.options,
-          required: q.required,
-          order: i + 1,
-        })),
-        TenantId: user?.tenantId || '',
-        URL: `${RECIPIENT_BASE}/survey/${surveyId}`
+        surveyId: surveyId,
+        template: surveyTitle,
+        recipient: 'General',
+        biodata: surveyDescription,
+        tenantId: user?.tenantId || '',
+        phone: '',
+        riderName: '',
+        rideId: '',
       };
+      
+      const generatedSurvey = await generateSurvey(surveyData);
 
-      await ApiBaseHelper.post(ApiLinks.SURVEY_CREATE, surveyData);
+      // 4. Update Status & Launch if not Draft
+      // Since advanced builder hardcodes Status: 'Draft' initially in original code
+      await updateTemplateStatus(surveyTitle, 'Draft');
+
       showNotification('Survey saved successfully!');
       
       setTimeout(() => {
@@ -270,7 +307,7 @@ const SurveyBuilderAdvanced = () => {
       }, 1500);
     } catch (err) {
       console.error('Error saving survey:', err);
-      showNotification('Failed to save survey. Please try again.', 'error');
+      showNotification(err.message || 'Failed to save survey. Please try again.', 'error');
     } finally {
       setSaving(false);
     }
