@@ -27,6 +27,7 @@ from livekit.agents import (
     RoomInputOptions,
 )
 from livekit.agents.voice import AgentSession
+from livekit.agents.voice.events import CloseEvent
 from livekit.plugins import deepgram, openai, silero, elevenlabs, noise_cancellation
 
 from config.settings import (
@@ -526,15 +527,9 @@ async def entrypoint(ctx: JobContext):
 
     asyncio.create_task(_time_limit_watchdog())
 
-    try:
-        await session.start(
-            room=ctx.room,
-            agent=call_data.agents["greeter"],
-            room_input_options=RoomInputOptions(
-                noise_cancellation=noise_cancellation.BVCTelephony(),
-            ),
-        )
-    finally:
+    async def _on_session_close_async():
+        """Cleanup when the AgentSession actually closes (participant disconnects, etc.)."""
+        _cancel_inactivity()
         audio_url = await stop_call_recording(recording_handle, ctx.api)
 
         if survey_id and not survey_responses.get("_finalized"):
@@ -595,6 +590,19 @@ async def entrypoint(ctx: JobContext):
             except Exception as e:
                 logger.warning(f"Failed to save responses on exit: {e}")
         await release_call_lock()
+
+    @session.on("close")
+    def _on_session_close(ev: CloseEvent):
+        logger.info(f"[SESSION] closed — reason: {ev.reason}")
+        asyncio.create_task(_on_session_close_async())
+
+    await session.start(
+        room=ctx.room,
+        agent=call_data.agents["greeter"],
+        room_input_options=RoomInputOptions(
+            noise_cancellation=noise_cancellation.BVCTelephony(),
+        ),
+    )
 
 
 if __name__ == "__main__":
