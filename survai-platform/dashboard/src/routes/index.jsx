@@ -30,16 +30,16 @@ const routes = [
     },
     {
       path: '/',
-      element: <Navigate to="/dashboard" replace />
-    },
-    {
-      path: '/',
       element: (
         <ProtectedRoute>
           <MainLayout />
         </ProtectedRoute>
       ),
       children: [
+        {
+          index: true,
+          element: <Navigate to="/dashboard" replace />
+        },
         {
           path: 'welcome',
           element: <FirstTimeLanding />
