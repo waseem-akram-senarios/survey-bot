@@ -1,7 +1,10 @@
 // Survey API Utilities
 // Working survey creation and management functions
+// Uses same API base as rest of app (proxy in dev, or VITE_SERVER_URL in prod)
+import ApiLinks from '../network/apiLinks';
 
-const API_BASE_URL = '/api';
+const getApiBase = () => ApiLinks.API_BASE_URL || '';
+const API_BASE_URL = getApiBase() ? `${getApiBase().replace(/\/$/, '')}/api` : '/api';
 
 export const surveyAPI = {
   // Get all surveys

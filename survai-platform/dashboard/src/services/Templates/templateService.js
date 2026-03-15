@@ -42,13 +42,22 @@ class TemplateService {
     } catch (error) {
       console.error("Error creating template:", error);
 
+      const detail = error.response?.data?.detail;
+      const msg = typeof detail === "string" ? detail : Array.isArray(detail) ? detail[0]?.msg || detail[0] : null;
+
       if (error.response?.status === 400) {
-        throw new Error(
-          "Template name already exists. Please choose a different name."
-        );
+        throw new Error(msg || "Template name already exists. Please choose a different name.");
       }
 
-      throw new Error("Failed to create template. Please try again.");
+      if (error.response?.status >= 500) {
+        throw new Error(msg || "Server error. Please try again.");
+      }
+
+      if (error.code === "ERR_NETWORK" || error.message?.includes("Network")) {
+        throw new Error("Cannot reach the server. Start the backend (e.g. gateway on port 8080) and try again.");
+      }
+
+      throw new Error(msg || error.message || "Failed to create template. Please try again.");
     }
   }
 
@@ -144,18 +153,27 @@ class TemplateService {
 
   static async addQuestionToTemplate(templateName, queId, order) {
     try {
+      const orderNum = typeof order === "number" ? order : parseInt(order, 10);
       const response = await ApiBaseHelper.post(
         ApiLinks.TEMPLATE_ADD_QUESTION,
         {
           TemplateName: templateName,
           QueId: queId,
-          Order: order.toString(),
+          Order: Number.isNaN(orderNum) ? 0 : orderNum,
         }
       );
       return response;
     } catch (error) {
       console.error("Error adding question to template:", error);
-      throw new Error("Failed to add question to template. Please try again.");
+      const detail = error.response?.data?.detail;
+      const msg = typeof detail === "string" ? detail : Array.isArray(detail) ? detail[0]?.msg : null;
+      if (error.response?.status === 404) {
+        throw new Error(msg || "Template or question not found. Save the survey again.");
+      }
+      if (error.code === "ERR_NETWORK" || error.message?.includes("Network")) {
+        throw new Error("Cannot reach the server. Start the backend (e.g. gateway on port 8080) and try again.");
+      }
+      throw new Error(msg || error.message || "Failed to add question to template. Please try again.");
     }
   }
 

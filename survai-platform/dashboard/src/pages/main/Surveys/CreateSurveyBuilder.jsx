@@ -93,8 +93,24 @@ export default function CreateSurveyBuilder() {
     setQuestions((prev) => [...prev, q]);
   };
 
+  const getErrorMessage = (err) => {
+    if (!err) return 'Failed to save survey.';
+    const msg = err.message || '';
+    if (msg.includes('already exists')) return msg;
+    if (msg.includes('Cannot reach the server')) return msg;
+    if (msg.includes('Network') || msg.includes('ECONNREFUSED') || err.code === 'ERR_NETWORK') {
+      return 'Cannot reach the server. Start the backend (e.g. gateway on port 8080) and try again.';
+    }
+    return msg || 'Failed to save survey.';
+  };
+
   const handleSaveSurvey = async () => {
-    const name = surveyTitle?.trim() || `Survey ${new Date().toISOString().slice(0, 10)}`;
+    if (typeof createTemplate !== 'function' || typeof saveMultipleQuestions !== 'function') {
+      setSnack({ open: true, message: 'Survey API not available. Please refresh the page.', severity: 'error' });
+      return;
+    }
+    const rawName = (surveyTitle ?? '').trim();
+    const name = rawName || `Survey ${new Date().toISOString().slice(0, 10)}`;
     setSaving(true);
     try {
       await createTemplate(name);
@@ -102,11 +118,11 @@ export default function CreateSurveyBuilder() {
         await saveMultipleQuestions(name, questions);
       }
       setSnack({ open: true, message: 'Survey saved successfully.', severity: 'success' });
-      setTimeout(() => navigate('/surveys?tab=library'), 1500);
+      setTimeout(() => navigate('/templates/manage'), 1500);
     } catch (err) {
       setSnack({
         open: true,
-        message: err?.message || 'Failed to save survey.',
+        message: getErrorMessage(err),
         severity: 'error',
       });
     } finally {
@@ -155,11 +171,13 @@ export default function CreateSurveyBuilder() {
               Preview
             </Button>
             <Button
+              type="button"
               variant="contained"
               size="small"
               startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon fontSize="small" />}
               onClick={handleSaveSurvey}
               disabled={saving}
+              data-testid="save-survey-btn"
               sx={{
                 textTransform: 'none',
                 borderRadius: 999,
@@ -250,6 +268,7 @@ export default function CreateSurveyBuilder() {
               <Stack direction="row" flexWrap="wrap" gap={1.5} useFlexGap>
                 {QUESTION_TYPE_BUTTONS.map((btn) => (
                   <Button
+                    type="button"
                     key={btn.label}
                     variant="contained"
                     size="small"

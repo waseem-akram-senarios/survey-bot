@@ -15,6 +15,7 @@ import {
   InputLabel,
 } from '@mui/material';
 import { ArrowBack, Save, Send } from '@mui/icons-material';
+import { RECIPIENT_BASE } from '../../../network/apiLinks';
 
 const CreateSurveyDirect = () => {
   const [templates, setTemplates] = useState([]);
@@ -34,7 +35,7 @@ const CreateSurveyDirect = () => {
 
   const fetchTemplates = async () => {
     try {
-      const response = await fetch('/pg/api/templates/list');
+      const response = await fetch('/api/templates/list');
       if (response.ok) {
         const data = await response.json();
         setTemplates(data);
@@ -64,17 +65,19 @@ const CreateSurveyDirect = () => {
     setIsProcessing(true);
     try {
       const surveyId = `survey_${Date.now()}`;
+      const surveyBaseUrl = RECIPIENT_BASE || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080');
       const surveyData = {
         SurveyId: surveyId,
         template_name: selectedTemplate,
         Recipient: recipientName.trim(),
-        RiderName: riderName.trim(),
-        RideId: rideId.trim(),
+        Name: `${recipientName.trim()}'s Survey` || `Survey ${surveyId}`,
+        RiderName: riderName.trim() || recipientName.trim(),
+        RideId: rideId.trim() || '',
         TenantId: 'demo_tenant',
-        Phone: phone.trim(),
-        URL: `http://54.86.65.150:8080/survey/${surveyId}`,
+        Phone: phone.trim() || '',
+        URL: `${surveyBaseUrl.replace(/\/$/, '')}/survey/${surveyId}`,
+        Biodata: '',
         Bilingual: languageMode === 'bilingual',
-        Name: `${recipientName}'s Survey`
       };
 
       const response = await fetch('/api/surveys/generate', {
@@ -98,8 +101,21 @@ const CreateSurveyDirect = () => {
         setRecipientEmail('');
         setLanguageMode('en');
       } else {
-        const errorData = await response.json();
-        showNotification(`Error creating survey: ${errorData.detail || 'Unknown error'}`, 'error');
+        let message = 'Unknown error';
+        try {
+          const errorData = await response.json();
+          const d = errorData.detail;
+          if (Array.isArray(d) && d.length > 0) {
+            const first = d[0];
+            const loc = first.loc?.slice(-1)?.[0] || first.ctx?.field;
+            message = loc ? `Missing or invalid: ${loc}` : (first.msg || String(d));
+          } else if (typeof d === 'string') {
+            message = d;
+          }
+        } catch (_) {
+          message = `Request failed (${response.status})`;
+        }
+        showNotification(`Error creating survey: ${message}`, 'error');
       }
     } catch (error) {
       console.error('Error creating survey:', error);

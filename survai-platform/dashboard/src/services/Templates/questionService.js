@@ -4,7 +4,6 @@ import ApiLinks from "../../network/apiLinks";
 class QuestionService {
   static async createQuestion(questionData) {
     try {
-      console.log("Creating question with data:", questionData);
       const response = await ApiBaseHelper.post(
         ApiLinks.QUESTION_CREATE,
         questionData
@@ -12,7 +11,15 @@ class QuestionService {
       return response;
     } catch (error) {
       console.error("Error creating question:", error);
-      throw new Error("Failed to create question. Please try again.");
+      const detail = error.response?.data?.detail;
+      const msg = typeof detail === "string" ? detail : Array.isArray(detail) ? detail[0]?.msg || detail[0] : null;
+      if (error.response?.status === 400) {
+        throw new Error(msg || "Question already exists or invalid data.");
+      }
+      if (error.code === "ERR_NETWORK" || error.message?.includes("Network")) {
+        throw new Error("Cannot reach the server. Start the backend (e.g. gateway on port 8080) and try again.");
+      }
+      throw new Error(msg || error.message || "Failed to create question. Please try again.");
     }
   }
 

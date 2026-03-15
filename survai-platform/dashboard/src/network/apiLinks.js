@@ -3,8 +3,19 @@ const API_BASE = import.meta.env.VITE_SERVER_URL ?? '';
 // Base URL for survey links (empty = same origin, e.g. /survey/id)
 export const RECIPIENT_BASE = import.meta.env.VITE_RECIPIENT_URL ?? '';
 
+// When running on server (e.g. http://54.86.65.150:8080), use current origin so API and survey links work
+function getEffectiveApiBase() {
+  if (typeof window === 'undefined') return API_BASE;
+  const origin = window.location.origin;
+  if (!API_BASE) return origin;
+  if (API_BASE.includes('localhost') && !origin.includes('localhost')) return origin;
+  return API_BASE;
+}
+
 class ApiLinks {
-    static API_BASE_URL = API_BASE;
+    static get API_BASE_URL() {
+      return getEffectiveApiBase();
+    }
 
     //Templates
     static TEMPLATE_STATS = `/api/templates/stat`;

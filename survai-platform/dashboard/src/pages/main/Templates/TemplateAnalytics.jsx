@@ -26,6 +26,7 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import QuestionRenderer from "../../../components/QuestionRenderer";
 import Header from "../../../components/Header";
+import ApiLinks from "../../../network/apiLinks";
 
 const PIE_COLORS = [
   "#1958F7",
@@ -36,7 +37,7 @@ const PIE_COLORS = [
   "#FF6B6B",
 ];
 
-const API_BASE_URL = import.meta.env.VITE_SERVER_URL;
+const API_BASE = ApiLinks.API_BASE_URL || "";
 
 export default function SurveyQuestionAnalytics() {
   const location = useLocation();
@@ -109,7 +110,7 @@ export default function SurveyQuestionAnalytics() {
         setLoading(true);
         const analyticsPromises = flattenedQuestions.map((question) =>
           fetch(
-            `${API_BASE_URL}api/questions/${question.queId}/answers`
+            `${API_BASE}/api/questions/${question.queId}/answers`
           )
             .then((res) => {
               if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);

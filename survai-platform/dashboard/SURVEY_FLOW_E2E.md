@@ -1,5 +1,39 @@
 # Survey flow: creation to sending (E2E)
 
+## Frontend–backend integration
+
+The dashboard talks to the API at `/api/*`. For this to work end-to-end:
+
+### Local development (recommended)
+
+1. **Start the backend** so the gateway listens on **port 8080**:
+   - From repo root: `cd survai-platform && docker compose -f docker-compose.microservices.yml up --build`
+   - Or run the gateway + required services (template-service, question-service, survey-service, postgres) however you normally do.
+2. **Start the dashboard**: `cd survai-platform/dashboard && npm run dev` → http://localhost:5173
+3. The Vite dev server **proxies** all requests from `http://localhost:5173/api/*` to `http://localhost:8080/api/*`. The gateway then rewrites `/api/` to `/pg/api/` and routes to the right service.
+4. **Do not set** `VITE_SERVER_URL` in `.env` for this setup (leave it unset so the app uses relative `/api` and the proxy is used).
+
+### Server deployment (e.g. http://54.86.65.150:8080)
+
+When the dashboard is served from the **same host** as the gateway (e.g. at `http://54.86.65.150:8080`):
+
+1. **Build** without setting `VITE_SERVER_URL` (or set it to `http://54.86.65.150:8080`). The app uses the **current origin** at runtime, so opening `http://54.86.65.150:8080/surveys/builder` will send API requests to `http://54.86.65.150:8080/api/*` and survey links will use the same host.
+2. Ensure the **gateway and backend services** (template-service, question-service, survey-service, postgres) are running on that server so `/api/*` is handled.
+3. **Test create survey:** Open `http://54.86.65.150:8080/surveys/builder` → add title and questions → **Save Survey**. If you see “Survey saved successfully”, the flow works on the server.
+4. **Test launch survey:** Open `http://54.86.65.150:8080/surveys/launch` → select template, recipient, phone → **Create Survey**.
+
+### Production or API on another host
+
+- Set `VITE_SERVER_URL` to the gateway URL (e.g. `http://your-server:8080`) in `.env` and rebuild. All API calls (axios and fetch) will then use that base URL.
+- See `dashboard/.env.example` for the exact variable names.
+
+### Quick check that the backend is reachable
+
+- Open the dashboard, go to **Surveys** → **Survey library** (or **Templates**). If the list loads, the API is reachable.
+- Create a survey from **+ Create Survey** → add questions → **Save Survey**. If you see “Survey saved successfully” and redirect to the library, the full create flow (template + questions + link) is working.
+
+---
+
 ## Test: Can you launch a survey from the new UI?
 
 Yes. You can launch in two ways:

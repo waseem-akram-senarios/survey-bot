@@ -1,6 +1,6 @@
 import ApiLinks from '../network/apiLinks';
 
-const API_BASE = ApiLinks.API_BASE_URL;
+const API_BASE = ApiLinks.API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
 export async function downloadCSV(endpoint, filename, queryParams = {}) {
   try {
