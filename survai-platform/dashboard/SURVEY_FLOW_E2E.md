@@ -1,55 +1,62 @@
 # Survey flow: creation to sending (E2E)
 
-## Quick verification (run with backend on :8080 or dashboard dev on :5173)
+## Test: Can you launch a survey from the new UI?
 
-1. **Start app:** `cd survai-platform/dashboard && npm run dev` → http://localhost:5173/
-2. **Login:** e.g. `admin` / `admin123`
-3. **Dashboard:** You should see "Rider Voice", "+ Create Survey", "Launch survey", "Templates", "Surveys" in the top bar.
-4. **Create:** Click "+ Create Survey" → enter title, add a question (e.g. Open Ended) → "Save Survey" → redirects to Templates (needs API for save).
-5. **Launch:** Click "Launch survey" or go to Templates → Launch on a row → select template, Recipient name → "Create Survey" (needs API).
-6. **Send:** Go to Surveys → use Send on a survey row (needs API).
+Yes. You can launch in two ways:
 
-**E2E tests:** `cd e2e-tests && npx playwright install && BASE_URL=http://localhost:5173 npx playwright test --project=dashboard`
+### Option A – From Dashboard
+1. Open **Dashboard** (after login).
+2. Click the **Launch survey** button (outlined, next to Refresh).
+3. You should land on **Create Survey** at `/surveys/launch`.
+4. Select a **template** (dropdown), enter **Recipient name**, then click **Create Survey** (needs backend to complete).
+
+### Option B – From Survey library (unified Surveys page)
+1. Click **Surveys** in the top bar → opens the unified Surveys page with tabs **Launched** | **Survey library**.
+2. Click the **Survey library** tab.
+3. In the table, click the **Launch Survey** button on a row (survey definition).
+4. You should land on `/surveys/launch` with that template **pre-selected**.
+5. Enter **Recipient name** and click **Create Survey** (needs backend).
+
+Both paths use the same launch page; the only difference is that from the library, the template is already chosen.
+
+---
+
+## Quick verification (manual)
+
+1. **Start app:** `cd survai-platform/dashboard && npm run dev` → http://localhost:5173/ (or :5174 if 5173 is in use).
+2. **Login:** e.g. `admin` / `admin123`.
+3. **Dashboard:** You should see "Rider Voice", "+ Create Survey", "Launch survey", and in the top bar: **Surveys** (no separate Templates).
+4. **Launch from Dashboard:** Click **Launch survey** → you should see the launch page (template dropdown, Recipient name, Create Survey).
+5. **Launch from Survey library:** Click **Surveys** → **Survey library** tab → click **Launch Survey** on a row (if any) → same launch page, template pre-selected.
+6. **Create:** "+ Create Survey" → builder → add question → Save → redirects to **Surveys** (Survey library tab). Needs API for save.
+
+**E2E (Playwright):**  
+`cd e2e-tests && npx playwright install chromium && BASE_URL=http://localhost:5173 npx playwright test --project=dashboard`  
+Tests include: "Can launch a survey from new UI" and "Can launch from Survey library".
 
 ---
 
 ## 1. Create a survey (builder)
 
-- **Where:** Dashboard → **+ Create Survey** (or **Templates** → then create from builder).
+- **Where:** Dashboard → **+ Create Survey**.
 - **Route:** `/surveys/builder`
-- **Steps:**
-  1. Enter Survey title, Client/Agency name, Description (optional).
-  2. Click **Add a question** and add one or more question types (Multiple Choice, Open Ended, Yes/No, Rating, NPS, Route/Stop, Date/Time).
-  3. Click **Save Survey**.
-- **Result:** A template is created (name = survey title or "Survey YYYY-MM-DD") and you are redirected to **Templates** (`/templates/manage`).
+- **Steps:** Enter title, add questions, **Save Survey**.
+- **Result:** Redirects to **Surveys** (Survey library tab). Needs API.
 
-## 2. Launch a survey (create + send to recipient)
+## 2. Launch a survey
 
-- **Where:** **Templates** → click **Launch** on a template, or Dashboard → **Launch survey**.
+- **Where:** Dashboard → **Launch survey**, or **Surveys** → **Survey library** → **Launch Survey** on a row.
 - **Route:** `/surveys/launch`
-- **Steps:**
-  1. Select a **template** (pre-filled if you came from the Templates table).
-  2. Enter **Recipient name** (required); optionally Rider name, Ride ID, Phone, Biodata.
-  3. Choose **language** (e.g. English).
-  4. Click **Create Survey** (generate + launch).
-- **Result:** Survey is generated and launched; you are redirected to **Survey status** (`/surveys/status/{surveyId}`).
+- **Steps:** Select template (or use pre-selected), Recipient name, **Create Survey**.
+- **Result:** Survey created and launched; redirect to status page. Needs API.
 
-## 3. Send an existing survey (email / phone)
+## 3. Send existing survey (email/phone)
 
-- **Where:** **Surveys** (Manage Surveys) in the top nav.
-- **Route:** `/surveys/manage`
-- **Steps:**
-  1. Find the survey in the table.
-  2. Click the **Send** (email/phone) action for that row.
-  3. Enter email or phone and confirm.
-- **Result:** Survey is sent by email or a call is initiated to the given phone.
+- **Where:** **Surveys** → **Launched** tab → Send on a row.
+- **Result:** Send by email or start call. Needs API.
 
 ## Navigation (TopBar)
 
-- **Dashboard** – Home, stats, Create Survey, Launch survey, Manage Surveys.
-- **Templates** – Manage templates, Launch from table.
-- **Surveys** – Manage and send existing surveys.
-- **Analytics** – Analytics.
-- **Contacts** – Contacts.
-
-All of the above flows are wired end-to-end in the app.
+- **Dashboard** – Home, Create Survey, Launch survey.
+- **Surveys** – Launched + Survey library (tabs).
+- **Analytics**, **Contacts**.
