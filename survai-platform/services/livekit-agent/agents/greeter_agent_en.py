@@ -1,21 +1,15 @@
 """
-English Greeter Agent — first agent for English and bilingual calls.
+English Greeter Agent — handles identity and availability confirmation in English.
 
-Supports two modes:
-  - language_mode="bilingual": asks caller to choose English or Spanish, then verifies identity
-  - language_mode="en": English-only, skips language question, goes straight to identity
+Call flow:
+  1. on_enter(): speak English opening greeting with identity question
+  2. STEP 1 — Identity: confirm who they are
+  3. STEP 2 — Availability: ask if they have time
+  4. Hand off via to_questions() → loads EnglishQuestionsAgent
 
-Call flow (bilingual):
-  1. on_enter(): "Hi, I'm Cameron... To continue in English say English / Para continuar en español..."
-  2. Language preference → set_language() (provided as external tool, NOT on this class)
-  3. Identity → Availability → to_questions()
+No language-preference step — that's handled by LanguagePreferenceAgent.
 
-Call flow (English-only):
-  1. on_enter(): "Hi, I'm Cameron... Am I speaking with {name}?"
-  2. Identity → Availability → to_questions()
-
-IMPORTANT: set_language is NOT a class method here — it is created externally
-in survey_tools.py and only included in the bilingual greeter tool list.
+Tools (from survey_tools): to_questions, schedule_callback, send_survey_link, end_survey
 """
 
 import asyncio
@@ -52,13 +46,8 @@ def _is_real_name(name: str) -> bool:
 
 class EnglishGreeterAgent(Agent):
     """
-    Handles opening, identity confirmation, and availability check
-    for English-initiated calls. Hands off to the correct QuestionsAgent once the
-    recipient confirms they are available.
-
-    In bilingual mode, the external set_language tool (from survey_tools)
-    handles language detection. In English-only mode, no set_language tool
-    is provided.
+    Handles identity confirmation and availability check in English.
+    Hands off to EnglishQuestionsAgent once the recipient confirms availability.
     """
 
     def __init__(
@@ -67,46 +56,31 @@ class EnglishGreeterAgent(Agent):
         rider_first_name: str,
         organization_name: str = None,
         greetings: str = "",
-        language_mode: str = "bilingual",
         **kwargs,
     ):
         super().__init__(instructions=instructions, **kwargs)
         self.rider_first_name = rider_first_name
         self.organization_name = organization_name or ORGANIZATION_NAME
         self.greetings = greetings
-        self.language_mode = language_mode
 
     async def on_enter(self) -> None:
-        """Speak the opening line, inject it into chat context, then let the LLM continue."""
-        await asyncio.sleep(1.5)
+        """Go straight to identity confirmation (lang-agent already introduced)."""
+        await asyncio.sleep(0.5)
 
-        org = self.organization_name
         name = self.rider_first_name
 
         if self.greetings:
             greeting = self.greetings
-        elif self.language_mode == "en":
-            if _is_real_name(name):
-                greeting = (
-                    f"Hi, I'm Cameron from {org}. I'd like to conduct a brief survey with you. "
-                    f"Am I speaking with {name}?"
-                )
-            else:
-                greeting = (
-                    f"Hi, I'm Cameron from {org}. I'd like to conduct a brief survey with you. "
-                    "May I know who I'm speaking with?"
-                )
+        elif _is_real_name(name):
+            greeting = f"Great. Am I speaking with {name}?"
         else:
-            greeting = (
-                f"Hi, I'm Cameron from {org}. I'd like to conduct a brief survey with you. "
-                "To continue in English, say English. "
-                "Para continuar en español, di español."
-            )
+            greeting = "Great. May I know who I'm speaking with?"
 
-        logger.info(f"[GREETER] mode={self.language_mode} | greeting={greeting[:80]}...")
+        logger.info(f"[GREETER EN] {greeting[:80]}...")
 
+        await self.session.say(greeting).wait_for_playout()
+
+        # Inject AFTER playout so preemptive_generation doesn't race with TTS
         chat_ctx = self.chat_ctx.copy()
         chat_ctx.add_message(role="assistant", content=greeting)
         await self.update_chat_ctx(chat_ctx)
-
-        await self.session.say(greeting).wait_for_playout()

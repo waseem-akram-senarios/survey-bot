@@ -32,7 +32,6 @@ DEFAULT_RIDER = {
 # Speech-to-Text (Deepgram)
 STT_MODEL = os.getenv("STT_MODEL", "nova-3")
 STT_LANGUAGE = os.getenv("STT_LANGUAGE", "multi")
-STT_DETECT_LANGUAGE = os.getenv("STT_DETECT_LANGUAGE", "false").lower() == "true"
 STT_ENDPOINTING_MS = int(os.getenv("STT_ENDPOINTING_MS", "300"))
 
 # Large Language Model (OpenAI)
@@ -60,7 +59,7 @@ MAX_TOOL_STEPS = 15
 # activation_threshold: 0.3 — lower threshold captures quieter/softer short responses
 VAD_MIN_SILENCE_DURATION = float(os.getenv("VAD_MIN_SILENCE_DURATION", "0.35"))
 VAD_MIN_SPEECH_DURATION = float(os.getenv("VAD_MIN_SPEECH_DURATION", "0.08"))
-VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.3"))
+VAD_ACTIVATION_THRESHOLD = float(os.getenv("VAD_ACTIVATION_THRESHOLD", "0.45"))
 
 # ===========================================
 # FILE/DIRECTORY PATHS
@@ -90,7 +89,7 @@ WORKER_INITIALIZE_TIMEOUT = 600.0
 JOB_MEMORY_WARN_MB = 1200
 JOB_MEMORY_LIMIT_MB = 1500
 
-INACTIVITY_TIMEOUT = int(os.getenv("INACTIVITY_TIMEOUT", "6"))
+INACTIVITY_TIMEOUT = int(os.getenv("INACTIVITY_TIMEOUT", "15"))
 MAX_INACTIVITY_REPROMPTS = int(os.getenv("MAX_INACTIVITY_REPROMPTS", "2"))
 
 AGENT_NAME = os.getenv("AGENT_NAME", "survey-agent")

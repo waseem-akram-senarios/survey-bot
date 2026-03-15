@@ -26,12 +26,31 @@ SCHEDULER_SERVICE_URL = os.getenv("SCHEDULER_SERVICE_URL", "http://scheduler-ser
 
 
 async def _call_service(url: str, params: dict):
-    """POST to an internal service endpoint."""
+    """POST to an internal service endpoint (query-param style for short payloads)."""
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 url,
                 params=params,
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    logger.warning(f"{url} returned {resp.status}: {body}")
+                    return False
+                return True
+    except Exception as e:
+        logger.warning(f"Service call {url} failed: {e}")
+        return False
+
+
+async def _call_service_json(url: str, payload: dict):
+    """POST JSON body to an internal service endpoint (for large payloads like transcripts)."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url,
+                json=payload,
                 timeout=aiohttp.ClientTimeout(total=8),
             ) as resp:
                 if resp.status != 200:
@@ -59,7 +78,6 @@ def create_survey_tools(
     rider_email: Optional[str] = None,
     rider_name: Optional[str] = None,
     questions_metadata: List[dict] = None,
-    language_mode: str = "bilingual",
 ):
     total_questions = len(question_ids) if question_ids else 0
     qmap = questions_map or {}
@@ -221,12 +239,12 @@ def create_survey_tools(
                 full_transcript = "\n".join(transcript_lines)
 
             try:
-                await _call_service(
+                await _call_service_json(
                     f"{VOICE_SERVICE_URL}/api/voice/store-transcript",
                     {
                         "survey_id": survey_id,
                         "full_transcript": full_transcript,
-                        "call_duration_seconds": str(int(call_duration)),
+                        "call_duration_seconds": int(call_duration),
                         "call_status": reason,
                     },
                 )
@@ -310,6 +328,8 @@ def create_survey_tools(
         Args:
             reason: Why the call is ending — completed, wrong_person, declined, not_available, callback_scheduled, link_sent
         """
+        context.disallow_interruptions()
+
         if reason == "completed" and question_ids:
             done = set(survey_responses["answers"].keys())
             remaining = [q for q in question_ids if q not in done]
@@ -360,7 +380,7 @@ def create_survey_tools(
                 farewell = "Of course, no problem at all! Thanks for your time — have a great day! Goodbye!"
 
         logger.info(f"[FAREWELL] {farewell}")
-        speech_handle = context.session.say(farewell)
+        speech_handle = context.session.say(farewell, allow_interruptions=False)
         await speech_handle.wait_for_playout()
         logger.info("[FAREWELL] playout finished — person heard the full goodbye")
 
@@ -483,36 +503,36 @@ def create_survey_tools(
     @function_tool()
     async def set_language(context: RunContext, language: str):
         """
-        Record the recipient's language preference detected from their reply.
-        Call this as soon as the language is clear. This LOCKS the language for the entire call.
+        Record the recipient's language preference and immediately hand off to the greeter agent.
+        Call this as soon as the language is clear. This LOCKS the language and transitions automatically.
         language must be 'en' for English or 'es' for Spanish.
         """
-        context.userdata.detected_language = language
+        call_data = context.userdata
+        call_data.detected_language = language
+        call_data.prev_agent = context.session.current_agent
+
+        key = "greeter_es" if language == "es" else "greeter_en"
         logger.info(f"[LANGUAGE] Recipient selected: {language}")
+        logger.info(f"[HANDOFF] set_language → {key}")
+        return call_data.agents[key]
 
-        name = rider_name or ""
-        name_known = bool(name and len(name.strip()) >= 2 and name.strip().lower() not in {
-            "customer", "unknown", "user", "recipient", "test", "n/a", "na", "none", "name"
-        })
+    @function_tool()
+    async def to_greeter(context: RunContext):
+        """
+        Transition from language preference agent to the appropriate greeter agent.
+        The greeter agent will handle identity and availability confirmation.
+        """
+        call_data = context.userdata
+        call_data.prev_agent = context.session.current_agent
 
-        if language == "es":
-            next_q = (
-                f"¿Estoy hablando con {name}?"
-                if name_known
-                else "¿Con quién tengo el gusto de hablar?"
-            )
-            return f"Español confirmado. Pregunta: '{next_q}'"
+        lang = getattr(call_data, "detected_language", "en")
+        key = "greeter_es" if lang == "es" else "greeter_en"
+        logger.info(f"[HANDOFF] to_greeter → {key} (detected_language={lang})")
+        return call_data.agents[key]
 
-        next_q = (
-            f"Am I speaking with {name}?"
-            if name_known
-            else "May I know who I'm speaking with?"
-        )
-        return f"English confirmed. Ask: '{next_q}'"
-
-    greeter_tools = [end_survey, schedule_callback, send_survey_link, to_questions]
-    if language_mode == "bilingual":
-        greeter_tools.insert(0, set_language)
-
+    # Tool sets for different agent types
+    lang_agent_tools = [set_language, end_survey]
+    greeter_tools = [to_questions, schedule_callback, send_survey_link, end_survey]
     question_tools = [record_answer, end_survey]
-    return greeter_tools, question_tools
+    
+    return lang_agent_tools, greeter_tools, question_tools

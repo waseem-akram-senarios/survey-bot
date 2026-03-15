@@ -66,30 +66,23 @@ class SpanishGreeterAgent(Agent):
         # Ensure detected_language is pre-set for any tools/agents that read it
 
     async def on_enter(self) -> None:
-        """Speak the Spanish opening greeting and wait for playout before the LLM takes over."""
-        await asyncio.sleep(1.5)
+        """Go straight to identity confirmation (lang-agent already introduced)."""
+        await asyncio.sleep(0.5)
+
+        name = self.rider_first_name
 
         if self.greetings:
             greeting = self.greetings
+        elif _is_real_name(name):
+            greeting = f"Perfecto. ¿Estoy hablando con {name}?"
         else:
-            name = self.rider_first_name
-            org = self.organization_name
+            greeting = "Perfecto. ¿Con quién tengo el gusto de hablar?"
 
-            if _is_real_name(name):
-                greeting = (
-                    f"Hola, mi nombre es Cameron y estoy llamando de parte de {org}. "
-                    f"¿Estoy hablando con {name}?"
-                )
-            else:
-                greeting = (
-                    f"Hola, mi nombre es Cameron y estoy llamando de parte de {org}. "
-                    f"¿Con quién tengo el gusto de hablar?"
-                )
+        logger.info(f"[GREETER ES] mode=es | greeting={greeting[:80]}...")
 
-        logger.info(f"[GREETER] mode=es | greeting={greeting[:80]}...")
+        await self.session.say(greeting).wait_for_playout()
 
+        # Inject AFTER playout so preemptive_generation doesn't race with TTS
         chat_ctx = self.chat_ctx.copy()
         chat_ctx.add_message(role="assistant", content=greeting)
         await self.update_chat_ctx(chat_ctx)
-
-        await self.session.say(greeting).wait_for_playout()

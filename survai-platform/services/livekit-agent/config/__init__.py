@@ -5,7 +5,6 @@ from .settings import (
     DEFAULT_RIDER,
     STT_MODEL,
     STT_LANGUAGE,
-    STT_DETECT_LANGUAGE,
     STT_ENDPOINTING_MS,
     LLM_MODEL,
     LLM_TEMPERATURE,

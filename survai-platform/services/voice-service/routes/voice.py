@@ -14,6 +14,7 @@ import time
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from db import (
     get_survey_with_questions,
@@ -25,8 +26,9 @@ from db import (
     enhance_transcript,
     sql_execute,
     async_execute,
+    update_survey_status,
 )
-from prompt_builder import build_greeter_prompt, build_questions_prompt
+from prompt_builder import build_greeter_prompt, build_questions_prompt, build_lang_preference_prompt
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/voice", tags=["voice"])
@@ -194,7 +196,7 @@ async def make_call(
     phone: str,
     provider: str = "livekit",
     greetings: str = "",
-    language: str = "bilingual",
+    language: str = "en",
 ):
     """Initiate an AI-powered survey call via LiveKit SIP."""
     normalized_phone = phone.strip().replace(" ", "")
@@ -218,8 +220,8 @@ async def make_call(
     else:
         template_config = {}
 
-    if language not in ("en", "es", "bilingual"):
-        language = "bilingual"
+    if language not in ("en", "es"):
+        raise HTTPException(status_code=400, detail="language must be 'en' or 'es'")
 
     # Caller ID / display: must be "IT Curves" (with s), not "IT Curve"
     company_name = (template_config.get("company_name") or os.getenv("ORGANIZATION_NAME", "IT Curves") or "").strip()
@@ -259,42 +261,55 @@ async def make_call(
     }
 
     try:
-        # For prompt building: bilingual uses the bilingual greeter,
-        # en/es use their respective fixed-language prompts
-        prompt_language = language  # "en", "es", or "bilingual"
-        greeter_prompt = build_greeter_prompt(
+        # Build lang preference prompt (always first agent)
+        lang_preference_prompt = build_lang_preference_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
-            language=prompt_language,
+            initial_language=language,
         )
 
-        # For questions prompt: bilingual and en both default to English questions
-        questions_lang = "es" if language == "es" else "en"
-        questions_prompt, translated_questions_map = await build_questions_prompt(
+        # Build greeter prompts for both languages (agent will use the one caller selects)
+        greeter_prompt_en = build_greeter_prompt(
+            organization_name=company_name,
+            rider_first_name=rider_first_name,
+            language="en",
+        )
+        greeter_prompt_es = build_greeter_prompt(
+            organization_name=company_name,
+            rider_first_name=rider_first_name,
+            language="es",
+        )
+
+        # Build questions prompts for both languages
+        questions_prompt_en, translated_questions_map_en = await build_questions_prompt(
             organization_name=company_name,
             rider_first_name=rider_first_name,
             survey_name=template_name or f"Survey {survey_id}",
             questions=questions,
-            language=questions_lang,
+            language="en",
         )
-        survey_context["greeter_prompt"] = greeter_prompt
-        survey_context["questions_prompt"] = questions_prompt
-        survey_context["translated_questions"] = translated_questions_map
-        survey_context["system_prompt"] = greeter_prompt  # backward compat
-        # For bilingual calls, also build Spanish prompts so user can switch
-        if language == "bilingual":
-            questions_prompt_es, questions_es_map = await build_questions_prompt(
-                organization_name=company_name,
-                rider_first_name=rider_first_name,
-                survey_name=template_name or f"Survey {survey_id}",
-                questions=questions,
-                language="es",
-            )
-            survey_context["questions_prompt_es"] = questions_prompt_es
-            survey_context["questions_es_map"] = questions_es_map
+        questions_prompt_es, translated_questions_map_es = await build_questions_prompt(
+            organization_name=company_name,
+            rider_first_name=rider_first_name,
+            survey_name=template_name or f"Survey {survey_id}",
+            questions=questions,
+            language="es",
+        )
+
+        # Store all prompts in survey_context
+        survey_context["lang_preference_prompt"] = lang_preference_prompt
+        survey_context["greeter_prompt_en"] = greeter_prompt_en
+        survey_context["greeter_prompt_es"] = greeter_prompt_es
+        survey_context["questions_prompt_en"] = questions_prompt_en
+        survey_context["questions_prompt_es"] = questions_prompt_es
+        survey_context["translated_questions_en"] = {}
+        survey_context["translated_questions_es"] = translated_questions_map_es
+        survey_context["system_prompt"] = lang_preference_prompt  # backward compat
+        
         logger.info(
-            f"Built prompts for LiveKit call — greeter: {len(greeter_prompt)} chars, "
-            f"questions: {len(questions_prompt)} chars"
+            f"Built prompts for LiveKit call — lang_pref: {len(lang_preference_prompt)} chars, "
+            f"greeter_en: {len(greeter_prompt_en)} chars, greeter_es: {len(greeter_prompt_es)} chars, "
+            f"questions_en: {len(questions_prompt_en)} chars, questions_es: {len(questions_prompt_es)} chars"
         )
     except Exception as e:
         logger.warning(f"Local prompt build failed: {e}, agent will use defaults")
@@ -451,22 +466,24 @@ async def get_survey_transcript(survey_id: str):
     }
 
 
+class StoreTranscriptRequest(BaseModel):
+    survey_id: str
+    full_transcript: str
+    call_duration_seconds: int = 0
+    call_status: str = "completed"
+    audio_url: str = ""
+
+
 @router.post("/store-transcript")
-async def api_store_transcript(
-    survey_id: str,
-    full_transcript: str,
-    call_duration_seconds: int = 0,
-    call_status: str = "completed",
-    audio_url: str = "",
-):
+async def api_store_transcript(body: StoreTranscriptRequest):
     """Store a call transcript (and optional audio URL) after the voice call ends."""
     try:
         tid = store_transcript(
-            survey_id=survey_id,
-            full_transcript=full_transcript,
-            call_duration_seconds=call_duration_seconds,
-            call_status=call_status,
-            audio_url=audio_url or None,
+            survey_id=body.survey_id,
+            full_transcript=body.full_transcript,
+            call_duration_seconds=body.call_duration_seconds,
+            call_status=body.call_status,
+            audio_url=body.audio_url or None,
         )
         return {"status": "stored", "transcript_id": tid}
     except Exception as e:
@@ -483,9 +500,7 @@ async def send_email_fallback(
 ):
     """Send an email survey link as fallback when call fails or is declined."""
     from db import build_html_email, build_text_email
-    subject = "We'd love your feedback! / ¡Nos encantaría conocer su opinión!" if language == "bilingual" else (
-        "¡Su Encuesta Está Lista!" if language == "es" else "We'd love your feedback!"
-    )
+    subject = "¡Su Encuesta Está Lista!" if language == "es" else "We'd love your feedback!"
     survey_url = _with_language_query(survey_url, language)
     html_body = build_html_email(survey_url, language=language)
     text_body = build_text_email(survey_url, language=language)
@@ -679,7 +694,7 @@ async def api_release_call(survey_id: str | None = None, phone: str | None = Non
 # ─── Direct call endpoint (dashboard calls this via gateway, skipping survey-service hop)
 
 @router.post("/direct-call")
-async def direct_call(to: str, survey_id: str, provider: str = "livekit", greetings: str = "", language: str = "bilingual"):
+async def direct_call(to: str, survey_id: str, provider: str = "livekit", greetings: str = "", language: str = "en"):
     """Dashboard-compatible endpoint: accepts 'to' param instead of 'phone'."""
     return await make_call(survey_id=survey_id, phone=to, provider=provider, greetings=greetings, language=language)
 

@@ -1,15 +1,17 @@
 """
 Survey Voice Bot — Main Entry Point (Multi-Agent)
 
-Two agents handle each call. The pair depends on the call language:
-  language=="en" (default):
-    EnglishGreeterAgent — lang-pref detection + identity + availability (~300-token prompt)
-    EnglishQuestionsAgent or SpanishQuestionsAgent — chosen after lang-pref
-  language=="es":
-    SpanishGreeterAgent — identity + availability in Spanish (~300-token prompt)
-    SpanishQuestionsAgent — Spanish-only survey questions
+Three-agent pipeline for every call:
+  1. LanguagePreferenceAgent — asks caller which language they prefer (EN or ES)
+  2. EnglishGreeterAgent OR SpanishGreeterAgent — identity + availability confirmation
+  3. EnglishQuestionsAgent OR SpanishQuestionsAgent — conduct survey
 
-Prompts come from voice-service via dispatch metadata (greeter_prompt / questions_prompt).
+The initial `language` parameter ("en" or "es") determines which language the
+LanguagePreferenceAgent starts speaking. The caller then selects their preferred
+language, which determines which greeter and questions agents are used.
+
+Prompts come from voice-service via dispatch metadata (lang_preference_prompt,
+greeter_prompt_en/es, questions_prompt_en/es).
 """
 
 import asyncio
@@ -24,7 +26,7 @@ from livekit.agents import (
     WorkerOptions,
     cli,
     AutoSubscribe,
-    RoomInputOptions,
+    room_io,
 )
 from livekit.agents.voice import AgentSession
 from livekit.agents.voice.events import CloseEvent
@@ -35,7 +37,6 @@ from config.settings import (
     SIP_OUTBOUND_TRUNK_ID,
     STT_MODEL,
     STT_LANGUAGE,
-    STT_DETECT_LANGUAGE,
     STT_ENDPOINTING_MS,
     LLM_MODEL,
     LLM_TEMPERATURE,
@@ -60,8 +61,7 @@ from config.settings import (
 )
 from agents import (
     SurveyCallData,
-    GreeterAgent,
-    QuestionsAgent,
+    LanguagePreferenceAgent,
     EnglishGreeterAgent,
     SpanishGreeterAgent,
     EnglishQuestionsAgent,
@@ -175,15 +175,19 @@ async def entrypoint(ctx: JobContext):
 
     rider_first_name = platform_recipient.split()[0] if platform_recipient else ""
     org_name = platform_org or ORGANIZATION_NAME
-    call_language = metadata.get("language", "bilingual")
+    call_language = metadata.get("language", "en")  # only "en" or "es"
     greetings = metadata.get("greetings", "")
     logger.info(f"Call config: language={call_language}, recipient={rider_first_name}, org={org_name}")
 
     # Ensure detected_language is pre-set to the call language
     # (for Spanish calls it is always "es"; for English calls it may change after lang-pref)
 
-    greeter_prompt = metadata.get("greeter_prompt") or metadata.get("system_prompt") or MINIMAL_GREETER_PROMPT
-    questions_prompt = metadata.get("questions_prompt") or MINIMAL_QUESTIONS_PROMPT
+    # Load prompts for all agents (voice-service sends all variants)
+    lang_pref_prompt = metadata.get("lang_preference_prompt") or MINIMAL_GREETER_PROMPT
+    greeter_prompt_en = metadata.get("greeter_prompt_en") or metadata.get("greeter_prompt") or MINIMAL_GREETER_PROMPT
+    greeter_prompt_es = metadata.get("greeter_prompt_es") or MINIMAL_GREETER_PROMPT
+    questions_prompt_en = metadata.get("questions_prompt_en") or metadata.get("questions_prompt") or MINIMAL_QUESTIONS_PROMPT
+    questions_prompt_es = metadata.get("questions_prompt_es") or MINIMAL_QUESTIONS_PROMPT
 
     questions_list = metadata.get("questions", [])
     question_ids = [q.get("id", f"q{i+1}") for i, q in enumerate(questions_list) if isinstance(q, dict)]
@@ -193,21 +197,22 @@ async def entrypoint(ctx: JobContext):
             qid = q.get("id", f"q{i+1}")
             questions_map[qid] = q.get("text") or q.get("question_text") or f"Question {i+1}"
 
-    # For Spanish-initiated calls, overwrite with Spanish question texts
-    translated_map = metadata.get("translated_questions")
-    if isinstance(translated_map, dict) and translated_map:
-        logger.info(f"Applying {len(translated_map)} translated question texts")
-        questions_map.update(translated_map)
-    # For English-initiated calls, keep Spanish map separate (used when user selects Spanish)
-    questions_map_es = metadata.get("questions_es_map") or {}
-    if questions_map_es:
-        logger.info(f"Spanish question map available for lang switch: {len(questions_map_es)} questions")
+    # English question map (default, already populated from questions_list)
+    questions_map_en = questions_map.copy()
+
+    # Spanish question map
+    translated_map_es = metadata.get("translated_questions_es") or {}
+    questions_map_es = questions_map.copy()
+    if translated_map_es:
+        questions_map_es.update(translated_map_es)
+        logger.info(f"Loaded {len(translated_map_es)} Spanish question translations")
 
     logger.info(
         f"Recipient: '{rider_first_name}' | Org: '{org_name}' | Phone: {caller_number} | "
         f"Language: {call_language} | Questions: {len(question_ids)} | "
-        f"Greeter prompt: {len(greeter_prompt)} chars | "
-        f"Questions prompt: {len(questions_prompt)} chars | "
+        f"Lang-pref prompt: {len(lang_pref_prompt)} chars | "
+        f"Greeter EN/ES prompts: {len(greeter_prompt_en)}/{len(greeter_prompt_es)} chars | "
+        f"Questions EN/ES prompts: {len(questions_prompt_en)}/{len(questions_prompt_es)} chars | "
         f"Greetings override: {'yes' if greetings else 'no'}"
     )
 
@@ -244,8 +249,8 @@ async def entrypoint(ctx: JobContext):
         rider_name=rider_first_name,
     )
 
-    # Create tools — split into greeter and questions sets
-    greeter_tools, question_tools = create_survey_tools(
+    # Create tools — split into lang_agent, greeter, and questions sets
+    lang_agent_tools, greeter_tools, question_tools = create_survey_tools(
         survey_responses=survey_responses,
         caller_number=caller_number,
         call_start_time=call_start_time,
@@ -253,77 +258,61 @@ async def entrypoint(ctx: JobContext):
         cleanup_logging_fn=cleanup_survey_logging,
         disconnect_fn=hangup_call,
         question_ids=question_ids,
-        questions_map=questions_map,
+        questions_map=questions_map_en,
         questions_map_es=questions_map_es,
         survey_id=survey_id,
         survey_url=survey_url,
         rider_email=rider_email,
         rider_name=rider_first_name,
         questions_metadata=questions_list,
-        language_mode=call_language,
     )
 
-    # Build agents based on call language mode
-    if call_language == "es":
-        # Spanish-only pipeline: SpanishGreeterAgent → SpanishQuestionsAgent
-        call_data.detected_language = "es"
-        greeter_agent = SpanishGreeterAgent(
-            instructions=greeter_prompt,
-            rider_first_name=rider_first_name,
-            organization_name=org_name,
-            greetings=greetings,
-            tools=greeter_tools,
-        )
-        questions_agent = SpanishQuestionsAgent(
-            instructions=questions_prompt,
-            tools=question_tools,
-        )
-        call_data.agents["questions"] = questions_agent
-        call_data.agents["greeter"] = greeter_agent
-    elif call_language == "en":
-        # English-only pipeline: EnglishGreeterAgent (no lang question) → EnglishQuestionsAgent
-        call_data.detected_language = "en"
-        greeter_agent = EnglishGreeterAgent(
-            instructions=greeter_prompt,
-            rider_first_name=rider_first_name,
-            organization_name=org_name,
-            greetings=greetings,
-            language_mode="en",
-            tools=greeter_tools,
-        )
-        questions_agent = EnglishQuestionsAgent(
-            instructions=questions_prompt,
-            tools=question_tools,
-        )
-        call_data.agents["greeter"] = greeter_agent
-        call_data.agents["questions"] = questions_agent
-        call_data.agents["questions_en"] = questions_agent
-    else:
-        # Bilingual pipeline: EnglishGreeterAgent (asks lang pref) → EnglishQuestionsAgent or SpanishQuestionsAgent
-        greeter_agent = EnglishGreeterAgent(
-            instructions=greeter_prompt,
-            rider_first_name=rider_first_name,
-            organization_name=org_name,
-            greetings=greetings,
-            language_mode="bilingual",
-            tools=greeter_tools,
-        )
-        questions_agent_en = EnglishQuestionsAgent(
-            instructions=questions_prompt,
-            tools=question_tools,
-        )
-        questions_prompt_es = metadata.get("questions_prompt_es") or questions_prompt
-        questions_agent_es = SpanishQuestionsAgent(
-            instructions=questions_prompt_es,
-            tools=question_tools,
-        )
-        call_data.agents["greeter"] = greeter_agent
-        call_data.agents["questions_en"] = questions_agent_en
-        call_data.agents["questions_es"] = questions_agent_es
-        questions_agent = questions_agent_en
+    # ALWAYS start with language preference agent
+    # Initial language determines lang-agent's greeting language
+    call_data.detected_language = call_language  # "en" or "es" for initial greeting
 
-    stt_language = "es" if call_language == "es" else STT_LANGUAGE
-    stt_detect_language = STT_DETECT_LANGUAGE and call_language not in ("es", "en")
+    lang_agent = LanguagePreferenceAgent(
+        instructions=lang_pref_prompt,
+        organization_name=org_name,
+        rider_first_name=rider_first_name,
+        initial_language=call_language,
+        tools=lang_agent_tools,
+    )
+
+    # Create greeter agents for both languages (lang-agent transitions to one of these)
+    greeter_agent_en = EnglishGreeterAgent(
+        instructions=greeter_prompt_en,
+        rider_first_name=rider_first_name,
+        organization_name=org_name,
+        greetings=greetings,
+        tools=greeter_tools,
+    )
+    greeter_agent_es = SpanishGreeterAgent(
+        instructions=greeter_prompt_es,
+        rider_first_name=rider_first_name,
+        organization_name=org_name,
+        greetings=greetings,
+        tools=greeter_tools,
+    )
+
+    # Create questions agents for both languages (greeter transitions to one of these)
+    questions_agent_en = EnglishQuestionsAgent(
+        instructions=questions_prompt_en,
+        tools=question_tools,
+    )
+    questions_agent_es = SpanishQuestionsAgent(
+        instructions=questions_prompt_es,
+        tools=question_tools,
+    )
+
+    # Register all agents in call_data
+    call_data.agents["lang"] = lang_agent
+    call_data.agents["greeter_en"] = greeter_agent_en
+    call_data.agents["greeter_es"] = greeter_agent_es
+    call_data.agents["questions_en"] = questions_agent_en
+    call_data.agents["questions_es"] = questions_agent_es
+
+    logger.info(f"Agent pipeline: lang → greeter_{call_language} → questions (caller chooses final language)")
 
     tts_model = TTS_MODEL_ES if call_language == "es" else TTS_MODEL
     tts_voice = TTS_VOICE_ID_ES if call_language == "es" else TTS_VOICE_ID
@@ -331,22 +320,15 @@ async def entrypoint(ctx: JobContext):
     # Nova-3 uses keyterm prompting; Nova-2 and older use keywords
     stt_kw: dict = {
         "model": STT_MODEL,
-        "language": stt_language,
-        "detect_language": stt_detect_language,
+        "language": STT_LANGUAGE,
         "endpointing_ms": STT_ENDPOINTING_MS,
-    }
-    if (STT_MODEL or "").strip().lower().startswith("nova-3"):
-        stt_kw["keyterm"] = [
+        "keyterm": [
             "Yes", "No", "Yeah", "Yep", "Nope",
-            "Sí", "Bueno",
-        ]
-    else:
-        stt_kw["keywords"] = [
-            "Yes:2", "No:2", "Yeah:2", "Yep:2", "Nope:2",
-            "Sí:2", "No:2", "Bueno:1",
-        ]
+            "Sí", "No", "Bueno",
+        ],
+    }
 
-    llm_temperature = LLM_TEMPERATURE_ES if call_language in ("es", "bilingual") else LLM_TEMPERATURE
+    llm_temperature = LLM_TEMPERATURE_ES if call_language == "es" else LLM_TEMPERATURE
 
     session = AgentSession[SurveyCallData](
         userdata=call_data,
@@ -598,9 +580,11 @@ async def entrypoint(ctx: JobContext):
 
     await session.start(
         room=ctx.room,
-        agent=call_data.agents["greeter"],
-        room_input_options=RoomInputOptions(
-            noise_cancellation=noise_cancellation.BVCTelephony(),
+        agent=call_data.agents["lang"],
+        room_options=room_io.RoomOptions(
+            audio_input=room_io.AudioInputOptions(
+                noise_cancellation=noise_cancellation.BVCTelephony(),
+            ),
         ),
     )
 
