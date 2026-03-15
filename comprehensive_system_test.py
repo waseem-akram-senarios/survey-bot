@@ -85,7 +85,7 @@ class SystemTester:
             ("/api/surveys/stats", "Survey Statistics"),
             ("/api/surveys/dashboard", "Dashboard Data"),
             ("/api/surveys", "List Surveys"),
-            ("/api/templates", "List Templates"),
+            ("/pg/api/templates/list", "List Templates"),
             ("/api/templates/stat", "Template Statistics"),
             ("/api/analytics/summary", "Analytics Summary"),
         ]
@@ -120,14 +120,15 @@ class SystemTester:
         # Test survey creation endpoint
         try:
             survey_data = {
-                "template_name": "Customer Satisfaction",
+                "template_name": "MK Survey",
                 "Recipient": "Test User",
                 "Phone": "+1234567890",
                 "RiderName": "Test Rider",
                 "RideId": "TEST_123",
                 "TenantId": "test_tenant",
                 "URL": "http://test.com",
-                "Bilingual": True
+                "Bilingual": True,
+                "Name": "Test Survey Name"
             }
             
             start_time = time.time()
@@ -140,7 +141,7 @@ class SystemTester:
                 details = "Survey creation endpoint working"
             else:
                 passed = False
-                details = f"HTTP {response.status_code}"
+                details = f"HTTP {response.status_code} - {response.text[:50] if response.text else 'No text'}"
             
             self.log_test("Survey Creation API", passed, details, response_time)
             
@@ -349,14 +350,14 @@ class SystemTester:
         # Test template data access
         try:
             start_time = time.time()
-            response = requests.get(f"{BASE_URL}/api/templates", timeout=10)
+            response = requests.get(f"{BASE_URL}/pg/api/templates/list", timeout=10)
             response_time = time.time() - start_time
             
             if response.status_code == 200:
                 data = response.json()
                 has_data = bool(data) and len(str(data)) > 10
                 passed = has_data
-                details = f"Template data accessible"
+                details = f"Template data accessible: {len(data)} templates"
             else:
                 passed = False
                 details = f"HTTP {response.status_code}"
