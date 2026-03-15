@@ -17,12 +17,13 @@ import {
   Typography,
   Divider,
 } from '@mui/material';
-import { Menu as MenuIcon, User, LayoutDashboard, BarChart3, Users, FileText, ClipboardList, LogOut, Settings } from 'lucide-react';
+import { Menu as MenuIcon, User, LayoutDashboard, BarChart3, Users, ClipboardList, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/surveys', label: 'Surveys', icon: ClipboardList },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/contacts', label: 'Contacts', icon: Users },
 ];

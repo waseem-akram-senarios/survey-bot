@@ -22,7 +22,8 @@ import {
   Users,
   AlertCircle,
   BarChart3,
-  RefreshCw
+  RefreshCw,
+  Send
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import StatCard from '../../../components/StatCard';
@@ -104,6 +105,23 @@ const Dashboard = () => {
             }}
           >
             Refresh
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Send size={18} />}
+            onClick={() => navigate('/surveys/launch')}
+            sx={{
+              py: 1.5,
+              px: 2.5,
+              borderRadius: 'var(--radius-lg)',
+              borderColor: 'var(--color-gray-300)',
+              color: 'var(--color-gray-700)',
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': { borderColor: 'var(--color-primary-500)', color: 'var(--color-primary-600)', bgcolor: 'var(--color-primary-50)' }
+            }}
+          >
+            Launch survey
           </Button>
           <Button
             variant="contained"

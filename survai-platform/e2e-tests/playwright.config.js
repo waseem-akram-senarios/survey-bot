@@ -30,15 +30,11 @@ module.exports = defineConfig({
     },
     {
       name: 'dashboard',
-      testMatch: /.*dashboard\.spec\.js/,
-    },
-    {
-      name: 'templates',
-      testMatch: /.*templates\.spec\.js/,
+      testMatch: /.*(dashboard|survey-flow)\.spec\.js/,
     },
     {
       name: 'surveys',
-      testMatch: /.*surveys\.spec\.js/,
+      testMatch: /.*(surveys|templates)\.spec\.js/,
     },
     {
       name: 'recipient',

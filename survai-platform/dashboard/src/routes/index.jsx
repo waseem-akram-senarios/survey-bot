@@ -1,4 +1,4 @@
-import { useRoutes, Navigate, useLocation } from 'react-router-dom';
+import { useRoutes, Navigate } from 'react-router-dom';
 
 import MainLayout from '../layout/MainLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -15,17 +15,30 @@ import ManageSurveys from '../pages/main/Surveys/ManageSurveys';
 import CompletedSurveys from '../pages/main/Surveys/CompletedSurveys';
 import CreateSurvey from '../pages/main/Surveys/CreateSurveyModern';
 import SurveyBuilderAdvanced from '../pages/main/Surveys/SurveyBuilder/SurveyBuilderAdvanced';
-
-// Debug: Check if components are loaded
-console.log('CreateSurveyModern component:', CreateSurvey);
-console.log('SurveyBuilderAdvanced component:', SurveyBuilderAdvanced);
 import GeneratedSurveyView from '../pages/main/Surveys/GeneratedSurveyView';
 import SurveyProgressPage from '../pages/main/Surveys/SurveyProgressPage';
 import SurveyQuestionAnalytics from '../pages/main/Templates/TemplateAnalytics';
 import ImportData from '../pages/main/Surveys/ImportData';
 import EditSurvey from '../pages/main/Surveys/EditSurvey';
 import Analytics from '../pages/main/Analytics/Analytics';
-import RouteDebug from '../pages/main/Surveys/RouteDebug';
+import Contacts from '../pages/main/Contacts/Contacts';
+
+// Debug component to test routing
+const RouteDebug = () => {
+  const location = useLocation();
+  return (
+    <div style={{ padding: '20px', background: '#f5f5f5', minHeight: '100vh' }}>
+      <h1>🐛 Route Debug</h1>
+      <p>Current path: {location.pathname}</p>
+      <p>Search: {location.search}</p>
+      <p>Hash: {location.hash}</p>
+      <button onClick={() => window.location.href = '/dashboard'}>Go to Dashboard</button>
+      <button onClick={() => window.location.href = '/surveys/launch'}>Go to Create Survey</button>
+      <button onClick={() => window.location.href = '/surveys/builder'}>Go to Survey Builder</button>
+    </div>
+  );
+};
+import SurveysUnified from '../pages/main/Surveys/SurveysUnified';
 
 const routes = [
     {
@@ -110,11 +123,11 @@ const routes = [
         },
         {
           path: 'contacts',
-          element: <RouteDebug />
+          element: <Contacts />
         },
         {
           path: '*',
-          element: <RouteDebug />
+          element: <NotFound />
         }
       ]
     },

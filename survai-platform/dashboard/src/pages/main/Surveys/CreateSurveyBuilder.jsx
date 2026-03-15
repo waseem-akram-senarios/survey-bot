@@ -102,7 +102,7 @@ export default function CreateSurveyBuilder() {
         await saveMultipleQuestions(name, questions);
       }
       setSnack({ open: true, message: 'Survey saved successfully.', severity: 'success' });
-      setTimeout(() => navigate('/templates/manage'), 1500);
+      setTimeout(() => navigate('/surveys?tab=library'), 1500);
     } catch (err) {
       setSnack({
         open: true,

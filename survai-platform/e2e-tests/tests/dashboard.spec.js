@@ -24,11 +24,12 @@ test.describe('Dashboard Home', () => {
     expect(hasRiderVoice || hasLegacyCards || hasMetricCards || hasTableOrActions).toBeTruthy();
   });
 
-  test('dashboard has top bar navigation (Dashboard, Analytics, Contacts)', async ({ page }) => {
+  test('dashboard has top bar navigation (Dashboard, Surveys, Analytics, Contacts)', async ({ page }) => {
     await loginToDashboard(page);
 
     const bodyText = await page.textContent('body');
     expect(bodyText).toContain('Dashboard');
+    expect(bodyText).toContain('Surveys');
     expect(bodyText).toContain('Analytics');
     expect(bodyText).toContain('Contacts');
   });
@@ -92,12 +93,13 @@ test.describe('Dashboard Home', () => {
 });
 
 test.describe('Top bar navigation', () => {
-  test('can navigate to Templates Manage page via URL', async ({ page }) => {
+  test('can navigate to Surveys page via URL', async ({ page }) => {
     await loginToDashboard(page);
-    await page.goto(`${BASE}/templates/manage`);
+    await page.goto(`${BASE}/surveys`);
     await page.waitForLoadState('networkidle');
     const bodyText = await page.textContent('body');
     expect(bodyText && bodyText.length > 10).toBeTruthy();
+    expect(page.url()).toContain('/surveys');
   });
 
   test('can navigate to Contacts or Surveys Manage page', async ({ page }) => {
