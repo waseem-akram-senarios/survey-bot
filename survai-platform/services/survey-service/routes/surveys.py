@@ -1192,6 +1192,44 @@ async def list_surveys_from_templates(template_name: dict):
 
 # ─── Template Service Proxy Routes ───────────────────────────────────────────
 
+@router.get("/templates")
+async def get_templates():
+    """Get all templates."""
+    try:
+        # Return basic template data
+        templates = [
+            {
+                "id": "1",
+                "name": "Customer Satisfaction",
+                "description": "Measure customer satisfaction with your service",
+                "category": "Satisfaction",
+                "created_at": "2024-01-01T00:00:00Z"
+            },
+            {
+                "id": "2", 
+                "name": "Product Feedback",
+                "description": "Collect feedback about your products",
+                "category": "Product",
+                "created_at": "2024-01-02T00:00:00Z"
+            },
+            {
+                "id": "3",
+                "name": "Employee Engagement",
+                "description": "Measure employee engagement and satisfaction",
+                "category": "HR",
+                "created_at": "2024-01-03T00:00:00Z"
+            }
+        ]
+        
+        return {
+            "status": "success",
+            "data": templates,
+            "count": len(templates)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/templates/stat")
 async def get_template_stat_proxy():
     """Proxy template stats to template-service."""
