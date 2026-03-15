@@ -1,0 +1,27 @@
+{
+  "caller_number": "zero-knowledge-network",
+  "timestamp": "2026-03-15T21:04:17.371430",
+  "call_duration_seconds": 30.57,
+  "responses": {
+    "rider_name": "",
+    "rider_phone": "zero-knowledge-network",
+    "answers": {},
+    "end_reason": "declined",
+    "completed": false,
+    "survey_id": null,
+    "_conversation_log": [
+      {
+        "role": "agent",
+        "text": "Hi, thanks for taking a few minutes to chat with us. We're conducting a quick survey on AI adoption in public transportation agencies. This will only take about two minutes.",
+        "ts": "2026-03-15T21:03:58.120398"
+      },
+      {
+        "role": "agent",
+        "text": "No problem, I understand you're busy. When would be a good time for me to call you back?",
+        "ts": "2026-03-15T21:04:09.890591"
+      }
+    ],
+    "_finalized": true
+  },
+  "completed": false
+}

@@ -1,0 +1,44 @@
+{
+  "caller_number": "identity-w3D1",
+  "timestamp": "2026-03-15T21:14:04.087144",
+  "call_duration_seconds": 47.16,
+  "responses": {
+    "rider_name": "",
+    "rider_phone": "identity-w3D1",
+    "answers": {
+      "Q1": "Yes"
+    },
+    "end_reason": "completed",
+    "completed": true,
+    "survey_id": null,
+    "_conversation_log": [
+      {
+        "role": "agent",
+        "text": "Hi, thanks for taking a few minutes to chat with us. We're conducting a quick survey on AI adoption in public transportation agencies. This will only take about two minutes.",
+        "ts": "2026-03-15T21:13:28.143980"
+      },
+      {
+        "role": "agent",
+        "text": "Hello? Are you still there?",
+        "ts": "2026-03-15T21:13:35.937699"
+      },
+      {
+        "role": "agent",
+        "text": "That's all the questions we have — thank you so much for your time. If you'd like to be entered into our raffle for a chance to win the big prize, just give us your name and phone number and we'll get you entered.",
+        "ts": "2026-03-15T21:13:50.166073"
+      },
+      {
+        "role": "agent",
+        "text": "Hello? Are you still there?",
+        "ts": "2026-03-15T21:13:57.842047"
+      },
+      {
+        "role": "agent",
+        "text": "Great! May I have your name, please?",
+        "ts": "2026-03-15T21:14:02.642168"
+      }
+    ],
+    "_finalized": true
+  },
+  "completed": true
+}

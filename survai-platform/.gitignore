@@ -7,3 +7,6 @@ auth.env
 # Playwright e2e
 e2e-tests/playwright-report/
 e2e-tests/test-results/
+
+.venv
+*/.venv
