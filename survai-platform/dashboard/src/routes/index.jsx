@@ -13,7 +13,7 @@ import Templates from '../pages/main/Templates/Templates';
 import DraftTemplates from '../pages/main/Templates/DraftTemplates';
 import ManageSurveys from '../pages/main/Surveys/ManageSurveys';
 import CompletedSurveys from '../pages/main/Surveys/CompletedSurveys';
-import CreateSurveyDebug from '../pages/main/Surveys/CreateSurveyDebug';
+import CreateSurvey from '../pages/main/Surveys/CreateSurveyModern';
 import SurveyBuilderAdvanced from '../pages/main/Surveys/SurveyBuilder/SurveyBuilderAdvanced';
 import GeneratedSurveyView from '../pages/main/Surveys/GeneratedSurveyView';
 import SurveyProgressPage from '../pages/main/Surveys/SurveyProgressPage';
@@ -66,7 +66,7 @@ const routes = [
         },
         {
           path: 'surveys/launch',
-          element: <CreateSurveyDebug />
+          element: <CreateSurvey />
         },
         {
           path: 'surveys/builder',
